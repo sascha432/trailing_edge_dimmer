@@ -17,6 +17,7 @@ Firmware for a trailing edge MOSFET dimmer.
 * 50-110us pulse width to extend opto isolator live
 
 ![Zero crossing detection](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.png)
+
 [Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.svg)
 
 
@@ -28,4 +29,5 @@ Firmware for a trailing edge MOSFET dimmer.
 # Dev board schematics with ESP8266
 
 ![Dev board](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_4Ch-Dimmer-Rev1.3_dev_example.png)
+
 [Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_4Ch-Dimmer-Rev1.3_dev_example.svg)

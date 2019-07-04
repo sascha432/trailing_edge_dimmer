@@ -4,8 +4,8 @@
 - Added VCC to dimmer info and temperature report (INTERNAL_VREF_1_1V might need some adjustments to be precise)
 - Added CPU Frequency to dimmer info
 - Support for ATMEGA Mini Pro 3.3V @ 8MHz
-- Set default prescaler to 8 increasing dimming levels to 16667 for 16MHz and 8334 for 8MHz
-- Respond to invalid commands
+- Set default prescaler to 8 increasing dimming levels to 16666 for 16MHz and 8333 for 8MHz
+- Respond to invalid commands with error
 - Changed part of the fade response from "to=" to "lvl="
 
 ## 1.0.7
