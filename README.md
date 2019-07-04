@@ -13,7 +13,7 @@ Firmware for a trailing edge MOSFET dimmer.
 
 * Low current consumption (0.15mA @ 120V)
 * Tested with 85-265V 50/60Hz
-* Logic level output with different opto isolators (4N25, PC817, ACPL-217, H11L1)
+* Logic level output with different opto isolators (4N25, PC817, ACPL-217)
 * 50-110us pulse width to extend opto isolator live
 
 ![Zero crossing detection](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.png)
