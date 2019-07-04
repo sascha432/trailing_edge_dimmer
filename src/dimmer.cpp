@@ -209,7 +209,7 @@ uint16_t dimmer_get_level(uint8_t channel) {
 
 #if DIMMER_USE_FADING
 
-void dimmer_fade(uint8_t channel, int16_t to_level, float time_in_seconds, bool absolute_time = false) {
+void dimmer_fade(uint8_t channel, int16_t to_level, float time_in_seconds, bool absolute_time) {
     dimmer_set_fade(channel, DIMMER_FADE_FROM_CURRENT_LEVEL, to_level, time_in_seconds, absolute_time);
 }
 

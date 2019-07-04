@@ -56,9 +56,8 @@
 #define DIMMER_LINEAR_LEVEL(level)                           level
 #endif
 
-
 #ifndef DIMMER_PRESCALER
-    #define DIMMER_PRESCALER                                64
+    #define DIMMER_PRESCALER                                8
 #endif
 
 #if DIMMER_PRESCALER == 8
@@ -92,7 +91,7 @@
     #error TICKS are limited to 32767 per half wave, increase prescaler
 #endif
 
-#define DIMMER_VERSION                                      "1.0.7"
+#define DIMMER_VERSION                                      "1.0.8"
 #define DIMMER_INFO                                         "Author: sascha_lammers@gmx.de"
 
 #if DIMMER_USE_FADING

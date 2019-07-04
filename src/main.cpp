@@ -12,42 +12,8 @@
 
 Changelog
 
-1.0.7
-    - Support for internal temperature sensor of the ATMEGA
+    Moved to CHANGELOG.md
 
-1.0.6
-    - EEPROM wear leveling to increase writes ((EEPROM size - 8 byte) / size of configuration) = 50, which should be ~5 million writes
-
-1.0.5
-    - EEPROM write delay to reduce writes
-    - Added prefix "~$" for commands
-
-1.0.4
-    - Slim version with less than 7.5kb for ATMEGA88. No EEPROM support and different serial protocol
-
-1.0.3
-    - Serial command to change configuration
-    - Store configuration in EEPROM
-
-1.0.2
-    - NTC with configurable over temperature shutdown
-    - Store last levels in EEPROM and restore when power is turned on
-
-1.0.1
-    - Added support for multiple channels to the dimmer library
-    - Added debug code
-    - Increased dimming levels to 32767 (DIMMER_MAX_LEVEL)
-
-1.0.0
-    - Initial version
-
-TODO
-
-    - I2C slave
-
- */
-
-/*
 
 Serial protocol
 
@@ -74,7 +40,7 @@ Serial protocol
         from level = -1: use current level
         if no channel is specified, it is using the selected channel(s)
 
-        Response (one line per channel): fade,ch=<channel>,from=<old level>,to=<target level>,time=<time tom reach target in seconds>
+        Response (one line per channel): fade,ch=<channel>,from=<old level>,lvl=<target level>,time=<time tom reach target in seconds>
 
 
     Get level for all channels
@@ -170,6 +136,11 @@ Slim version only:
 #define USE_EEPROM                              1
 #endif
 
+#ifndef INTERNAL_VREF_1_1V
+#define INTERNAL_VREF_1_1V                      1.1
+#endif
+
+
 #ifndef USE_TEMPERATURE_CHECK
 #define USE_TEMPERATURE_CHECK                   1
 #endif
@@ -196,7 +167,9 @@ Slim version only:
 #include <EEPROM.h>
 #endif
 
+#ifndef DEFAULT_BAUD_RATE
 #define DEFAULT_BAUD_RATE                       115200
+#endif
 
 #define NTC_PIN                                 A1
 
@@ -346,7 +319,7 @@ double get_interal_temperature(void) {
   ADCSRA |= _BV(ADSC);  // Start the ADC
 
   // Detect end-of-conversion
-  while (bit_is_set(ADCSRA,ADSC));
+  while (bit_is_set(ADCSRA, ADSC)) ;
 
   // Reading register "ADCW" takes care of how to read ADCL and ADCH.
   wADC = ADCW;
@@ -356,6 +329,15 @@ double get_interal_temperature(void) {
 
   // The returned temperature is in degrees Celsius.
   return (t);
+}
+
+// read VCC in mV
+int16_t read_vcc() {
+  ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+  delay(20);
+  ADCSRA |= _BV(ADSC);
+  while (bit_is_set(ADCSRA, ADSC)) ;
+  return (uint32_t)(5000 * (INTERNAL_VREF_1_1V / 5) * 1024) / ADCW;
 }
 
 uint16_t read_ntc_value(uint8_t num = 5) {
@@ -370,10 +352,10 @@ uint16_t read_ntc_value(uint8_t num = 5) {
 float convert_to_celsius(uint16_t value) {
     float steinhart;
     steinhart = 1023 / (float)value - 1;
-    steinhart *= 2200;                        // serial resistance
-    steinhart /= 10000;                       // nominal resistance
+    steinhart *= 2200;                          // serial resistance
+    steinhart /= 10000;                         // nominal resistance
     steinhart = log(steinhart);
-    steinhart /= 3950;                        // beta coeff.
+    steinhart /= 3950;                          // beta coeff.
     steinhart += 1.0 / (25 + 273.15);           // nominal temperature
     steinhart = 1.0 / steinhart;
     steinhart -= 273.15;
@@ -412,7 +394,7 @@ void fade(int8_t channel, int16_t from, int16_t to, float time) {
         }
     } else {
         dimmer_set_fade(channel, from, to, time);
-        SerialEx.printf_P(PSTR("fade,ch=%d,from=%d,to=%d,time=%s\n"), channel, (from == -1 ? dimmer_get_level(channel) : from), to, float_to_str(time));
+        SerialEx.printf_P(PSTR("fade,ch=%d,from=%d,lvl=%d,time=%s\n"), channel, (from == -1 ? dimmer_get_level(channel) : from), to, float_to_str(time));
     }
 }
 
@@ -486,13 +468,17 @@ void loop() {
             SerialEx.printf_P(PSTR("Temperature reached %d C, emergency shutdown\n"), current_temp);
         }
         if (config.report_temp) {
-            SerialEx.printf_P(PSTR("temp=%d\n"), current_temp);
+            SerialEx.printf_P(PSTR("temp=%d,vcc=%d\n"), current_temp, read_vcc());
         }
     }
 #endif
 
     if (Serial.available()) {
         int ch = Serial.read();
+#if DEBUG
+        serial_buffer[serial_buffer_len] = 0;
+        SerialEx.printf_P(PSTR("serial in %d buffer '%s'\n"), ch, serial_buffer);
+#endif
         if (ch == '\n') {
             serial_buffer[serial_buffer_len] = 0;
 #if SLIM_VERSION
@@ -539,6 +525,9 @@ void loop() {
                     SerialEx.printf_P(PSTR("lvl=0-%d\n"), DIMMER_MAX_LEVEL);
                     SerialEx.printf_P(PSTR("ch=0-%d\n"), DIMMER_CHANNELS);
                     SerialEx.printf_P(PSTR("lcf=%s\n"), float_to_str(dimmer.linear_correction_factor));
+                    SerialEx.printf_P(PSTR("vcc=%d\n"), read_vcc());
+                    SerialEx.printf_P(PSTR("f_cpu=%ld\n"), F_CPU);
+
 #if USE_TEMPERATURE_CHECK
                 } else if (strcmp(buffer, "temp") == 0) {
 #if USE_NTC
@@ -687,6 +676,9 @@ void loop() {
                             fade(channel, from, to, time);
                         }
                     }
+                } else {
+                    Serial.print(F("invalid="));
+                    Serial.println(buffer);
                 }
             }
 #endif
