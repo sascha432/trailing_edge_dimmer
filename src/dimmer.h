@@ -11,8 +11,16 @@
 #endif
 
 #ifndef DIMMER_ZC_DELAY
-#define DIMMER_ZC_DELAY                                         1800.0 // ZC interrupt occurs before the zero crossing, delay before turning on MOSFET in µs
-#define DIMMER_ZC_DELAY_TICKS                                   (unsigned)(DIMMER_ZC_DELAY * DIMMER_TICKS_PER_US)
+// the exact delay depends on the zero crossing detection, the prescaler and the CPU speed
+// I strongly recommend to check with an oscilloscope to get the exact time
+#define DIMMER_ZC_DELAY                                         1670UL          // microseconds
+#endif
+
+#ifndef DIMMER_MIN_ON_TIME
+#define DIMMER_MIN_ON_TIME                                  200 // minimum "on"-time in µs
+#endif
+#ifndef DIMMER_ADJUST_HALFWAVE
+#define DIMMER_ADJUST_HALFWAVE                              300 // reduce "on"-time in µs to match the exact level
 #endif
 
 // some LEDs have a soft start function. to get smooth fading, the minimum level is set
@@ -56,16 +64,28 @@
 #define DIMMER_LINEAR_LEVEL(level)                           level
 #endif
 
-#ifndef DIMMER_PRESCALER
-    #define DIMMER_PRESCALER                                8
+#ifndef DIMMER_TIMER1_PRESCALER
+    #define DIMMER_TIMER1_PRESCALER                         8
 #endif
 
-#if DIMMER_PRESCALER == 8
-    #define DIMMER_PRESCALER_BV                             (1 << CS11)
-#elif DIMMER_PRESCALER == 64
-    #define DIMMER_PRESCALER_BV                             ((1 << CS11) | (1 << CS10))
-#elif DIMMER_PRESCALER == 256
-    #define DIMMER_PRESCALER_BV                             (1 << CS12)
+#define DIMMER_TIMER2_PRESCALER                             64
+#define DIMMER_TIMER2_PRESCALER_BV                          (1 << CS22)
+// #define DIMMER_TIMER2_PRESCALER                             128
+// #define DIMMER_TIMER2_PRESCALER_BV                          ((1 << CS22) | (1 << CS20))
+// #define DIMMER_TIMER2_PRESCALER                             256
+// #define DIMMER_TIMER2_PRESCALER_BV                          ((1 << CS22) | (1 << CS21))
+// #define DIMMER_TIMER2_PRESCALER                             1024
+// #define DIMMER_TIMER2_PRESCALER_BV                          ((1 << CS22) | (1 << CS21) | (1 << CS20))
+
+#if DIMMER_TIMER1_PRESCALER == 8
+    #define DIMMER_TIMER1_PRESCALER_BV                      (1 << CS11)
+    #define DIMMER_EXTRA_TICKS                              8           // add some extra ticks that the timer interrupt doesn't skip turning off a mosfet if the timer interrupts are very close
+#elif DIMMER_TIMER1_PRESCALER == 64
+    #define DIMMER_TIMER1_PRESCALER_BV                      ((1 << CS11) | (1 << CS10))
+    #define DIMMER_EXTRA_TICKS                              1
+#elif DIMMER_TIMER1_PRESCALER == 256
+    #define DIMMER_TIMER1_PRESCALER_BV                      (1 << CS12)
+    #define DIMMER_EXTRA_TICKS                              1
 #else
     #error prescaler not supported
 #endif
@@ -74,24 +94,34 @@
     #define DIMMER_AC_FREQUENCY                             60
 #endif
 
-#define DIMMER_START_TIMER()                                TCCR1B |= DIMMER_PRESCALER_BV;
-#define DIMMER_PAUSE_TIMER()                                TCCR1B = 0;
+#define DIMMER_START_TIMER1()                                TCCR1B |= DIMMER_TIMER1_PRESCALER_BV;
+#define DIMMER_PAUSE_TIMER1()                                TCCR1B = 0;
+#define DIMMER_START_TIMER2()                                TCCR2B |= DIMMER_TIMER2_PRESCALER_BV;
+#define DIMMER_PAUSE_TIMER2()                                TCCR2B = 0;
 
-#define DIMMER_GET_TICKS(level)                             (level * (DIMMER_TICKS_PER_HALFWAVE - DIMMER_ZC_DELAY_TICKS - 16) / DIMMER_MAX_LEVEL)
+#define DIMMER_GET_TICKS(level)                             max(DIMMER_MIN_ON_TIME * DIMMER_TICKS_PER_US, (level * DIMMER_TICKS_PER_HALFWAVE) / DIMMER_MAX_LEVEL - DIMMER_ADJUST_HALFWAVE * DIMMER_TICKS_PER_US)
 
-#define DIMMER_ENABLE_TIMER()                               { TIMSK1 |= (1 << OCIE1A) | (1 << OCIE1B); TCCR1A = 0; TCCR1B = 0; }
-#define DIMMER_DISABLE_TIMER()                              TIMSK1 &= ~((1 << OCIE1A) | (1 << OCIE1B));
+#define DIMMER_ENABLE_TIMERS()                              { TIMSK1 |= (1 << OCIE1A); TCCR1A = 0; TCCR1B = 0; TIMSK2 |= (1 << OCIE2A); TCCR2A = 0; TCCR2B = 0; }
+#define DIMMER_DISABLE_TIMERS()                             { TIMSK1 &= ~(1 << OCIE1A); TIMSK2 &= ~(1 << OCIE2A); }
 
-#define DIMMER_TICKS_PER_HALFWAVE                           (F_CPU / DIMMER_PRESCALER / (DIMMER_AC_FREQUENCY * 2))
-#define DIMMER_MS_PER_TICK                                  ((F_CPU / DIMMER_PRESCALER) / 1000)
-#define DIMMER_US_PER_TICK                                  (DIMMER_MS_PER_TICK / 1000)
-#define DIMMER_TICKS_PER_US                                 (F_CPU / DIMMER_PRESCALER / 1000000.0)
+#define DIMMER_TICKS_PER_HALFWAVE                           (F_CPU / DIMMER_TIMER1_PRESCALER / (DIMMER_AC_FREQUENCY * 2))
+#define DIMMER_TICKS_PER_US                                 (F_CPU / DIMMER_TIMER1_PRESCALER / 1000000.0)
+#define DIMMER_TICKS_PER_US_TIMER2                          (F_CPU / DIMMER_TIMER2_PRESCALER / 1000000.0)
+
+#define DIMMER_ZC_DELAY_TICKS                               (F_CPU / DIMMER_TIMER2_PRESCALER * DIMMER_ZC_DELAY / 1000000UL)
 
 #if DIMMER_TICKS_PER_HALFWAVE > 32767
     #error TICKS are limited to 32767 per half wave, increase prescaler
 #endif
 
-#define DIMMER_VERSION                                      "1.0.8"
+#if DIMMER_ZC_DELAY_TICKS == 0
+#elif DIMMER_ZC_DELAY_TICKS > 255
+    #error timer 2 is 8bit only, increase prescaler
+#elif DIMMER_ZC_DELAY_TICKS < 64
+    #warning consider decreasing the prescaler for a more precise timing
+#endif
+
+#define DIMMER_VERSION                                      "1.0.9"
 #define DIMMER_INFO                                         "Author: sascha_lammers@gmx.de"
 
 #if DIMMER_USE_FADING
@@ -132,7 +162,8 @@ void dimmer_zc_interrupt_handler();
 void dimmer_zc_setup();
 void dimmer_timer_setup();
 void dimmer_timer_remove();
-void dimmer_start_timer();
+void dimmer_start_timer1();
+void dimmer_start_timer2();
 void dimmer_set_level(uint8_t channel, int16_t level);
 uint16_t dimmer_get_level(uint8_t channel);
 #if DIMMER_USE_LINEAR_CORRECTION

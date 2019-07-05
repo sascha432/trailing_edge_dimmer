@@ -15,7 +15,13 @@ void dimmer_setup() {
 
 void dimmer_zc_interrupt_handler() {
 
-    dimmer_start_timer();
+#if DIMMER_ZC_DELAY_TICKS == 0
+    dimmer_start_timer1(); // no delay, start timer1
+#else
+    dimmer_start_timer2(); // delay timer1 until actual zero crossing
+#endif
+    memcpy(dimmer.ordered_channels, dimmer.ordered_channels_buffer, sizeof(dimmer.ordered_channels));
+    sei();
 #if DIMMER_USE_FADING
     dimmer_apply_fading();
 #endif
@@ -59,7 +65,7 @@ void dimmer_timer_setup() {
         _D(5, SerialEx.printf_P(PSTR("Channel %u Pin %u\n"), i, dimmer_pins[i]));
     }
 
-    DIMMER_ENABLE_TIMER();
+    DIMMER_ENABLE_TIMERS();
 }
 
 void dimmer_timer_remove() {
@@ -68,46 +74,38 @@ void dimmer_timer_remove() {
 
     cli();
     dimmer_set_mosfet_gate(0, false);
-    DIMMER_PAUSE_TIMER();
-    DIMMER_DISABLE_TIMER();
+    DIMMER_DISABLE_TIMERS();
     sei();
 }
 
-void dimmer_start_timer() {
-    cli();
-    memcpy(dimmer.ordered_channels, dimmer.ordered_channels_buffer, sizeof(dimmer.ordered_channels));
-    DIMMER_ENABLE_TIMER();
+void dimmer_start_timer1() {
+    uint8_t i;
+
     TCNT1 = 0;
-    OCR1A = DIMMER_ZC_DELAY_TICKS; // zero crossing event
-    OCR1B = 0;
-    DIMMER_START_TIMER();
+    OCR1A = 0;
+    DIMMER_START_TIMER1();
+
     if (dimmer.ordered_channels[0].ticks) { // any channel active?
         dimmer.channel_ptr = 0;
-        OCR1B = max(TCNT1 + 1, dimmer.ordered_channels[0].ticks);
+        OCR1A = dimmer.ordered_channels[0].ticks;
+        for(i = 0; i < DIMMER_CHANNELS; i++) {
+            if (!dimmer.level[i]) {
+                dimmer_set_mosfet_gate(i, false);
+            }
+        }
+        for(i = 0; dimmer.ordered_channels[i].ticks; i++) {
+            dimmer_set_mosfet_gate(dimmer.ordered_channels[i].channel, true);
+        }
     } else {
-         // disable all channels with next zero crossing
-    }
-    sei();
-}
-
-// zero crossing event: turn channels on or off
-ISR(TIMER1_COMPA_vect) {
-    cli();
-    uint8_t i;
-    for(i = 0; i < DIMMER_CHANNELS; i++) {
-        if (!dimmer.level[i]) {
+        // all channels off
+        for(i = 0; i < DIMMER_CHANNELS; i++) {
             dimmer_set_mosfet_gate(i, false);
         }
     }
-    for(i = 0; dimmer.ordered_channels[i].ticks; i++) {
-        dimmer_set_mosfet_gate(dimmer.ordered_channels[i].channel, true);
-    }
-    sei();
 }
 
 // turn channels off
-ISR(TIMER1_COMPB_vect) {
-    cli();
+ISR(TIMER1_COMPA_vect) {
     dimmer_channel_t *channel = &dimmer.ordered_channels[dimmer.channel_ptr++];
     dimmer_channel_t *next_channel = &dimmer.ordered_channels[dimmer.channel_ptr];
     for(;;) {
@@ -115,11 +113,11 @@ ISR(TIMER1_COMPB_vect) {
 
         if (next_channel->ticks == 0 || next_channel->ticks == 0xffff) {
             // no more channels to turn off, end timer
-            DIMMER_PAUSE_TIMER();
+            DIMMER_PAUSE_TIMER1();
             break;
         } else if (next_channel->ticks > channel->ticks) {
             // next channel has a different time slot, re-schedule
-            OCR1B = max(TCNT1 + 1, next_channel->ticks);  // make sure to trigger an interrupt even if the time slot is in the past by using TCNT1 + 1 as minimum
+            OCR1A = max(TCNT1 + DIMMER_EXTRA_TICKS, next_channel->ticks);  // make sure to trigger an interrupt even if the time slot is in the past by using TCNT1 + 1 as minimum
             break;
         }
         //
@@ -127,7 +125,17 @@ ISR(TIMER1_COMPB_vect) {
         dimmer.channel_ptr++;
         next_channel = &dimmer.ordered_channels[dimmer.channel_ptr];
     }
-    sei();
+}
+
+void dimmer_start_timer2() {
+    DIMMER_START_TIMER2();
+    TCNT2 = 0;
+    OCR2A = (uint8_t)DIMMER_ZC_DELAY_TICKS;
+}
+
+ISR(TIMER2_COMPA_vect){
+    DIMMER_PAUSE_TIMER2();  // pause until next zero crossing interrupt
+    dimmer_start_timer1();
 }
 
 

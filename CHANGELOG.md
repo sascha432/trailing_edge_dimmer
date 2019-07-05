@@ -1,5 +1,10 @@
 ## Changelog
 
+## 1.0.9
+- Added some extra ticks if timer interrupts are close to avoid skipping one
+- Improved the timing of the zero crossing interrupt using timer2
+- Added min. "on" time
+
 ## 1.0.8
 - Added VCC to dimmer info and temperature report (INTERNAL_VREF_1_1V might need some adjustments to be precise)
 - Added CPU Frequency to dimmer info
