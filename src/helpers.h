@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <HardwareSerial.h>
 #include <PrintEx.h>
-#include "global.h"
 #include "helpers.h"
 
 #if DEBUG
@@ -32,11 +31,9 @@ typedef unsigned long ulong;
 #define STR(s)                  _STR(s)
 #define _STR(s)                 #s
 
-String &floatToString(double n, uint8_t prec = 2, int8_t width = 1);
-String &ticksToTime(ulong ticks);
+#define float_to_str(value)             (String(value).c_str())
 
-#define float_to_str(value)             (floatToString(value).c_str())
-#define ticks_to_time(value)            (ticksToTime(value).c_str())
+#if DEBUG
 
 class PrintExEx : public PrintEx {
 public:
@@ -56,10 +53,4 @@ private:
 
 extern PrintExEx SerialEx;
 extern uint8_t _debug_level;
-
-template <typename T>
-void swap(T &a, T &b) {
-    T c = a;
-    a = b;
-    b = c;
-};
+#endif

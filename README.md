@@ -7,7 +7,10 @@ Firmware for a trailing edge MOSFET dimmer.
 * Store last levels in EEPROM and restore during boot
 * EEPROM wear level protection
 * Serial protocol to control the dimmer
+* I2C or UART interface
 * Over temperature protection using an external NTC or the internal ATMEGA temperature sensor
+
+[I2C/UART protocol](docs/protocol.md)
 
 # Improved zero crossing detection
 
@@ -31,3 +34,13 @@ Firmware for a trailing edge MOSFET dimmer.
 ![Dev board](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_4Ch-Dimmer-Rev1.3_dev_example.png)
 
 [Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_4Ch-Dimmer-Rev1.3_dev_example.svg)
+
+# Schematics of the final design (not yet tested, waiting for PCBs and parts)
+
+* 3.3V only
+* Improved power consumption (~0.3-0.4W idle depending on the power supply)
+* Improved MOSFET switching
+
+![Final design](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematics_4Ch-Dimmer-Rev3.png)
+
+[Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_4Ch-Dimmer-Rev3.svg)

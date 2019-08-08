@@ -1,5 +1,13 @@
 ## Changelog
 
+### 2.0.0
+- Added [I2C slave protocol](docs/protocol.md)
+- The serial protocol was replaced by [I2C over UART emulation](https://github.com/sascha432/i2c_uart_bridge)
+- Added example how to control the dimmer via I2C and UART
+- Removed SLIM version
+- Auto select prescaler bits for DIMMER_TIMER2_PRESCALER
+- Changes for Platform IO 4.0
+
 ## 1.0.9
 - Added some extra ticks if timer interrupts are close to avoid skipping one
 - Improved the timing of the zero crossing interrupt using timer2
@@ -41,7 +49,3 @@
 
 ## 1.0.0
 - Initial version
-
-## TODO
-
-- I2C slave

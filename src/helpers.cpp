@@ -2,11 +2,11 @@
  * Author: sascha_lammers@gmx.de
  */
 
-#include "global.h"
 #include "helpers.h"
 
-PrintExEx SerialEx = Serial;
+#if DEBUG
 uint8_t _debug_level = DEBUG_LEVEL;
+PrintExEx SerialEx = Serial;
 
 void PrintExEx::printf_P(PGM_P format, ...) {
     char buf[64];
@@ -92,12 +92,4 @@ bool PrintExEx::readLine(String &input, bool allowEmpty) {
     return false;
 }
 
-static String _output[8];
-static int num = 0;
-
-String &floatToString(double n, uint8_t prec, int8_t width) {
-    char buf[16];
-    String &output = _output[num++ % 8];
-    output = String(dtostrf(n, width, prec, buf));
-    return output;
-}
+#endif
