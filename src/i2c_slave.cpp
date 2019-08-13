@@ -7,6 +7,8 @@
 
 register_mem_union_t register_mem;
 
+#if DIMMER_USE_FADING
+
 void fade(int8_t channel, int16_t from, int16_t to, float time) {
     _D(5, SerialEx.printf_P(PSTR("fade %d: %d to %d, time %f\n"), channel, from, to, time));
     if (channel == -1) {
@@ -17,6 +19,8 @@ void fade(int8_t channel, int16_t from, int16_t to, float time) {
         dimmer_set_fade(channel, from, to, time);
     }
 }
+
+#endif
 
 void set_level(int8_t channel, int16_t level) {
     _D(5, SerialEx.printf_P(PSTR("set level %d: %d\n"), channel, level));
@@ -134,29 +138,38 @@ void _dimmer_i2c_on_receive(int length) {
                     _D(5, SerialEx.printf_P(PSTR("I2C set level=%d, channel=%d\n"), register_mem.data.to_level, register_mem.data.channel));
                     set_level(register_mem.data.channel, register_mem.data.to_level);
                     break;
+#if DIMMER_USE_FADING
                 case DIMMER_COMMAND_FADE:
                     _D(5, SerialEx.printf_P(PSTR("I2C fade from=%d, to=%d, channel=%d, fade_time=%f\n"), register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
                     fade(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time); // 0-655 seconds in 10ms steps
                     break;
-#if USE_NTC
+#endif
+#if HAVE_NTC
                 case DIMMER_COMMAND_READ_NTC:
                     register_mem.data.temp = convert_to_celsius(read_ntc_value());
+                    _D(5, SerialEx.printf_P(PSTR("I2C read ntc=%s\n"), float_to_str(register_mem.data.temp)));
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
 #endif
-#if USE_INTERAL_TEMP_SENSOR
+#if HAVE_READ_INT_TEMP
                 case DIMMER_COMMAND_READ_INT_TEMP:
-                    register_mem.data.temp = get_interal_temperature();
+                    register_mem.data.temp = get_internal_temperature();
+                    _D(5, SerialEx.printf_P(PSTR("I2C read int. temp=%s\n"), float_to_str(register_mem.data.temp)));
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
 #endif
+#if HAVE_READ_VCC
                 case DIMMER_COMMAND_READ_VCC:
                     register_mem.data.vcc = read_vcc();
+                    _D(5, SerialEx.printf_P(PSTR("I2C read vcc=%u\n"), register_mem.data.vcc));
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.vcc));
                     break;
+#endif
+#if USE_EEPROM
                 case DIMMER_COMMAND_WRITE_EEPROM:
                     write_config();
                     break;
+#endif                    
                 case DIMMER_COMMAND_RESTORE_FS:
                     reset_config();
                     init_eeprom();

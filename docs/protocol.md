@@ -8,13 +8,13 @@ The examples are using the UART protocol.
 
 Using the Arduino TwoWire class (or [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
 
-    // +i2ct=75,89,22
+    // +i2ct=17,89,22
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
     Wire.write(DIMMER_REGISTER_COMMAND);
     Wire.write(DIMMER_COMMAND_READ_VCC);
     if (Wire.endTransmission() == 0) {
 
-        // +i2cr=75,02
+        // +i2cr=17,02
         uint16_t vcc;
         if (Wire.requestFrom(DIMMER_I2C_ADDRESS, sizeof(vcc)) == sizeof(vcc)) {
             Wire.readBytes(reinterpret_cast<const uint8_t *>(&vcc), sizeof(vcc));
@@ -45,7 +45,7 @@ Channels are 0 based and -1 / 0xff means all channels
 
 Set *from level* to -1, *channel* to 0, *to level* to 0x0301, *time* 7.5 (seconds) and execute fade command
 
-    +i2ct=75,80,ff,ff,00,03,01,00,00,f0,40,11
+    +i2ct=17,80,ff,ff,00,03,01,00,00,f0,40,11
                 ^^^^^ from level           ^^ command
                       ^^ channnel
                          ^^^^^ to level
@@ -57,7 +57,7 @@ Short version
 
 Assuming *from level* is the default -1, set *channel* to -1, *to level* to 0x0301, *time* 7.5
 
-    +i2ct=75,82,ff,03,01,00,00,f0,40,11
+    +i2ct=17,82,ff,03,01,00,00,f0,40,11
 
 ## DIMMER_COMMAND_SET_LEVEL
 
@@ -68,12 +68,12 @@ The fading command uses following registers
 
 Set *channel* to 1, *to level* to 777 (0x0309) and execute set level command
 
-    +i2ct=75,82,01,09,03
-    +i2ct=75,89,10
+    +i2ct=17,82,01,09,03
+    +i2ct=17,89,10
 
 To send the command in one transmission, the time can be filled with any data
 
-    +i2ct=75,82,01,09,03,00,00,00,00,10
+    +i2ct=17,82,01,09,03,00,00,00,00,10
 
 ## DIMMER_COMMAND_READ_xxx
 
@@ -90,8 +90,8 @@ If no further data is sent after the read command, the register is set automatic
 
 Read VCC
 
-    +i2ct=75,89,22
-    +i2cr=75,02
+    +i2ct=17,89,22
+    +i2cr=17,02
 
 Response (0x3613 = 4.918V)
 
@@ -99,15 +99,15 @@ Response (0x3613 = 4.918V)
 
 Read internal temperature
 
-    +i2ct=75,89,21
-    +i2cr=75,04
+    +i2ct=17,89,21
+    +i2cr=17,04
 
 Read int. temp and VCC
 
 In this example, *DIMMER_REGISTER_READ_LENGTH* is set manually to 6 byte, followed by the start address *DIMMER_REGISTER_TEMP*
 
-    +i2ct=75,89,21,89,22,8a,06,9c
-    +i2cr=75,06
+    +i2ct=17,89,21,89,22,8a,06,9c
+    +i2cr=17,06
 
 ## DIMMER_COMMAND_READ_CHANNELS
 
@@ -126,30 +126,30 @@ The byte after command specifies the number of channels and start address, each 
 
 Channel 1 - 4
 
-    +i2ct=75,89,12,40
-    +i2cr=75,08
+    +i2ct=17,89,12,40
+    +i2cr=17,08
 
 Channel 8
 
-    +i2ct=75,89,12,17
-    +i2cr=75,02
+    +i2ct=17,89,12,17
+    +i2cr=17,02
 
 Channel 2 and 3
 
-    +i2ct=75,89,12,21
-    +i2cr=75,04
+    +i2ct=17,89,12,21
+    +i2cr=17,04
 
 ## DIMMER_COMMAND_WRITE_EEPROM
 
 Store configuration and current levels in EEPROM
 
-    +i2ct=75,89,50
+    +i2ct=17,89,50
 
 ## DIMMER_COMMAND_RESTORE_FS
 
 Restore factory settings and re-initialize EEPROM wear leveling
 
-    +i2ct=75,89,51
+    +i2ct=17,89,51
 
 ## Reading and writing the dimmer settings
 
@@ -169,13 +169,13 @@ To make any changes permanent, *DIMMER_COMMAND_WRITE_EEPROM* needs to be execute
 
 Read all settings
 
-    +i2ct=75,8a,07,a2
-    +i2cr=75,08
+    +i2ct=17,8a,07,a2
+    +i2cr=17,08
 
 Read temperature check interval
 
-    +i2ct=75,8a,01,a8
-    +i2cr=75,02
+    +i2ct=17,8a,01,a8
+    +i2cr=17,02
 
 Response (0x1e, 30 seconds)
 
@@ -183,11 +183,11 @@ Response (0x1e, 30 seconds)
 
 Set temperature check interval to 30 seconds
 
-    +i2ct=75,a8,1e
+    +i2ct=17,a8,1e
 
 Setting the linear correction factor to 1.0
 
-    +i2ct=75,a9,00,00,80,3f
+    +i2ct=17,a9,00,00,80,3f
 
 ## DIMMER_COMMAND_DUMP_xxx
 
@@ -198,11 +198,11 @@ This is only available with enabled debugging.
 
 Dump the content of the register memory
 
-    +i2ct=75,89,ee
+    +i2ct=17,89,ee
 
 Dump macros for the register memory
 
-    +i2ct=75,89,ef
+    +i2ct=17,89,ef
 
 ## Temperature and VCC status
 
@@ -210,8 +210,8 @@ If temperature reporting is enabled, the dimmer sends the temperature and VCC to
 
 The register address DIMMER_TEMPERATURE_REPORT indicates a temperature (uint8) and VCC (uint16) report
 
-    +I2CT=76F022E212
+    +I2CT=18F022E212
 
 If the max. temperature was exceeded, it sends one alarm with register address DIMMER_TEMPERATURE_ALERT, the current temperature (uint8) and the temperature threshold (uint8)
 
-    +I2CT=76F16A64
+    +I2CT=18F16A64

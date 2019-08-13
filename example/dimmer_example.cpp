@@ -45,6 +45,23 @@ ISR(TIMER1_COMPB_vect) {
 }
 #endif
 
+float get_internal_temperature(void) {
+    ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
+    ADCSRA |= _BV(ADEN);
+    delay(50);
+    ADCSRA |= _BV(ADSC);
+    while (bit_is_set(ADCSRA, ADSC)) ;
+    return (ADCW - 324.31) / 1.22;
+}
+
+uint16_t read_vcc() {
+    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
+    delay(50);
+    ADCSRA |= _BV(ADSC);
+    while (bit_is_set(ADCSRA, ADSC)) ;
+    return ((uint32_t)(5000 * (1.1 / 5) * 1024)) / ADCW;
+}
+
 void setup() {
 
 #if ZC_PIN
@@ -59,7 +76,8 @@ void setup() {
 #endif
 
     Serial.begin(115200);
-    Serial.println("Dimmer control example");
+    Serial.print("Dimmer control example @ ");
+    SerialEx.printf("0x%02x\n", DIMMER_I2C_ADDRESS);
 
 #if SERIAL_I2C_BRDIGE
     Serial2.begin(DEFAULT_BAUD_RATE);
@@ -70,6 +88,7 @@ void setup() {
     });
 
 #endif
+
     // receive incoming data as slave
     Wire.begin(DIMMER_I2C_ADDRESS + 1);
     Wire.onReceive([](int length) {
@@ -221,6 +240,20 @@ void loop() {
 
         auto input = Serial.read();
         switch(input) {
+            case 't':
+                Serial.println(get_internal_temperature());
+                break;
+            case 'v':
+                Serial.println(read_vcc());
+                break;
+            case 'V':
+                Wire.beginTransmission(DIMMER_I2C_ADDRESS);
+                Wire.write(DIMMER_REGISTER_COMMAND);
+                Wire.write(DIMMER_COMMAND_READ_VCC);
+                if (endTransmission() == 0) {
+                    
+                }
+                break;
 
             case 'q':
                 set_channel(0);

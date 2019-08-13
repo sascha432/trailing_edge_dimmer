@@ -5,7 +5,7 @@
 #pragma once
 
 #ifndef DIMMER_I2C_ADDRESS
-#define DIMMER_I2C_ADDRESS                  0x75
+#define DIMMER_I2C_ADDRESS                  0x17
 #endif
 
 #if DIMMER_I2C_SLAVE
@@ -27,7 +27,7 @@
 #define DIMMER_REGISTER_CH5_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 5)
 #define DIMMER_REGISTER_CH6_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 6)
 #define DIMMER_REGISTER_CH7_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 7)
-#define DIMMER_REGISTER_CHANNELS_END        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, temp))
+#define DIMMER_REGISTER_CHANNELS_END        (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level))
 #define DIMMER_REGISTER_TEMP                (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, temp))
 #define DIMMER_REGISTER_VCC                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, vcc))
 #define DIMMER_REGISTER_OPTIONS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, options))
@@ -70,6 +70,7 @@
 #define DIMMER_TEMPERATURE_REPORT           0xf0
 #define DIMMER_TEMPERATURE_ALERT            0xf1
 
+// DIMMER_REGISTER_COMMAND
 #define DIMMER_COMMAND_SET_LEVEL            0x10
 #define DIMMER_COMMAND_FADE                 0x11
 #define DIMMER_COMMAND_READ_CHANNELS        0x12
@@ -83,5 +84,11 @@
 #define DIMMER_COMMAND_DUMP_MACROS          0xef
 #endif
 
+// DIMMER_REGISTER_COMMAND_STATUS
 #define DIMMER_COMMAND_STATUS_OK            0
 #define DIMMER_COMMAND_STATUS_ERROR         -1
+
+// DIMMER_REGISTER_OPTIONS
+#define DIMMER_OPTIONS_RESTORE_LEVEL        0x01
+#define DIMMER_OPTIONS_REPORT_TEMP          0x02
+#define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED 0x04

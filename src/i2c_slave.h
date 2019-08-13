@@ -47,7 +47,7 @@ typedef struct __attribute__packed__ {
     register_mem_command_t cmd;
     uint16_t level[8];
     float temp;
-    int16_t vcc;
+    uint16_t vcc;
     register_mem_cfg_t cfg;
     uint8_t address;
 } register_mem_t;

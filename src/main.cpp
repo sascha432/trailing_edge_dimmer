@@ -21,7 +21,7 @@ void fade(int8_t channel, int16_t from, int16_t to, float time);
 void reset_config() {
     memset(&config, 0, sizeof(config));
     memset(&register_mem.data.cfg, 0, sizeof(register_mem.data.cfg));
-    register_mem.data.cfg.max_temp = 65;
+    register_mem.data.cfg.max_temp = 75;
     register_mem.data.cfg.bits.restore_level = true;
     register_mem.data.cfg.bits.report_temp = true;
     register_mem.data.cfg.fade_in_time = 7.5;
@@ -143,45 +143,34 @@ void write_config() {
     }
 }
 
+#if HAVE_READ_INT_TEMP
+
 // https://playground.arduino.cc/Main/InternalTemperatureSensor/
-float get_interal_temperature(void) {
-  unsigned int wADC;
-  float t;
-
-  // The internal temperature has to be used
-  // with the internal reference of 1.1V.
-  // Channel 8 can not be selected with
-  // the analogRead function yet.
-
-  // Set the internal reference and mux.
-  ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
-  ADCSRA |= _BV(ADEN);  // enable the ADC
-
-  delay(20);            // wait for voltages to become stable.
-
-  ADCSRA |= _BV(ADSC);  // Start the ADC
-
-  // Detect end-of-conversion
-  while (bit_is_set(ADCSRA, ADSC)) ;
-
-  // Reading register "ADCW" takes care of how to read ADCL and ADCH.
-  wADC = ADCW;
-
-  // The offset of 324.31 could be wrong. It is just an indication.
-  t = (wADC - 324.31 ) / 1.22;
-
-  // The returned temperature is in degrees Celsius.
-  return (t);
+float get_internal_temperature() {
+    ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
+    ADCSRA |= _BV(ADEN);
+    delay(40); // 20 was not enough. It takes quite a while when switching from reading VCC to temp.
+    ADCSRA |= _BV(ADSC);
+    while (bit_is_set(ADCSRA, ADSC)) ;
+    return (ADCW - 324.31) / 1.22;
 }
+
+#endif
+
+#if HAVE_READ_VCC
 
 // read VCC in mV
 uint16_t read_vcc() {
     ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-    delay(20);
+    delay(40);
     ADCSRA |= _BV(ADSC);
     while (bit_is_set(ADCSRA, ADSC)) ;
     return ((uint32_t)(5000 * (INTERNAL_VREF_1_1V / 5) * 1024)) / ADCW;
 }
+
+#endif
+
+#if HAVE_NTC
 
 uint16_t read_ntc_value(uint8_t num) {
     uint32_t value = 0;
@@ -195,15 +184,17 @@ uint16_t read_ntc_value(uint8_t num) {
 float convert_to_celsius(uint16_t value) {
     float steinhart;
     steinhart = 1023 / (float)value - 1;
-    steinhart *= 2200;                          // serial resistance
-    steinhart /= 10000;                         // nominal resistance
+    steinhart *= NTC_SERIES_RESISTANCE;
+    steinhart /= NTC_NOMINAL_RESISTANCE;
     steinhart = log(steinhart);
-    steinhart /= 3950;                          // beta coeff.
-    steinhart += 1.0 / (25 + 273.15);           // nominal temperature
+    steinhart /= NTC_BETA_COEFF;
+    steinhart += 1.0 / (NTC_NOMINAL_TEMP + 273.15);
     steinhart = 1.0 / steinhart;
     steinhart -= 273.15;
     return steinhart;
 }
+
+#endif
 
 #if USE_EEPROM
 void restore_level() {
@@ -254,7 +245,7 @@ void loop() {
 #if USE_TEMPERATURE_CHECK
     if (millis() > next_temp_check) {
 #if USE_INTERAL_TEMP_SENSOR_FOR_SHUTDOWN
-        int current_temp = get_interal_temperature();
+        int current_temp = get_internal_temperature();
 #else
         int current_temp = convert_to_celsius(read_ntc_value());
 #endif
@@ -266,17 +257,19 @@ void loop() {
             if (register_mem.data.cfg.bits.report_temp) {
                 Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
                 Wire.write(DIMMER_TEMPERATURE_ALERT);
-                Wire.write(current_temp);
+                Wire.write((uint8_t)current_temp);
                 Wire.write(register_mem.data.cfg.max_temp);
                 Wire.endTransmission();
             }
         }
         if (register_mem.data.cfg.bits.report_temp) {
-            uint16_t vcc = read_vcc();
             Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
             Wire.write(DIMMER_TEMPERATURE_REPORT);
-            Wire.write(current_temp);
+            Wire.write((uint8_t)current_temp);
+#if HAVE_READ_VCC
+            uint16_t vcc = read_vcc();
             Wire.write(reinterpret_cast<const uint8_t *>(&vcc), sizeof(vcc));
+#endif
             Wire.endTransmission();
         }
     }

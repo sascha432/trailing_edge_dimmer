@@ -1,6 +1,12 @@
 ## Changelog
 
-### 2.0.0
+## 2.0.1
+- Changed default I2C address to 0x17/0x18
+- Increased delay when reading internal temperature and VCC
+- Added macros for thermistor temperature calculation
+- Changed macro names to match pattern, additional macros to enable/disable reading VCC, NTC, internal temp. sensor
+
+## 2.0.0
 - Added [I2C slave protocol](docs/protocol.md)
 - The serial protocol was replaced by [I2C over UART emulation](https://github.com/sascha432/i2c_uart_bridge)
 - Added example how to control the dimmer via I2C and UART

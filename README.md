@@ -12,6 +12,29 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
+# PCB arrived and first prototype is working
+
+ * Wall Mounted Dimmer
+ * ESP8266 with MQTT and Home Assistant integration
+ * Atmega328P as controller over UART
+
+  * [ESP8266 and Atmega Module](https://easyeda.com/sascha23095123423/esp12e_iot_module)
+  * 1 Channel Dimmer Module - Coming soon
+
+ Testing it with a PWM generator to simulate the zero crossing signal, dimming a LED instead switching the MOSFET. The 120V part is waiting for opto couplers.
+
+ ![Testing PCB](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/IMG_9100.JPG)
+
+# Schematics of the final design (not yet tested, waiting for PCBs and parts)
+
+* 3.3V only
+* Improved power consumption (~0.3-0.4W idle depending on the power supply)
+* Improved MOSFET switching
+
+![Final design](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematics_4Ch-Dimmer-Rev3.png)
+
+[Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_4Ch-Dimmer-Rev3.svg)
+
 # Improved zero crossing detection
 
 * Low current consumption (0.15mA @ 120V)
@@ -23,8 +46,7 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.svg)
 
-
-
+ 
 # In action
 
 ![In action](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/oscilloscope_example.jpg)
@@ -35,12 +57,3 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_4Ch-Dimmer-Rev1.3_dev_example.svg)
 
-# Schematics of the final design (not yet tested, waiting for PCBs and parts)
-
-* 3.3V only
-* Improved power consumption (~0.3-0.4W idle depending on the power supply)
-* Improved MOSFET switching
-
-![Final design](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematics_4Ch-Dimmer-Rev3.png)
-
-[Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_4Ch-Dimmer-Rev3.svg)
