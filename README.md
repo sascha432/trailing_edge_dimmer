@@ -12,14 +12,14 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
-# PCB arrived and first prototype is working
+# PCBs arrived and first prototype is working
 
- * Wall Mounted Dimmer
- * ESP8266 with MQTT and Home Assistant integration
- * Atmega328P as controller over UART
+* Wall Mounted Dimmer
+* ESP8266 with MQTT and Home Assistant integration
+* Atmega328P as controller over UART
 
-  * [ESP8266 and Atmega Module](https://easyeda.com/sascha23095123423/esp12e_iot_module)
-  * 1 Channel Dimmer Module - Coming soon
+* [ESP8266 and Atmega Module](https://easyeda.com/sascha23095123423/esp12e_iot_module)
+* 1 Channel Dimmer Module - Coming soon
 
  Testing it with a PWM generator to simulate the zero crossing signal, dimming a LED instead switching the MOSFET. The 120V part is waiting for opto couplers.
 
