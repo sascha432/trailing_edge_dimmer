@@ -35,6 +35,9 @@
 #define DIMMER_REGISTER_FADE_IN_TIME        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, fade_in_time))
 #define DIMMER_REGISTER_TEMP_CHECK_INT      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, temp_check_interval))
 #define DIMMER_REGISTER_LC_FACTOR           (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, linear_correction_factor))
+#define DIMMER_REGISTER_ZC_DELAY_TICKS      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, zero_crossing_delay_ticks))
+#define DIMMER_REGISTER_MIN_ON_TIME_TICKS   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, minimum_on_time_ticks))
+#define DIMMER_REGISTER_ADJ_HALFWAVE_TICKS  (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, adjust_halfwave_time_ticks))
 #define DIMMER_REGISTER_ADDRESS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, address))
 #define DIMMER_REGISTER_END_ADDR            (DIMMER_REGISTER_START_ADDR + sizeof(register_mem_t))
 
@@ -62,13 +65,18 @@
 #define DIMMER_REGISTER_FADE_IN_TIME        0xA4
 #define DIMMER_REGISTER_TEMP_CHECK_INT      0xA8
 #define DIMMER_REGISTER_LC_FACTOR           0xA9
-#define DIMMER_REGISTER_ADDRESS             0xAD
-#define DIMMER_REGISTER_END_ADDR            0xAE
+#define DIMMER_REGISTER_ZC_DELAY_TICKS      0xAD
+#define DIMMER_REGISTER_MIN_ON_TIME_TICKS   0xAE
+#define DIMMER_REGISTER_ADJ_HALFWAVE_TICKS  0xB0
+#define DIMMER_REGISTER_ADDRESS             0xB2
+#define DIMMER_REGISTER_END_ADDR            0xB3
 
 #endif
 
+// first byte in master mode indicates the data that was sent
 #define DIMMER_TEMPERATURE_REPORT           0xf0
 #define DIMMER_TEMPERATURE_ALERT            0xf1
+#define DIMMER_FADING_COMPLETE              0xf2
 
 // DIMMER_REGISTER_COMMAND
 #define DIMMER_COMMAND_SET_LEVEL            0x10
@@ -77,8 +85,10 @@
 #define DIMMER_COMMAND_READ_NTC             0x20
 #define DIMMER_COMMAND_READ_INT_TEMP        0x21
 #define DIMMER_COMMAND_READ_VCC             0x22
+#define DIMMER_COMMAND_READ_AC_FREQUENCY    0x23
 #define DIMMER_COMMAND_WRITE_EEPROM         0x50
 #define DIMMER_COMMAND_RESTORE_FS           0x51
+#define DIMMER_COMMAND_READ_TIMINGS         0x52
 #if DEBUG
 #define DIMMER_COMMAND_DUMP_MEM             0xee
 #define DIMMER_COMMAND_DUMP_MACROS          0xef
@@ -92,3 +102,11 @@
 #define DIMMER_OPTIONS_RESTORE_LEVEL        0x01
 #define DIMMER_OPTIONS_REPORT_TEMP          0x02
 #define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED 0x04
+
+// DIMMER_COMMAND_READ_TIMINGS
+// All timings are float and read from DIMMER_REGISTER_TEMP
+#define DIMMER_TIMINGS_TMR1_TICKS_PER_US    0x01
+#define DIMMER_TIMINGS_TMR2_TICKS_PER_US    0x02
+#define DIMMER_TIMINGS_ZC_DELAY_IN_US       0x03
+#define DIMMER_TIMINGS_MIN_ON_TIME_IN_US    0x04
+#define DIMMER_TIMINGS_ADJ_HW_TIME_IN_US    0x05

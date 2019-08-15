@@ -7,10 +7,11 @@
 #include <Arduino.h>
 #include <stdio.h>
 #include <HardwareSerial.h>
-#include <PrintEx.h>
 #include "helpers.h"
 
 #if DEBUG
+extern uint8_t _debug_level;
+
 #ifndef DEBUG_LEVEL
 #define DEBUG_LEVEL   _D_INFO
 #endif
@@ -26,31 +27,11 @@
 #define _D(...) ;
 #endif
 
+int Serial_printf(const char *format, ...);
+int Serial_printf_P(PGM_P format, ...);
+bool Serial_readLine(String &input, bool allowEmpty);
+
 typedef unsigned long ulong;
 
 #define STR(s)                  _STR(s)
 #define _STR(s)                 #s
-
-#define float_to_str(value)             (String(value).c_str())
-
-#if DEBUG
-
-class PrintExEx : public PrintEx {
-public:
-    PrintExEx(Stream &stream);
-    virtual ~PrintExEx();
-
-    bool readLine(String &input, bool allowEmpty = false);;
-
-    String floatToString(double n, uint8_t prec, int8_t width);
-
-    void printf_P(PGM_P format, ...);
-    void vprintf(const char *format, ...);
-
-private:
-  Stream &_stream;
-};
-
-extern PrintExEx SerialEx;
-extern uint8_t _debug_level;
-#endif

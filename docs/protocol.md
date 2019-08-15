@@ -2,11 +2,14 @@
 
 The dimmer is controlled via I2C or UART interface.
 
+The default address is 0x17 for the slave. When sending data, the dimmer acts as master and sends to address 0x18 (slave address + 1).
+
 The values for the registers and commands can be found in [dimmer_protocol.h](../src/dimmer_protocol.h)
 
-The examples are using the UART protocol.
+The examples are using the UART protocol and can send to the dimmer using any terminal software.
 
-Using the Arduino TwoWire class (or [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
+Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
+
 
     // +i2ct=17,89,22
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
@@ -109,6 +112,18 @@ In this example, *DIMMER_REGISTER_READ_LENGTH* is set manually to 6 byte, follow
     +i2ct=17,89,21,89,22,8a,06,9c
     +i2cr=17,06
 
+If the temperature is requested last, it is not required to set read length and register address
+
+    +i2ct=17,89,22,89,21
+    +i2cr=17,06
+
+
+Read AC frequency
+
+    +i2ct=17,89,23
+    +i2cr=17,04
+
+
 ## DIMMER_COMMAND_READ_CHANNELS
 
 Read one or more channel
@@ -151,6 +166,23 @@ Restore factory settings and re-initialize EEPROM wear leveling
 
     +i2ct=17,89,51
 
+## DIMMER_COMMAND_READ_TIMINGS
+
+Read timings for fine tuning. The return type is float and all values are in micro seconds
+
+- DIMMER_TIMINGS_TMR1_TICKS_PER_US
+- DIMMER_TIMINGS_TMR2_TICKS_PER_US
+- DIMMER_TIMINGS_ZC_DELAY_IN_US
+- DIMMER_TIMINGS_MIN_ON_TIME_IN_US
+- DIMMER_TIMINGS_ADJ_HW_TIME_IN_US
+
+Read zero crossing delay
+
+    +i2ct=17,89,23,03
+    +i2cr=17,04
+
+NOTE: Values are stored in ticks in the EEPROM, not micro seconds. DIMMER_TIMINGS_TMR1_TICKS_PER_US and DIMMER_TIMINGS_TMR2_TICKS_PER_US need to be used to translate them.
+
 ## Reading and writing the dimmer settings
 
 - DIMMER_REGISTER_OPTIONS (uint8)
@@ -158,6 +190,9 @@ Restore factory settings and re-initialize EEPROM wear leveling
 - DIMMER_REGISTER_FADE_IN_TIME (float, seconds)
 - DIMMER_REGISTER_TEMP_CHECK_INT (uint8, seconds)
 - DIMMER_REGISTER_LC_FACTOR (float)
+- DIMMER_REGISTER_ZC_DELAY_TICKS (uint8)
+- DIMMER_REGISTER_MIN_ON_TIME_TICKS (uint16)
+- DIMMER_REGISTER_ADJ_HALFWAVE_TICKS (uint16)
 
 ### Options
 
@@ -169,13 +204,13 @@ To make any changes permanent, *DIMMER_COMMAND_WRITE_EEPROM* needs to be execute
 
 Read all settings
 
-    +i2ct=17,8a,07,a2
-    +i2cr=17,08
+    +i2ct=17,8a,10,a2
+    +i2cr=17,10
 
 Read temperature check interval
 
     +i2ct=17,8a,01,a8
-    +i2cr=17,02
+    +i2cr=17,01
 
 Response (0x1e, 30 seconds)
 
@@ -189,6 +224,7 @@ Setting the linear correction factor to 1.0
 
     +i2ct=17,a9,00,00,80,3f
 
+
 ## DIMMER_COMMAND_DUMP_xxx
 
 - DIMMER_COMMAND_DUMP_MEM
@@ -200,18 +236,32 @@ Dump the content of the register memory
 
     +i2ct=17,89,ee
 
-Dump macros for the register memory
+Dump macros for the register memory.
 
     +i2ct=17,89,ef
 
-## Temperature and VCC status
+## Temperature, VCC status and AC Frequency
 
-If temperature reporting is enabled, the dimmer sends the temperature and VCC to it's own I2C address + 1.
+If temperature reporting is enabled, the dimmer sends the temperature, VCC and AC frequency to it's own I2C address + 1.
 
-The register address DIMMER_TEMPERATURE_REPORT indicates a temperature (uint8) and VCC (uint16) report
+The register address DIMMER_TEMPERATURE_REPORT indicates temperature (uint8), VCC (uint16) and frequency (float)
 
-    +I2CT=18F022E212
+    +I2CT=18F022E212426E5C29
+
+## Temperature Alarm
 
 If the max. temperature was exceeded, it sends one alarm with register address DIMMER_TEMPERATURE_ALERT, the current temperature (uint8) and the temperature threshold (uint8)
 
     +I2CT=18F16A64
+
+## Fading completed
+
+When fading to a new level has been completed, the dimmer sends DIMMER_FADING_COMPLETE, with channel (int8) and level (int16). Channel and level can occur multiple times in the case 2 channels finished at the same time.
+
+Channel 0 and 1 reached 0x1234 and fading is complete:
+
+    +I2CT=18F2001234011234
+
+Channel 0 reached level 0:
+
+    +I2CT=18F2000000

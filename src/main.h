@@ -5,6 +5,7 @@
 #pragma once
 
 #include "dimmer.h"
+#include "i2c_slave.h"
 
 #ifndef DIMMER_I2C_SLAVE
 #define DIMMER_I2C_SLAVE                        1
@@ -16,6 +17,10 @@
 
 #ifndef SERIAL_I2C_BRDIGE
 #define SERIAL_I2C_BRDIGE                       0
+#endif
+
+#ifndef DEFAULT_BAUD_RATE
+#define DEFAULT_BAUD_RATE                       115200
 #endif
 
 #ifndef USE_EEPROM
@@ -54,10 +59,6 @@
 #endif
 #endif
 
-#ifndef DEFAULT_BAUD_RATE
-#define DEFAULT_BAUD_RATE                       115200
-#endif
-
 // NTC pin
 #ifndef NTC_PIN
 #define NTC_PIN                                 A1
@@ -81,32 +82,9 @@
 
 #if USE_EEPROM
 
-#define CONFIG_ID                               0xc33e166c5e7c6572
+#define CONFIG_ID                               0xc33e186c5e2c8574
 #define EEPROM_WRITE_DELAY                      1000
 #define EEPROM_REPEATED_WRITE_DELAY             30000
-
-typedef struct {
-    uint8_t restore_level: 1;
-    uint8_t report_temp: 1;
-    uint8_t temperature_alert: 1;
-    uint8_t ___reserved: 5;
-} config_options_t;
-
-typedef struct {
-    float fadein_time;
-    uint8_t max_temp;
-    union {
-        config_options_t bits;
-        uint8_t options;
-    };
-    uint8_t temp_check_interval;
-} config_reg_mem_t;
-
-typedef struct {
-    uint32_t eeprom_cycle;
-    config_reg_mem_t cfg;
-    int16_t level[DIMMER_CHANNELS];
-} config_t;
 
 void read_config();
 void write_config();
@@ -125,7 +103,5 @@ uint16_t read_vcc();
 uint16_t read_ntc_value(uint8_t num = 5);
 float convert_to_celsius(uint16_t value);
 #endif
-
-extern config_t config;
 
 #endif

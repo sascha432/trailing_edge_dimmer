@@ -14,7 +14,7 @@ Firmware for a trailing edge MOSFET dimmer.
 
 # PCBs arrived and first prototype is working
 
-* Wall Mounted Dimmer
+* In-Wall Dimmer
 * ESP8266 with MQTT and Home Assistant integration
 * Atmega328P as controller over UART
 * [ESP12E/Atmega328P Control Module](https://easyeda.com/sascha23095123423/esp12e_iot_module)

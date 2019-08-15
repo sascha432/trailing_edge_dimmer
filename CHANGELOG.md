@@ -1,5 +1,14 @@
 ## Changelog
 
+## 2.0.2
+ - Configurable timing parameters for the MOSFET
+ - Added documentation for timings to dimmer.h
+ - Display compile settings and values during start up (HIDE_DIMMER_INFO)
+ - Added AC frequency measurement (FREQUENCY_TEST_DURATION)
+ - Enabled printf float formatting and removed PrintEx library
+ - Added event to indicate when a fading operation has been completed (HAVE_FADE_COMPLETION_EVENT)
+ - Fixed an issue with floats and rounding when using fading
+
 ## 2.0.1
 - Changed default I2C address to 0x17/0x18
 - Increased delay when reading internal temperature and VCC

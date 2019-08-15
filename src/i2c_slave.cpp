@@ -35,6 +35,7 @@ void set_level(int8_t channel, int16_t level) {
 
 #if DEBUG
 void dump_macros() {
+#if 0
     char str[100];
 
     #define DUMP_MACRO(name) { memset(str, 32, sizeof(str)); strcpy_P(str, ({static const char __c[] PROGMEM = {#name}; &__c[0];}))[strlen(str)] = 32; str[35] = 0; SerialEx.printf("#define %s ", str); SerialEx.printf("0x%02x\n", name); }
@@ -61,8 +62,12 @@ void dump_macros() {
     DUMP_MACRO(DIMMER_REGISTER_FADE_IN_TIME);
     DUMP_MACRO(DIMMER_REGISTER_TEMP_CHECK_INT);
     DUMP_MACRO(DIMMER_REGISTER_LC_FACTOR);
+    DUMP_MACRO(DIMMER_REGISTER_ZC_DELAY_TICKS);
+    DUMP_MACRO(DIMMER_REGISTER_MIN_ON_TIME_TICKS);
+    DUMP_MACRO(DIMMER_REGISTER_ADJ_HALFWAVE_TICKS);
     DUMP_MACRO(DIMMER_REGISTER_ADDRESS);
     DUMP_MACRO(DIMMER_REGISTER_END_ADDR);
+#endif
 }
 #endif
 
@@ -165,6 +170,13 @@ void _dimmer_i2c_on_receive(int length) {
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.vcc));
                     break;
 #endif
+#if FREQUENCY_TEST_DURATION
+                case DIMMER_COMMAND_READ_AC_FREQUENCY:
+                    register_mem.data.temp = dimmer_get_frequency();
+                    _D(5, SerialEx.printf_P(PSTR("I2C get AC frequency=%s\n"), float_to_str(register_mem.data.temp)));
+                    i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
+                    break;
+#endif
 #if USE_EEPROM
                 case DIMMER_COMMAND_WRITE_EEPROM:
                     write_config();
@@ -174,6 +186,35 @@ void _dimmer_i2c_on_receive(int length) {
                     reset_config();
                     init_eeprom();
                     _write_config();
+                    break;
+                case DIMMER_COMMAND_READ_TIMINGS:
+                    if (length-- > 0) {
+                        uint8_t timing = (uint8_t)Wire.read();
+                        switch(timing) {
+                            case DIMMER_TIMINGS_TMR1_TICKS_PER_US:
+                                register_mem.data.temp = DIMMER_TMR1_TICKS_PER_US;
+                                break;
+                            case DIMMER_TIMINGS_TMR2_TICKS_PER_US:
+                                register_mem.data.temp = DIMMER_TMR2_TICKS_PER_US;
+                                break;
+                            case DIMMER_TIMINGS_ZC_DELAY_IN_US:
+                                register_mem.data.temp = DIMMER_TICKS_TO_US(register_mem.data.cfg.zero_crossing_delay_ticks, DIMMER_TMR2_TICKS_PER_US);
+                                break;
+                            case DIMMER_TIMINGS_MIN_ON_TIME_IN_US:
+                                register_mem.data.temp = DIMMER_TICKS_TO_US(register_mem.data.cfg.minimum_on_time_ticks, DIMMER_TMR1_TICKS_PER_US);
+                                break;
+                            case DIMMER_TIMINGS_ADJ_HW_TIME_IN_US:
+                                register_mem.data.temp = DIMMER_TICKS_TO_US(register_mem.data.cfg.adjust_halfwave_time_ticks, DIMMER_TMR1_TICKS_PER_US);
+                                break;
+                            default:
+                                timing = 0;
+                                break;
+                        }
+                        if (timing) {
+                            i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
+                            _D(5, SerialEx.printf_P(PSTR("I2C get timing %#02x=%s\n"), timing, String(register_mem.data.temp, 5).c_str()));
+                        }
+                    }
                     break;
 #if DEBUG
                 case DIMMER_COMMAND_DUMP_MEM:
