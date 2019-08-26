@@ -14,7 +14,10 @@ Firmware for a trailing edge MOSFET dimmer.
 
 # Tested PCB Rev 3.1 is online
 
-* [4 Channel Dimmer](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2))
+* [4 Channel Dimmer](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2)
+
+![KFC FW UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui.jpg)
+![4 Channel Dimmer](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/4ch_dimmer.JPG)
 
 # PCBs arrived and first prototype is working
 
@@ -23,6 +26,8 @@ Firmware for a trailing edge MOSFET dimmer.
 * Atmega328P as controller over UART
 * [ESP12E/Atmega328P Control Module](https://easyeda.com/sascha23095123423/esp12e_iot_module)
 * [1 Channel Dimmer Module](https://easyeda.com/sascha23095123423/iot_1ch_dimmer)
+
+![1 Channel Dimmer](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/1ch_dimmer.JPG)
 
 Testing it with a PWM generator to simulate the zero crossing signal, dimming a LED instead switching the MOSFET. The 120V part is waiting for opto couplers.
 
