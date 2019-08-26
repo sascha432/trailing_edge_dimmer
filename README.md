@@ -39,7 +39,7 @@ Testing it with a PWM generator to simulate the zero crossing signal, dimming a 
 * Improved power consumption (~0.3-0.4W idle depending on the power supply)
 * Improved MOSFET switching
 
-![Final design](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematics_4Ch-Dimmer-Rev3_1.png)
+![Final design](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_4Ch-Dimmer-Rev3_1.png)
 
 [Open schematics...](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2)
 
