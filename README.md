@@ -12,27 +12,31 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
+# Tested PCB Rev 3.1 is online
+
+* [4 Channel Dimmer](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2))
+
 # PCBs arrived and first prototype is working
 
 * In-Wall Dimmer
 * ESP8266 with MQTT and Home Assistant integration
 * Atmega328P as controller over UART
 * [ESP12E/Atmega328P Control Module](https://easyeda.com/sascha23095123423/esp12e_iot_module)
-* 1 Channel Dimmer Module - Coming soon
+* [1 Channel Dimmer Module](https://easyeda.com/sascha23095123423/iot_1ch_dimmer)
 
- Testing it with a PWM generator to simulate the zero crossing signal, dimming a LED instead switching the MOSFET. The 120V part is waiting for opto couplers.
+Testing it with a PWM generator to simulate the zero crossing signal, dimming a LED instead switching the MOSFET. The 120V part is waiting for opto couplers.
 
  ![Testing PCB](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/IMG_9100.JPG)
 
-# Schematics of the final design (not yet tested, waiting for PCBs and parts)
+# Schematics of the final design
 
 * 3.3V only
 * Improved power consumption (~0.3-0.4W idle depending on the power supply)
 * Improved MOSFET switching
 
-![Final design](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematics_4Ch-Dimmer-Rev3.png)
+![Final design](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematics_4Ch-Dimmer-Rev3_1.png)
 
-[Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_4Ch-Dimmer-Rev3.svg)
+[Open schematics...](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2)
 
 # Improved zero crossing detection
 
@@ -45,7 +49,7 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.svg)
 
- 
+
 # In action
 
 ![In action](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/oscilloscope_example.jpg)
