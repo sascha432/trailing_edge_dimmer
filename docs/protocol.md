@@ -181,7 +181,7 @@ Read zero crossing delay
     +i2ct=17,89,23,03
     +i2cr=17,04
 
-NOTE: Values are stored in ticks in the EEPROM, not micro seconds. DIMMER_TIMINGS_TMR1_TICKS_PER_US and DIMMER_TIMINGS_TMR2_TICKS_PER_US need to be used to translate them.
+**NOTE:** Values are stored in ticks in the EEPROM. DIMMER_TIMINGS_TMR1_TICKS_PER_US and DIMMER_TIMINGS_TMR2_TICKS_PER_US can be used to translate time to ticks.
 
 ## Reading and writing the dimmer settings
 
@@ -200,7 +200,7 @@ NOTE: Values are stored in ticks in the EEPROM, not micro seconds. DIMMER_TIMING
 - Bit 1: Report temperature and over-temperature alarm (UART only)
 - Bit 2: Temperature alarm indication. Needs to be cleared manually
 
-To make any changes permanent, *DIMMER_COMMAND_WRITE_EEPROM* needs to be executed.
+To make any changes permanent, **DIMMER_COMMAND_WRITE_EEPROM** needs to be executed.
 
 Read all settings
 
@@ -216,21 +216,80 @@ Response (0x1e, 30 seconds)
 
     +I2CT=751E
 
-Set temperature check interval to 30 seconds
+Set temperature check interval/metrics reporting to 30 seconds
 
     +i2ct=17,a8,1e
+
+**Note:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+i2ct=17,89,54*) can be used to force a check without waiting
 
 Setting the linear correction factor to 1.0
 
     +i2ct=17,a9,00,00,80,3f
 
+## DIMMER_COMMAND_PRINT_INFO
+
+Print dimmer info on serial port
+
+    +i2ct=17,89,53
+
+### Compile options
+
+`+REM=options=EEPROM,NTC=19,Int.Temp,Temp.Chk,VCC,Fade,LCF,ACFrq=60,Pr=UART,CE=1,Addr=17,CPU=8,Pre=8/64,Ticks=1.000/0.125,Lvls=8333,Chs=4`
+
+- EEPROM = EEPROM enabled
+- NTC=19 = NTC enabled on PIN 19 (A5)
+- Int.Temp = Internal temperature sensor enabled
+- Temp.Chk = Temperature check and metrics enabled
+- VCC = Read VCC enabled
+- Fade = Fading enabled
+- LCF = Linear correction factor enabled
+- ACFrq=60 - AC frequency 60Hz
+- Pr=UART - Protocol UART
+- CE=1 - Fading completion event enabled
+- Addr=17 - Device address 0x17
+- CPU=8 - CPU 8Mhz
+- Pre=8/64 - Prescaler for timer1=8, timer2=64
+- Ticks=1.000/0.125 - Timer1/2 ticks per µs
+- Lvls=8333 - Max. brightness level 8333
+- P=6,8,9,10 - MOSFET pins / number of channels supported
+
+### Parameters and values
+
+`+REM=values=Restore=1,ACFrq=61.871,ref11=1.100,NTC=50.30,Int.Temp=38.78,VCC=3.322,Max.Temp=75,rtime=60,LCF=1.000,Min.on=200,Adj.hw=200,ZC.delay=13`
+
+- Restore=1 - Restore brightness after start`*`
+- ACFreq=61.871 - Measured AC frequency
+- ref11=1.100 - Reference voltage`*`
+- NTC=50.30 - NTC temperature in °C
+- Int.temp=38.78 - Atmega internal temperature in °C
+- VCC=3.322 - Supply voltage in V
+- Max.Temp=75 - Maximum temperature before emergency shutoff`*`
+- rtime=60 - Interval for metrics reporting`*`
+- LCF=1.000 - Linear correction factor`*`
+- Min.on=200 - Minimum on time in ticks (timer1)`*`
+- Adj.hw=200 - Adjust havewave time in ticks (timer1)`*`
+- ZC.delay=13 - Zero crossing delay in ticks (timer2)`*`
+
+**Note:** `*` These parameters can be changed
+
+## DIMMER_COMMAND_PRINT_METRICS
+
+Print metrics every 5 seconds on serial port in human readable form. The following byte enables (non 0) or disables the output
+
+    +i2ct=17,89,55,01
+
+## DIMMER_COMMAND_FORCE_TEMP_CHECK
+
+Force temperature check and report metrics if enabled
+
+    +i2ct=17,89,54
 
 ## DIMMER_COMMAND_DUMP_xxx
 
 - DIMMER_COMMAND_DUMP_MEM
 - DIMMER_COMMAND_DUMP_MACROS
 
-This is only available with enabled debugging. 
+This is only available with enabled debugging.
 
 Dump the content of the register memory
 
@@ -240,21 +299,22 @@ Dump macros for the register memory.
 
     +i2ct=17,89,ef
 
-## Temperature, VCC status and AC Frequency
+## Temperature, VCC status and AC Frequency (DIMMER_METRICS_REPORT)
 
-If temperature reporting is enabled, the dimmer sends the temperature, VCC and AC frequency to it's own I2C address + 1.
+If metrics reporting is enabled, the dimmer sends dimmer_metrics_t with DIMMER_TEMPERATURE_REPORT to it's own I2C address + 1.
+This can also be trigger with the command DIMMER_COMMAND_FORCE_TEMP_CHECK. The maximum interval is set with cfg.report_metrics_max_interval, the minimum is cfg.temp_check_interval. The event is sent either when the maximum time has been reached, or if any values has changed significantly.
 
-The register address DIMMER_TEMPERATURE_REPORT indicates temperature (uint8), VCC (uint16) and frequency (float)
+If data is not available, 0 (for VCC) or NaN (for any float) is returned.
 
-    +I2CT=18F022E212426E5C29
+    +I2CT=18F02...
 
-## Temperature Alarm
+## Temperature Alarm (DIMMER_TEMPERATURE_ALERT)
 
 If the max. temperature was exceeded, it sends one alarm with register address DIMMER_TEMPERATURE_ALERT, the current temperature (uint8) and the temperature threshold (uint8)
 
     +I2CT=18F16A64
 
-## Fading completed
+## Fading completed (DIMMER_FADING_COMPLETE)
 
 When fading to a new level has been completed, the dimmer sends DIMMER_FADING_COMPLETE, with channel (int8) and level (int16). Channel and level can occur multiple times in the case 2 channels finished at the same time.
 
@@ -265,3 +325,16 @@ Channel 0 and 1 reached 0x1234 and fading is complete:
 Channel 0 reached level 0:
 
     +I2CT=18F2000000
+
+## EEPROM written event (DIMMER_EEPROM_WRITTEN)
+
+EEPROM writes might be delayed due to wear leveling. Once written, DIMMER_EEPROM_WRITTEN with structure dimmer_eeprom_written_t is sent.
+
+    +I2CT=18F301000000000000
+
+## Frequency warning (DIMMER_FREQUENCY_WARNING)
+
+If a too low or high frequency (<75% >120%) is detected, DIMMER_FREQUENCY_WARNING will be sent. The byte indicates if it was too low (0) or high (1).
+No zero crossing signal does not fire this event, but the frequency measurement will return NaN.
+
+The error is stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*, which need to be reset manually.

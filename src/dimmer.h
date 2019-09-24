@@ -15,7 +15,7 @@
 //  for timing see docs/timings.svg
 // **********************************
 
-// the exact delay depends on the zero crossing detection, the prescaler and the CPU speed, the propagation delay and overall 
+// the exact delay depends on the zero crossing detection, the prescaler and the CPU speed, the propagation delay and overall
 // capacitiy of the circuit. I strongly recommend to check with an oscilloscope to get the exact timings. It can be tuned very
 // well by software to be accurate in the 200-300 nano second range.
 
@@ -23,7 +23,7 @@
 
 //  0.000 zero crossing
 //  6.658 zero crossing interrupt
-//  1.675 zero crossing delay (DIMMER_ZC_DELAY_US=1675) 
+//  1.675 zero crossing delay (DIMMER_ZC_DELAY_US=1675)
 //        NOTE: there is an additional delay of 22.8us (atmega328p, 16mhz) between the interrupt and the MOSFETs being turned on
 //        depending on the circuit, there will be a propagation delay of 100-500ns, or even more. The delay needs to be adjusted accordingly
 //  8.333 next zero crossing, turn on mosfets - dimmer level 0%
@@ -35,7 +35,7 @@
 
 // default for DIMMER_REGISTER_ZC_DELAY_TICKS
 #ifndef DIMMER_ZC_DELAY_US
-#define DIMMER_ZC_DELAY_US                                      1670  // micro seconds
+#define DIMMER_ZC_DELAY_US                                      104  // in µs
 #endif
 
 // default for DIMMER_REGISTER_MIN_ON_TIME_TICKS
@@ -51,7 +51,7 @@
 // this adjustment reduces the maximum on time while it does not reduce the dimming range (max level). if max level
 // is set to 100%, the mosfets do not turn off anymore.
 // basically: HALFWAVE_TIME_US - DIMMER_ADJUST_HALFWAVE_US = DIMMER_MAX_ON_TIME_US
-#define DIMMER_ADJUST_HALFWAVE_US                               300 // reduce "on"-time in µs
+#define DIMMER_ADJUST_HALFWAVE_US                               200 // reduce "on"-time in µs
 #endif
 
 // some LEDs have a soft start function. to get smooth fading, the minimum level is set
@@ -64,9 +64,16 @@
 
 // used to calculate the length of the half wave
 #ifndef DIMMER_AC_FREQUENCY
-    #define DIMMER_AC_FREQUENCY                                 60
+    #define DIMMER_AC_FREQUENCY                                 60      // Hz
 #endif
 
+#ifndef DIMMER_LOW_FREQUENCY
+#define DIMMER_LOW_FREQUENCY                                    0.75    // 75%
+#endif
+
+#ifndef DIMMER_HIGH_FREQUENCY
+#define DIMMER_HIGH_FREQUENCY                                   1.2     // 120%
+#endif
 
 // fading command
 #define DIMMER_USE_FADING                                       1
@@ -79,6 +86,8 @@
 #ifndef DIMMER_MOSFET_PINS
     #define DIMMER_MOSFET_PINS                                  { 6, 8, 9, 10 }
 #endif
+
+static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 
 // sets the maximum level (100%)
 #ifndef DIMMER_MAX_LEVEL
@@ -102,7 +111,7 @@
 
 #if DIMMER_USE_LINEAR_CORRECTION
 // pow() is pretty slow
-#define DIMMER_LINEAR_LEVEL(level)                              (register_mem.data.cfg.linear_correction_factor == 1 ? level : pow(level, register_mem.data.cfg.linear_correction_factor) * dimmer.linear_correction_divider)
+#define DIMMER_LINEAR_LEVEL(level)                              (dimmer_config.linear_correction_factor == 1 ? level : (float)pow(level, dimmer_config.linear_correction_factor) * dimmer.linear_correction_divider)
 #else
 #define DIMMER_LINEAR_LEVEL(level)                              level
 #endif
@@ -149,7 +158,7 @@
 #define DIMMER_START_TIMER2()                                   TCCR2B |= DIMMER_TIMER2_PRESCALER_BV;
 #define DIMMER_PAUSE_TIMER2()                                   TCCR2B = 0;
 
-#define DIMMER_GET_TICKS(level)                                 max(register_mem.data.cfg.minimum_on_time_ticks, (level * DIMMER_TICKS_PER_HALFWAVE) / DIMMER_MAX_LEVEL - register_mem.data.cfg.adjust_halfwave_time_ticks)
+#define DIMMER_GET_TICKS(level)                                 max(dimmer_config.minimum_on_time_ticks, (level * DIMMER_TICKS_PER_HALFWAVE) / DIMMER_MAX_LEVEL - dimmer_config.adjust_halfwave_time_ticks)
 
 #define DIMMER_ENABLE_TIMERS()                                  { TIMSK1 |= (1 << OCIE1A); TCCR1A = 0; TCCR1B = 0; TIMSK2 |= (1 << OCIE2A); TCCR2A = 0; TCCR2B = 0; }
 #define DIMMER_DISABLE_TIMERS()                                 { TIMSK1 &= ~(1 << OCIE1A); TIMSK2 &= ~(1 << OCIE2A); }
@@ -168,9 +177,9 @@
 
 #ifndef HAVE_FADE_COMPLETION_EVENT
 #if DIMMER_USE_FADING == 0
-#define HAVE_FADE_COMPLETION_EVENT              0
+#define HAVE_FADE_COMPLETION_EVENT                              0
 #else
-#define HAVE_FADE_COMPLETION_EVENT              1
+#define HAVE_FADE_COMPLETION_EVENT                              1
 #endif
 #endif
 
@@ -186,8 +195,13 @@
 float dimmer_get_frequency();
 #endif
 
-#define DIMMER_VERSION                                          "2.0.2"
-#define DIMMER_INFO                                             "Author: sascha_lammers@gmx.de"
+#define DIMMER_VERSION_WORD                                     ((2 << 10) | (1 << 5) | 0)
+#define DIMMER_VERSION                                          "2.1.0"
+#define DIMMER_INFO                                             "Author sascha_lammers@gmx.de"
+
+#ifndef DIMMER_I2C_SLAVE
+#define DIMMER_I2C_SLAVE                                        1
+#endif
 
 typedef int8_t dimmer_channel_id_t;
 typedef int16_t dimmer_level_t;
@@ -211,18 +225,31 @@ typedef struct __attribute__packed__ {
 
 #define INVALID_LEVEL                                           -1
 
+#if DIMMER_I2C_SLAVE
 #define dimmer_level(ch)        register_mem.data.level[ch]
-// #define dimmer_level(ch)        dimmer.level[ch]
+#define dimmer_config           register_mem.data.cfg
+#else
+#define dimmer_level(ch)        dimmer.level[ch]
+#define dimmer_config           dimmer.cfg
+#endif
 
 struct dimmer_t {
-    // uint16_t level[DIMMER_CHANNELS];                                 // current level
+#if !DIMMER_I2C_SLAVE
+    dimmer_level_t level[DIMMER_CHANNELS];                              // current level
+    struct {
+        uint8_t zero_crossing_delay_ticks;
+        uint16_t minimum_on_time_ticks;
+        uint16_t adjust_halfwave_time_ticks;
+        float linear_correction_factor;
+    } cfg;
+#endif
 #if DIMMER_USE_FADING
     dimmer_fade_t fade[DIMMER_CHANNELS];                                // calculated fading data
 #endif
 #if DIMMER_USE_LINEAR_CORRECTION
     float linear_correction_divider;
 #endif
-    uint8_t channel_ptr;
+    dimmer_channel_id_t channel_ptr;
     dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];             // current dimming levels in ticks
     dimmer_channel_t ordered_channels_buffer[DIMMER_CHANNELS + 1];      // next dimming levels
 
@@ -242,14 +269,14 @@ void dimmer_timer_setup();
 void dimmer_timer_remove();
 void dimmer_start_timer1();
 void dimmer_start_timer2();
-void dimmer_set_level(uint8_t channel, int16_t level);
-uint16_t dimmer_get_level(uint8_t channel);
+void dimmer_set_level(dimmer_channel_id_t channel, dimmer_level_t level);
+dimmer_level_t dimmer_get_level(dimmer_channel_id_t channel);
 #if DIMMER_USE_LINEAR_CORRECTION
 void dimmer_set_lcf(float lcf);
 #endif
 #if DIMMER_USE_FADING
-void dimmer_set_fade(uint8_t channel, int16_t from, int16_t to, float time, bool absolute_time = false);
-void dimmer_fade(uint8_t channel, int16_t to_level, float time_in_seconds, bool absolute_time = false);
+void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time = false);
+void dimmer_fade(dimmer_channel_id_t channel, dimmer_level_t to, float time_in_seconds, bool absolute_time = false);
 void dimmer_apply_fading();
 #endif
-void dimmer_set_mosfet_gate(uint8_t channel, bool state);
+void dimmer_set_mosfet_gate(dimmer_channel_id_t channel, bool state);

@@ -1,5 +1,27 @@
 ## Changelog
 
+## 2.1.0
+  - Added version to register memory (DIMMER_REGISTER_VERSION)
+  - Added print dimmer info command (DIMMER_COMMAND_PRINT_INFO)
+  - Added command force temperature check (DIMMER_COMMAND_FORCE_TEMP_CHECK)
+  - Added structure dimmer_metrics_t for DIMMER_METRICS_REPORT
+  - Added CRC16 to EEPROM configuration
+  - Added event that indicates that the EEPROM has been written (DIMMER_EEPROM_WRITTEN)
+  - Added print metrics on serial port (DIMMER_COMMAND_PRINT_METRICS)
+  - Added offset for internal temperature sensor and ntc (DIMMER_REGISTER_xxx_TEMP_OFS, int8 * 0.25 °C, ~ +-32°C)
+  - Added warning if the AC frequency is below 75% or above 120% (DIMMER_FREQUENCY_WARNING)
+  - Added undocumented commands for testing and calibration (0x80-0x91, i2c_slave.cpp)
+  - Added MCU detection for adjusting internal temperature sensor
+  - DIMMER_COMMAND_READ_NTC, DIMMER_COMMAND_READ_INT_TEMP and DIMMER_COMMAND_READ_AC_FREQUENCY return NaN if not available, DIMMER_COMMAND_READ_VCC 0
+  - Fixed outdated debug code
+  - Fixed issue with reading ADC values and delay() inside the I2C interrupt callback
+  - Fixed empty configuration structure after reset without calling _write_config()
+  - Fixed int overflow for temp_check_interval > 32
+  - Fixed pin mode for NTC
+  - Fixed fading with short time intervals and float not having enough precision for a sinle step
+  - Changed default values for ZC crossing delay and other timings to match my dimmer design
+  - Changed DIMMER_TEMPERATURE_REPORT to DIMMER_METRICS_REPORT
+
 ## 2.0.2
  - Configurable timing parameters for the MOSFET
  - Added documentation for timings to dimmer.h
