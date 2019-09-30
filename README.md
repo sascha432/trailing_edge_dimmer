@@ -13,7 +13,7 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
-[Change Log v2.1.1](docs/CHANGELOG.md)
+[Change Log v2.1.1](CHANGELOG.md)
 
 # Zero crossing detection update
 
@@ -26,13 +26,13 @@ Test environment: 4x10W LED + 60W incandescent bulb, 50% dimmed, random 1000-250
 
 # 3D models released
 
-![Printed version](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_tn.jpg)
+![Printed version](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_small.jpg)
 
-[Open](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing.jpg)
+[Open image](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing.jpg)
 
 ![3D model](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_3d_model_tn.jpg)
 
-![Open](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_3d_model.jpg)
+[Open image](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_3d_model.jpg)
 
 [3D model download](stl/housing)
 
