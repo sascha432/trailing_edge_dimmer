@@ -15,6 +15,7 @@ dimmer_t dimmer;
 volatile uint8_t zero_crossing_int_counter = 0;
 volatile unsigned long zero_crossing_frequency_time = 0;
 volatile uint16_t zero_crossing_frequency_period; // milliseconds for DIMMER_AC_FREQUENCY interrupts
+volatile ulong zc_min_time = 0;
 
 float dimmer_get_frequency() {
     if (!zero_crossing_frequency_period) {
@@ -24,6 +25,7 @@ float dimmer_get_frequency() {
     if (last > 1000 / DIMMER_LOW_FREQUENCY) { // signal lost
         zero_crossing_frequency_period = 0;
         dimmer_schedule_call(FREQUENCY_LOW);
+        register_mem.data.errors.frequency_low++;
         return NAN;
     }
     return 500 * DIMMER_AC_FREQUENCY / (float)zero_crossing_frequency_period;
@@ -31,7 +33,19 @@ float dimmer_get_frequency() {
 
 #endif
 
+#if ZC_MAX_TIMINGS
+volatile unsigned long *zc_timings = nullptr;
+volatile uint8_t zc_timings_counter;
+bool zc_timings_output = false;
+#endif
+
 void dimmer_setup() {
+#if ZC_MAX_TIMINGS
+    if (!zc_timings) {
+        zc_timings = new ulong[ZC_MAX_TIMINGS];
+    }
+    zc_timings_counter = 0;
+#endif
     for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
 	    dimmer_pins_mask[i] = digitalPinToBitMask(dimmer_pins[i]);
 	    dimmer_pins_addr[i] = portOutputRegister(digitalPinToPort(dimmer_pins[i]));
@@ -41,12 +55,33 @@ void dimmer_setup() {
     dimmer_timer_setup();
 }
 
+#if ZC_MAX_TIMINGS
+void dimmer_record_zc_timings(ulong time) {
+    if (zc_timings_output) {
+        zc_timings[zc_timings_counter] = time;
+        zc_timings_counter = (zc_timings_counter + 1) % ZC_MAX_TIMINGS;
+    }
+}
+#endif
+
 void dimmer_zc_interrupt_handler() {
+    auto time = micros();
+    if (time < zc_min_time) { // filter misfire of the ZC circuit
+        register_mem.data.errors.zc_misfire++;
+#if ZC_MAX_TIMINGS
+        dimmer_record_zc_timings(time);
+#endif
+        return;
+    }
     if (dimmer_config.zero_crossing_delay_ticks) {
         dimmer_start_timer2(); // delay timer1 until actual zero crossing
     } else {
         dimmer_start_timer1(); // no delay, start timer1
     }
+    zc_min_time = time + (ulong)(1e6 / DIMMER_AC_FREQUENCY / 3);       // filter above 90Hz @60Hz mains
+#if ZC_MAX_TIMINGS
+    dimmer_record_zc_timings(time);
+#endif
     memcpy(dimmer.ordered_channels, dimmer.ordered_channels_buffer, sizeof(dimmer.ordered_channels));
     sei();
 #if DIMMER_USE_FADING
@@ -61,9 +96,11 @@ void dimmer_zc_interrupt_handler() {
         zero_crossing_frequency_time = _millis;
         if (zero_crossing_frequency_period > 500 / DIMMER_LOW_FREQUENCY) {
             dimmer_schedule_call(FREQUENCY_LOW);
+            register_mem.data.errors.frequency_low++;
         }
         else if (zero_crossing_frequency_period < 500 / DIMMER_HIGH_FREQUENCY) {
             dimmer_schedule_call(FREQUENCY_HIGH);
+            register_mem.data.errors.frequency_high++;
         }
     }
 #endif

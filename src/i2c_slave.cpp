@@ -2,6 +2,7 @@
  * Author: sascha_lammers@gmx.de
  */
 
+#include <avr/wdt.h>
 #include "i2c_slave.h"
 #include "helpers.h"
 
@@ -237,6 +238,17 @@ void _dimmer_i2c_on_receive(int length) {
                     else {
                         dimmer_schedule_call(PRINT_METRICS);
                     }
+                    break;
+#endif
+
+                case DIMMER_COMMAND_RESET:
+                    wdt_reset();
+                    break;
+
+#if ZC_MAX_TIMINGS
+                case DIMMER_COMMAND_ZC_TIMINGS_OUTPUT:
+                    zc_timings_output = (length-- > 0 && Wire.read() != 0);
+                    zc_timings_counter = 0;
                     break;
 #endif
 

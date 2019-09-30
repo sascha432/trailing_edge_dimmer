@@ -42,6 +42,12 @@ typedef struct __attribute__packed__ {
 } register_mem_cfg_t;
 
 typedef struct __attribute__packed__ {
+    uint8_t frequency_low;
+    uint8_t frequency_high;
+    uint8_t zc_misfire;
+} register_mem_errors_t;
+
+typedef struct __attribute__packed__ {
     int16_t from_level;
     int8_t channel;
     int16_t to_level;
@@ -52,6 +58,7 @@ typedef struct __attribute__packed__ {
     uint16_t vcc;
     register_mem_cfg_t cfg;
     uint16_t version;
+    register_mem_errors_t errors;
     uint8_t address;
 } register_mem_t;
 

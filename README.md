@@ -3,16 +3,40 @@
 Firmware for a trailing edge MOSFET dimmer.
 
 * 16666 different dimming levels
-* Up to 16 different channels
-* Store last levels in EEPROM and restore during boot
+* Up to 8 different channels
+* Store last levels in EEPROM and restore during startup
 * EEPROM wear level protection
 * Serial protocol to control the dimmer
 * I2C or UART interface
-* Over temperature protection using an external NTC or the internal ATMEGA temperature sensor
+* Over temperature protection using an external NTC or the internal ATmega temperature sensor
+* Highly configurable to match hardware
 
 [I2C/UART protocol](docs/protocol.md)
 
-# Tested PCB Rev 3.1 is online
+[Change Log v2.1.1](docs/CHANGELOG.md)
+
+# Zero crossing detection update
+
+I've improved the zero crossing detection by adding a RC filter, which improves the signal but still has a 0.5% error rate compared to 2.2% before.
+Software filtering reduces the error rate to 0.001% even without the RC filter.
+
+Test environment: 4x10W LED + 60W incandescent bulb, 50% dimmed, random 1000-2500V transients 5-20µs several times per second on the AC side.
+
+![Comparision of unfiltered and filtered signal](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/zero_crossing_signal_filtering.png)
+
+# 3D models released
+
+![Printed version](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_tn.jpg)
+
+[Open](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing.jpg)
+
+![3D model](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_3d_model_tn.jpg)
+
+![Open](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_3d_model.jpg)
+
+[3D model download](stl/housing)
+
+# Tested PCB Rev 3.3 is online
 
 * [4 Channel Dimmer](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2)
 

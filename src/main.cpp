@@ -22,7 +22,7 @@ void reset_config() {
     memset(&config, 0, sizeof(config));
     memset(&register_mem.data.cfg, 0, sizeof(register_mem.data.cfg));
     register_mem.data.version = DIMMER_VERSION_WORD;
-    register_mem.data.cfg.max_temp = 75;
+    register_mem.data.cfg.max_temp = 90;
     register_mem.data.cfg.bits.restore_level = true;
     register_mem.data.cfg.bits.report_metrics = true;
     register_mem.data.cfg.fade_in_time = 7.5;
@@ -280,7 +280,7 @@ void display_dimmer_info() {
     Serial.print(F("EEPROM,"));
 #endif
 #if HAVE_NTC
-    Serial_printf_P(PSTR("NTC=A%u,"), A0 - NTC_PIN);
+    Serial_printf_P(PSTR("NTC=A%u,"), NTC_PIN - A0);
 #endif
 #if HAVE_READ_INT_TEMP
     Serial.print(F("Int.Temp,"));
@@ -413,6 +413,13 @@ unsigned long print_metrics_timeout;
 
 #endif
 
+#if ZC_MAX_TIMINGS
+
+unsigned long print_zc_timings = 0;
+
+#endif
+
+
 #if HAVE_FADE_COMPLETION_EVENT
 
 unsigned long next_fading_event_check = 0;
@@ -457,6 +464,7 @@ void loop() {
     if (dimmer_is_call_scheduled(PRINT_DIMMER_INFO) && millis() > frequency_wait_timeout) {
         dimmer_remove_scheduled_call(PRINT_DIMMER_INFO);
         display_dimmer_info();
+        memset(&register_mem.data.errors, 0, sizeof(register_mem.data.errors));
     }
 #endif
 
@@ -487,6 +495,7 @@ void loop() {
         Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
         Wire.write(DIMMER_FREQUENCY_WARNING);
         Wire.write(dimmer_is_call_scheduled(FREQUENCY_HIGH) ? 1 : 0);
+        Wire.write(reinterpret_cast<const uint8_t *>(&register_mem.data.errors), sizeof(register_mem.data.errors));
         Wire.endTransmission();
         dimmer_remove_scheduled_call(FREQUENCY_ERROR);
 
@@ -544,6 +553,23 @@ void loop() {
 #if USE_EEPROM
     if (dimmer_is_call_scheduled(EEPROM_WRITE) && millis() > eeprom_write_timer) {
         _write_config();
+    }
+#endif
+
+#if ZC_MAX_TIMINGS
+    if (zc_timings_output && millis() > print_zc_timings) {
+        auto tmp = zc_timings[0]; // copy first timing before resetting counter
+        auto counter = zc_timings_counter;
+        zc_timings_counter = 0;
+        print_zc_timings = millis() + 1000;
+        if (counter) {
+            Serial_printf_P(PSTR("+REM=ZC,%lx "), tmp);
+            for(uint8_t i = 1; i < counter; i++) {
+                Serial_printf("%lx ", zc_timings[i] - tmp); // use relative time to reduce output
+                tmp = zc_timings[i];
+            }
+            Serial.println();
+        }
     }
 #endif
 

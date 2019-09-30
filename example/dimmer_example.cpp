@@ -22,6 +22,9 @@ Keys
 'A': select all channels
 
 'p': read channels
+'P': increase frequency signal
+'K': enable zc timings output
+'k': disable zc timings output
 
 '0': set level for current channel to 0
 ',': set level to max
@@ -34,9 +37,12 @@ Keys
 
 't': read temperature and vcc
 'f': read AC frequency
+'E': read errors
 'l': display timings
 'm': modify timings
 'R': set 1.1v reference
+
+'O': wdt reset
 
 's': write EEPROM
 'F': reset configuration to factory default
@@ -77,6 +83,17 @@ ISR(TIMER1_COMPA_vect) {
 ISR(TIMER1_COMPB_vect) {
     digitalWrite(ZC_PIN, LOW);
     TCNT1 = 0;
+    if (rand() % 1000 == 0) {
+        // simulate misfire
+        for(ulong i = 0; i < rand() % 200; i++) {
+            i = i * 1.0;
+        }
+        digitalWrite(ZC_PIN, HIGH);
+        for(ulong i = 0; i < 10; i++) {
+            i = i * 1.0;
+        }
+        digitalWrite(ZC_PIN, LOW);
+    }
 }
 #endif
 
@@ -92,6 +109,7 @@ void setup() {
     TIMSK1 |= (1 << OCIE1A) | (1 << OCIE1B);
     TCCR1A = 0;
     TCCR1B = (1 << CS12); // prescaler 256 = 16us
+    // TCCR1B = ((1 << CS11) | (1 << CS10)); // prescaler 64
     // TCCR1B = (1 << CS11); // prescaler 8 = 0.5us
     TCNT1 = 0;
     OCR1A = F_CPU / 256 / 120;                          // 120Hz
@@ -303,6 +321,18 @@ void read_timing(uint8_t timing, const String &name) {
     }
 }
 
+void read_errors() {
+    register_mem_errors_t errors;
+    Wire.beginTransmission(DIMMER_I2C_ADDRESS);
+    Wire.write(DIMMER_REGISTER_READ_LENGTH);
+    Wire.write(sizeof(errors));
+    Wire.write(DIMMER_REGISTER_ERR_FREQ_LOW);
+    if (endTransmission() == 0 && Wire.requestFrom(DIMMER_I2C_ADDRESS, sizeof(errors)) == sizeof(errors)) {
+        Wire.readBytes(reinterpret_cast<uint8_t *>(&errors), sizeof(errors));
+        Serial_printf_P(PSTR("frequency low %u, frequency high %u, zc misfire %u\n"), errors.frequency_low, errors.frequency_high, errors.zc_misfire);
+    }
+}
+
 void loop() {
 
 #if SERIAL_I2C_BRDIGE
@@ -318,6 +348,38 @@ void loop() {
 
         auto input = Serial.read();
         switch(input) {
+            case 'K':
+                Serial.println(F("Enabling ZC timings output..."));
+                Wire.beginTransmission(DIMMER_I2C_ADDRESS);
+                Wire.write(DIMMER_REGISTER_COMMAND);
+                Wire.write(DIMMER_COMMAND_ZC_TIMINGS_OUTPUT);
+                Wire.write(1);
+                endTransmission();
+                break;
+            case 'k':
+                Serial.println(F("Disabling ZC timings output..."));
+                Wire.beginTransmission(DIMMER_I2C_ADDRESS);
+                Wire.write(DIMMER_REGISTER_COMMAND);
+                Wire.write(DIMMER_COMMAND_ZC_TIMINGS_OUTPUT);
+                Wire.write(0);
+                endTransmission();
+                break;
+            case 'O':
+                Serial.println(F("Sending reset..."));
+                Wire.beginTransmission(DIMMER_I2C_ADDRESS);
+                Wire.write(DIMMER_REGISTER_COMMAND);
+                Wire.write(DIMMER_COMMAND_RESET);
+                endTransmission();
+                break;
+            case 'P': {
+                    OCR1A--;
+                    OCR1B = OCR1A + 3;
+                    Serial_printf_P(PSTR("AC Frequency %.2f Hz (%u)\n"), F_CPU / 256.0 / (float)OCR1A / 2, OCR1A);
+                }
+                break;
+            case 'E':
+                read_errors();
+                break;
             case 't': {
                     float int_temp = NAN;
                     float ntc_temp = NAN;

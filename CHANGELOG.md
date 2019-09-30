@@ -1,5 +1,12 @@
 ## Changelog
 
+## 2.1.1
+  - Changed max. temperature to 90°C which is the maximum operation temperature allowed for dimmers (195F)
+  - Added filter to skip all ZC interrupts above 90Hz (@60Hz mains)
+  - Added error counter for high/low frequency and zero crossing misfire
+  - Added debugging code to send zero crossing interrupt timings to serial port (ZC_MAX_TIMINGS)
+  - Fixed wrong NTC PIN at dimmer info
+
 ## 2.1.0
   - Added version to register memory (DIMMER_REGISTER_VERSION)
   - Added print dimmer info command (DIMMER_COMMAND_PRINT_INFO)

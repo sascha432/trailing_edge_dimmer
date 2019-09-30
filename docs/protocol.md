@@ -232,6 +232,27 @@ Print dimmer info on serial port
 
     +i2ct=17,89,53
 
+## DIMMER_COMMAND_RESET
+
+Reset ATmega via WDT
+
+## DIMMER_COMMAND_ZC_TIMINGS_OUTPUT
+
+If ZC_MAX_TIMINGS is enabled, the dimmer outputs the zero crossing timings to the serial console every ZC_MAX_TIMINGS_INTERVAL milliseconds. ZC_MAX_TIMINGS needs to be equal or higher than the amount of expected data within this period. Collecting the data does not cause a delay of the ZC interrupt.
+
+The data expected is a boolean. Non-zero values enable the output on.
+
+    +i2ct=17,89,60,1
+
+### Outut format
+
+The first argument is the return value of micros() hex encoded. Every following the difference to the previous time.
+
++REM=ZC,\<microseconds\> [\<delay\> [\<delay\> ...]]
+
+    +REM=ZC,17f8c010 20b8 20b4 20b4 20b8 20b4 20b8 ...
+
+
 ### Compile options
 
 `+REM=options=EEPROM,NTC=19,Int.Temp,Temp.Chk,VCC,Fade,LCF,ACFrq=60,Pr=UART,CE=1,Addr=17,CPU=8,Pre=8/64,Ticks=1.000/0.125,Lvls=8333,Chs=4`
@@ -334,7 +355,7 @@ EEPROM writes might be delayed due to wear leveling. Once written, DIMMER_EEPROM
 
 ## Frequency warning (DIMMER_FREQUENCY_WARNING)
 
-If a too low or high frequency (<75% >120%) is detected, DIMMER_FREQUENCY_WARNING will be sent. The byte indicates if it was too low (0) or high (1).
+If a too low or high frequency (<75% >120%) is detected, DIMMER_FREQUENCY_WARNING will be sent. The second byte indicates if it was too low (0) or high (1), followed by register_mem_errors_t.
 No zero crossing signal does not fire this event, but the frequency measurement will return NaN.
 
-The error is stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*, which need to be reset manually.
+The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*, which need to be reset manually.

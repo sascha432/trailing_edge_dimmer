@@ -195,8 +195,8 @@ static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 float dimmer_get_frequency();
 #endif
 
-#define DIMMER_VERSION_WORD                                     ((2 << 10) | (1 << 5) | 0)
-#define DIMMER_VERSION                                          "2.1.0"
+#define DIMMER_VERSION_WORD                                     ((2 << 10) | (1 << 5) | 1)
+#define DIMMER_VERSION                                          "2.1.1"
 #define DIMMER_INFO                                             "Author sascha_lammers@gmx.de"
 
 #ifndef DIMMER_I2C_SLAVE
@@ -261,6 +261,25 @@ struct dimmer_t {
 #define DIMMER_FADE_FROM_CURRENT_LEVEL -1
 
 extern dimmer_t dimmer;
+
+#ifndef ZC_MAX_TIMINGS
+// 4 byte RAM required for each timing
+#define ZC_MAX_TIMINGS                                          0
+#endif
+
+#if ZC_MAX_TIMINGS > 255
+#error ZC_MAX_TIMINGS is limited to 255, decrease ZC_MAX_TIMINGS_INTERVAL to collect more data
+#endif
+
+#ifndef ZC_MAX_TIMINGS_INTERVAL
+#define ZC_MAX_TIMINGS_INTERVAL                                 500
+#endif
+
+#if ZC_MAX_TIMINGS
+extern volatile unsigned long *zc_timings;
+extern volatile uint8_t zc_timings_counter;
+extern bool zc_timings_output;
+#endif
 
 void dimmer_setup();
 void dimmer_zc_interrupt_handler();
