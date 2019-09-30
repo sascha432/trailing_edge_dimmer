@@ -76,7 +76,7 @@ Testing it with a PWM generator to simulate the zero crossing signal, dimming a 
 
 ![Zero crossing detection](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.png)
 
-[Open schematics...](https://github.com/sascha432/trailing_edge_dimmer/blob/master/docs/schematics/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.svg)
+[Open schematics...](https://easyeda.com/sascha23095123423/isolated-zero-crossing-detection-with-logic-level-output)
 
 
 # In action
