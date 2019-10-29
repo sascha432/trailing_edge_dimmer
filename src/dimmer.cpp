@@ -67,11 +67,16 @@ void dimmer_record_zc_timings(ulong time) {
 void dimmer_zc_interrupt_handler() {
     auto time = micros();
     if (time < zc_min_time) { // filter misfire of the ZC circuit
-        register_mem.data.errors.zc_misfire++;
+        if (zc_min_time - time >= 0x7fffffffUL) {   // timer overflow
+            zc_min_time = ~zc_min_time + 1;
+        }
+        if (time < zc_min_time) {
+            register_mem.data.errors.zc_misfire++;
 #if ZC_MAX_TIMINGS
-        dimmer_record_zc_timings(time);
+            dimmer_record_zc_timings(time);
 #endif
-        return;
+            return;
+        }
     }
     if (dimmer_config.zero_crossing_delay_ticks) {
         dimmer_start_timer2(); // delay timer1 until actual zero crossing
