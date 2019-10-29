@@ -378,6 +378,12 @@ void setup() {
     _debug_level = 9;
     #endif
 
+#if HIDE_DIMMER_INFO == 0
+    rem();
+    Serial.println(F("BOOT"));
+    Serial.flush();
+#endif
+
     dimmer_i2c_slave_setup();
 
     read_config();
