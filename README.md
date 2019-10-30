@@ -35,8 +35,8 @@ The zero crossing can be fine tuned live. To avoid the risk of electric shock an
 
 The firmware supports to adjust the zero crossing delay in 125ns steps. The exact timing depends on tolerances and the type of MOSFETs used.
 
-Around 30µs to early will switch at around 1.5-2V (@120VAC)
-Switching too late has the same result just in the oppostite direction.
+Around 30µs too early will switch at around 1.5-2V (@120VAC)
+Switching too late has the same result, just in the oppostite direction.
 
 ![Calibration 1](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/calibration/calibration1.png)
 
