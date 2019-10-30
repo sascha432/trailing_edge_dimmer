@@ -1,9 +1,14 @@
 # Changelog
 
+## 2.1.3
+
+- Fixed bug in EEPROM wear leveling and invalid CRC after cycling
+- Added output of EEPROM read/write status to serial port
+
 ## 2.1.2
 
 - Fixed 32bit overflow in timer that caused the zero crossing detection to malfunction
-- Added +BOOT message in setup()
+- Added +REM=BOOT message in setup()
 
 ## 2.1.1
 

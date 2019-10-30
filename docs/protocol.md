@@ -359,3 +359,24 @@ If a too low or high frequency (<75% >120%) is detected, DIMMER_FREQUENCY_WARNIN
 No zero crossing signal does not fire this event, but the frequency measurement will return NaN.
 
 The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*, which need to be reset manually.
+
+## Zero Crossing calibration
+
+Following commands are available for calibration. For more commands see "FOR CALIBRATION" in i2c_slave.cpp
+
+
+Increase zero crossing delay
+
+    +i2ct=17,89,82
+
+Decrease zero crossing delay
+
+    +i2ct=17,89,83
+
+Set zero crossing delay to 7F and print setting
+
+    +i2ct=17,89,92,7F
+
+The settings need to be stored in the EEPROM. The following command forces to write the EEPROM
+
+    +i2ct=17,89,93

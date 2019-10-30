@@ -88,7 +88,7 @@
 void read_config();
 void write_config();
 void init_eeprom();
-void _write_config();
+void _write_config(bool force = false);
 void reset_config();
 
  // bitset

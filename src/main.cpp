@@ -39,6 +39,10 @@ void reset_config() {
     memcpy(&config.cfg, &register_mem.data.cfg, sizeof(config.cfg));
 }
 
+unsigned long get_eeprom_num_writes(unsigned long cycle, uint16_t position) {
+    return ((EEPROM.length() / sizeof(config_t)) * (cycle - 1)) + (position / sizeof(config_t));
+}
+
 // initialize EEPROM and wear leveling
 void init_eeprom() {
     EEPROM.begin();
@@ -77,12 +81,15 @@ void read_config() {
     uint16_t pos = 0;
     uint32_t cycle, max_cycle = 0;
 
+    eeprom_position = 0;
+
     // find last configuration
-    while(pos < EEPROM.length()) {
+    // the first byte is the cycle, which increases by one once the last position has been written
+    while((pos + sizeof(config_t)) < EEPROM.length()) {
         EEPROM.get(pos, cycle);
         _D(5, debug_printf_P(PSTR("eeprom cycle %ld position %d id\n"), cycle, pos));
         if (cycle >= max_cycle) {
-            eeprom_position = pos;
+            eeprom_position = pos; // last position with highest cycle number is the config written last
             max_cycle = cycle;
         }
         pos += sizeof(config_t);
@@ -91,7 +98,11 @@ void read_config() {
     EEPROM.end();
 
     auto crc = crc16_calc(reinterpret_cast<const uint8_t *>(&config.cfg), sizeof(config.cfg));
+
+    Serial_printf_P(PSTR("+REM=EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x=%04x\n"), (unsigned long)max_cycle, eeprom_position, get_eeprom_num_writes(max_cycle, eeprom_position), config.crc16, crc);
+
     if (config.crc16 != crc) {
+        Serial.println(F("+REM=EEPROM CRC error"));
         _D(5, debug_printf_P(PSTR("read_config, CRC mismatch %04x<>%04x, eeprom cycle %lu, position %u\n"), config.crc16, crc, (unsigned long)max_cycle, eeprom_position));
         reset_config();
         init_eeprom();
@@ -116,7 +127,7 @@ void read_config() {
 #endif
 }
 
-void _write_config() {
+void _write_config(bool force) {
     config_t temp_config;
     dimmer_eeprom_written_t event;
 
@@ -134,17 +145,18 @@ void _write_config() {
 
     EEPROM.begin();
     EEPROM.get(eeprom_position, temp_config);
-    if (memcmp(&config, &temp_config, sizeof(config)) != 0) {
+    if (memcmp(&config, &temp_config, sizeof(config)) != 0 || force) {
         _D(5, debug_printf_P(PSTR("old eeprom write cycle %lu, position %u, "), (unsigned long)config.eeprom_cycle, eeprom_position));
         eeprom_position += sizeof(config);
         if (eeprom_position + sizeof(config) >= EEPROM.length()) { // end reached, start from beginning and increase cycle counter
             eeprom_position = 0;
             config.eeprom_cycle++;
+            config.crc16 = crc16_calc(reinterpret_cast<const uint8_t *>(&config.cfg), sizeof(config.cfg)); // recalculate CRC
         }
         _D(5, debug_printf_P(PSTR("new cycle %lu, position %u\n"), (unsigned long)config.eeprom_cycle, eeprom_position));
         EEPROM.put(eeprom_position, config);
         eeprom_write_timer = millis();
-    event.bytes_written = sizeof(config);
+        event.bytes_written = sizeof(config);
     } else {
         _D(5, debug_printf_P(PSTR("configuration didn't change, skipping write cycle\n")));
         eeprom_write_timer = millis();
@@ -161,6 +173,8 @@ void _write_config() {
     Wire.write(DIMMER_EEPROM_WRITTEN);
     Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
     Wire.endTransmission();
+
+    Serial_printf_P(PSTR("+REM=EEPROMW,c=%lu,p=%u,n=%lu,w=%u,crc=%04x\n"), (unsigned long)event.write_cycle, eeprom_position, get_eeprom_num_writes(event.write_cycle, eeprom_position), event.bytes_written, config.crc16);
 }
 
 void write_config() {
@@ -277,7 +291,7 @@ void display_dimmer_info() {
     rem();
     Serial.print(F("options="));
 #if USE_EEPROM
-    Serial.print(F("EEPROM,"));
+    Serial_printf_P(PSTR("EEPROM=%lu,"), get_eeprom_num_writes(config.eeprom_cycle, eeprom_position));
 #endif
 #if HAVE_NTC
     Serial_printf_P(PSTR("NTC=A%u,"), NTC_PIN - A0);

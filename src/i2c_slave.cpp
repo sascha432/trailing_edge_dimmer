@@ -253,6 +253,7 @@ void _dimmer_i2c_on_receive(int length) {
 #endif
 
 #if 1
+                // FOR CALIBRATION
                 // undocumented, for calibration and testing
                 case 0x80:
                     register_mem.data.cfg.internal_1_1v_ref += 0.001f;
@@ -264,11 +265,17 @@ void _dimmer_i2c_on_receive(int length) {
                     break;
                 case 0x82:
                     register_mem.data.cfg.zero_crossing_delay_ticks++;
-                    Serial_printf_P(PSTR("+REM=zcdelay=%u\n"), register_mem.data.cfg.zero_crossing_delay_ticks);
+                    Serial_printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
+                    break;
+                case 0x92:
+                    if (length-- >= 1) {
+                        register_mem.data.cfg.zero_crossing_delay_ticks = Wire.read();
+                    }
+                    Serial_printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
                 case 0x83:
                     register_mem.data.cfg.zero_crossing_delay_ticks--;
-                    Serial_printf_P(PSTR("+REM=zcdelay=%u\n"), register_mem.data.cfg.zero_crossing_delay_ticks);
+                    Serial_printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
                 case 0x84:
                     register_mem.data.cfg.int_temp_offset++;
@@ -294,6 +301,7 @@ void _dimmer_i2c_on_receive(int length) {
                     register_mem.data.cfg.linear_correction_factor -= 0.001f;
                     Serial_printf_P(PSTR("+REM=LCF=%.4f\n"), register_mem.data.cfg.linear_correction_factor);
                     break;
+#if 0
                 case 0x90: { // toggle pins on/off
                         if (length-- > 1) {
                             dimmer_timer_remove();
@@ -359,6 +367,7 @@ void _dimmer_i2c_on_receive(int length) {
                         }
                     }
                     break;
+#endif
                 case 0x91: { // print command to restore parameters
                         Serial_printf_P(PSTR("+REM=i2ct=%02x%02x"), DIMMER_I2C_ADDRESS, DIMMER_REGISTER_OPTIONS);
                         for(uint8_t i = DIMMER_REGISTER_OPTIONS; i < DIMMER_REGISTER_VERSION; i++) {
@@ -366,6 +375,11 @@ void _dimmer_i2c_on_receive(int length) {
                         }
                         Serial.println();
                     } break;
+#if USE_EEPROM
+                case 0x93:
+                    _write_config(true);
+                    break;
+#endif
 #endif
 
 #if USE_TEMPERATURE_CHECK
