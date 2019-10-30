@@ -13,7 +13,31 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
-[Change Log v2.1.1](CHANGELOG.md)
+[Change Log v2.1.2](CHANGELOG.md)
+
+# In action
+
+![In action](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/in_action.png)
+
+# Zero crossing calibration
+
+The zero crossing can be fine tuned live. To avoid the risk of electric shock and damage of equipment, I recommend to connect the dimmer to a low voltage transformer with a small load. 15-20VAC are sufficient for calibration, if the dimmer is separately powered by 3.3V over the programming header.
+
+The firmware supports to adjust the zero crossing delay in 125ns steps. The exact timing depends on tolerances and the type of MOSFETs used.
+
+Around 30µs to early will switch at around 1.5-2V (@120VAC)
+Switching too late has the same result just in the oppostite direction.
+
+![Calibration 1](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/calibration/calibration1.png)
+
+A few µs too early, which is acceptable and in the 100mV range
+
+![Calibration 2](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/calibration/calibration2.png)
+
+Spot on. The MOSFETs switch fully on at 0V.
+
+![Calibration 3](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/calibration/calibration3.png)
+
 
 # Zero crossing detection update
 
