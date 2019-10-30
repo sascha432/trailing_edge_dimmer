@@ -26,7 +26,7 @@ The recent version of the KFC firmware supports programming the ATmega over the 
 
 [KFC Firmware @ Github](https://github.com/sascha432/esp8266-kfc-fw)
 
-![WiFi Firmware Update](docs/images/wifi_firmware_update.jpg)
+![WiFi Firmware Update](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/wifi_firmware_update.jpg)
 
 
 # Zero crossing calibration
