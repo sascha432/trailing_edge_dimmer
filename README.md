@@ -19,6 +19,16 @@ Firmware for a trailing edge MOSFET dimmer.
 
 ![In action](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/in_action.png)
 
+
+# WiFi Firmware update
+
+The recent version of the KFC firmware supports programming the ATmega over the STK500v1 protocol directly from the ESP8266. I am using the Arduino bootloader for the ATmega328P mini PRO board@8MHz.
+
+[KFC Firmware @ Github](https://github.com/sascha432/esp8266-kfc-fw)
+
+![WiFi Firmware Update](docs/images/wifi_firmware_update.jpg)
+
+
 # Zero crossing calibration
 
 The zero crossing can be fine tuned live. To avoid the risk of electric shock and damage of equipment, I recommend to connect the dimmer to a low voltage transformer with a small load. 15-20VAC are sufficient for calibration, if the dimmer is separately powered by 3.3V over the programming header.
