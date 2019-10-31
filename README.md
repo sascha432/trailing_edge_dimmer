@@ -15,10 +15,6 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [Change Log v2.1.3](CHANGELOG.md)
 
-## In action
-
-![In action](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/in_action.png)
-
 ## WiFi Firmware update
 
 The recent version of the KFC firmware supports programming the ATmega over the STK500v1 protocol directly from the ESP8266. I am using the Arduino bootloader for the ATmega328P mini PRO board@8MHz (ATmegaBOOT_168_atmega328_pro_8MHz.hex)
@@ -26,27 +22,6 @@ The recent version of the KFC firmware supports programming the ATmega over the 
 [KFC Firmware @ Github](https://github.com/sascha432/esp8266-kfc-fw)
 
 ![WiFi Firmware Update](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/wifi_firmware_update.jpg)
-
-## Zero crossing calibration
-
-The zero crossing can be fine tuned live. To avoid the risk of electric shock and damage of equipment, I recommend to connect the dimmer to a low voltage transformer with a small load. 15-20VAC are sufficient for calibration, if the dimmer is separately powered by 3.3V over the programming header.
-
-The firmware supports to adjust the zero crossing delay in 125ns steps. The exact timing depends on tolerances and the type of MOSFETs used.
-
-Around 30µs too early will switch at around 1.5-2V (@120VAC)
-Switching too late has the same result, just in the oppostite direction.
-
-![Calibration 1](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/calibration/calibration1.png)
-
-A few µs too early, which is acceptable and in the 100mV range
-
-![Calibration 2](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/calibration/calibration2.png)
-
-Spot on. The MOSFETs switch fully on at 0V.
-
-![Calibration 3](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/calibration/calibration3.png)
-
-More details about timings can be found in dimmer.h
 
 ## Zero crossing detection update
 
