@@ -91,8 +91,10 @@ void init_eeprom();
 void _write_config(bool force = false);
 void reset_config();
 
+typedef uint8_t dimmer_scheduled_calls_t;
+
  // bitset
- typedef enum : uint8_t {
+ typedef enum : dimmer_scheduled_calls_t {
     TYPE_NONE =             0,
     READ_VCC =              0x01,
     READ_INT_TEMP =         0x02,
@@ -102,7 +104,7 @@ void reset_config();
     PRINT_METRICS =         0x20,
     FREQUENCY_LOW =         0x40,       // frequency 75% or less
     FREQUENCY_HIGH =        0x80,       // frequency 120% or more
-    FREQUENCY_ERROR =       FREQUENCY_LOW|FREQUENCY_HIGH,
+    FREQUENCY_ERROR =       FREQUENCY_LOW|FREQUENCY_HIGH
 } dimmer_scheduled_calls_enum_t;
 
 typedef struct {
@@ -121,18 +123,18 @@ extern unsigned long next_temp_check;
 extern unsigned long print_metrics_timeout;
 #endif
 
-extern uint8_t dimmer_scheduled_calls;
+extern uint16_t dimmer_scheduled_calls;
 
 inline void dimmer_schedule_call(dimmer_scheduled_calls_enum_t type) {
-    dimmer_scheduled_calls |= (uint8_t)type;
+    dimmer_scheduled_calls |= (dimmer_scheduled_calls_t)type;
 }
 
 inline bool dimmer_is_call_scheduled(dimmer_scheduled_calls_enum_t type) {
-    return (dimmer_scheduled_calls & (uint8_t)type);
+    return (dimmer_scheduled_calls & (dimmer_scheduled_calls_t)type);
 }
 
 inline void dimmer_remove_scheduled_call(dimmer_scheduled_calls_enum_t type) {
-    dimmer_scheduled_calls &= ~((uint8_t)type);
+    dimmer_scheduled_calls &= ~((dimmer_scheduled_calls_t)type);
 }
 
 #if HAVE_READ_INT_TEMP

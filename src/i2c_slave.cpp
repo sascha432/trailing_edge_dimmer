@@ -2,7 +2,6 @@
  * Author: sascha_lammers@gmx.de
  */
 
-#include <avr/wdt.h>
 #include "i2c_slave.h"
 #include "helpers.h"
 
@@ -189,7 +188,6 @@ void _dimmer_i2c_on_receive(int length) {
                     reset_config();
 #if USE_EEPROM
                     init_eeprom();
-                    _write_config();
 #endif
                     break;
                 case DIMMER_COMMAND_READ_TIMINGS:
@@ -232,7 +230,6 @@ void _dimmer_i2c_on_receive(int length) {
                 case DIMMER_COMMAND_PRINT_METRICS:
                     print_metrics_timeout = 0;
                     if (length-- > 0 && Wire.read() == 0) {
-
                         dimmer_remove_scheduled_call(PRINT_METRICS);
                     }
                     else {
@@ -240,10 +237,6 @@ void _dimmer_i2c_on_receive(int length) {
                     }
                     break;
 #endif
-
-                case DIMMER_COMMAND_RESET:
-                    wdt_reset();
-                    break;
 
 #if ZC_MAX_TIMINGS
                 case DIMMER_COMMAND_ZC_TIMINGS_OUTPUT:

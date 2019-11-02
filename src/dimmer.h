@@ -35,7 +35,11 @@
 
 // default for DIMMER_REGISTER_ZC_DELAY_TICKS
 #ifndef DIMMER_ZC_DELAY_US
-#define DIMMER_ZC_DELAY_US                                      1104  // in µs
+#define DIMMER_ZC_DELAY_US                                      144  // in µs
+#endif
+
+#ifndef DIMMER_ZC_INTERRUPT_MODE
+#define DIMMER_ZC_INTERRUPT_MODE                                RISING
 #endif
 
 // default for DIMMER_REGISTER_MIN_ON_TIME_TICKS
@@ -195,8 +199,8 @@ static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 float dimmer_get_frequency();
 #endif
 
-#define DIMMER_VERSION_WORD                                     ((2 << 10) | (1 << 5) | 3)
-#define DIMMER_VERSION                                          "2.1.3"
+#define DIMMER_VERSION_WORD                                     ((2 << 10) | (1 << 5) | 4)
+#define DIMMER_VERSION                                          "2.1.4"
 #define DIMMER_INFO                                             "Author sascha_lammers@gmx.de"
 
 #ifndef DIMMER_I2C_SLAVE

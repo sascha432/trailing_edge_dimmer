@@ -13,7 +13,7 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
-[Change Log v2.1.3](CHANGELOG.md)
+[Change Log v2.1.4](CHANGELOG.md)
 
 ## WiFi Firmware update
 
@@ -22,6 +22,8 @@ The recent version of the KFC firmware supports programming the ATmega over the 
 [KFC Firmware @ Github](https://github.com/sascha432/esp8266-kfc-fw)
 
 ![WiFi Firmware Update](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/wifi_firmware_update.jpg)
+
+![KFC Firmware UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui2.jpg)
 
 ## Zero crossing detection update
 

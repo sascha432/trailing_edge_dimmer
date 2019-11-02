@@ -32,6 +32,9 @@ void reset_config() {
     register_mem.data.cfg.adjust_halfwave_time_ticks = DIMMER_US_TO_TICKS(DIMMER_ADJUST_HALFWAVE_US, DIMMER_TMR1_TICKS_PER_US);
     register_mem.data.cfg.internal_1_1v_ref = INTERNAL_VREF_1_1V;
     register_mem.data.cfg.report_metrics_max_interval = 30;
+#ifdef INTERNAL_TEMP_OFS
+    register_mem.data.cfg.int_temp_offset = INTERNAL_TEMP_OFS;
+#endif
 #if DIMMER_USE_LINEAR_CORRECTION
     register_mem.data.cfg.linear_correction_factor = 1.0;
 #endif
@@ -418,7 +421,7 @@ void setup() {
 #endif
 }
 
-uint8_t dimmer_scheduled_calls = TYPE_NONE;
+uint16_t dimmer_scheduled_calls = TYPE_NONE;
 
 #if USE_TEMPERATURE_CHECK
 

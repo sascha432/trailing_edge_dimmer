@@ -128,7 +128,7 @@ void dimmer_zc_setup() {
 #endif
 
     pinMode(ZC_SIGNAL_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), dimmer_zc_interrupt_handler, RISING);
+    attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), dimmer_zc_interrupt_handler, DIMMER_ZC_INTERRUPT_MODE);
 }
 
 #if DIMMER_USE_LINEAR_CORRECTION

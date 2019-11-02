@@ -232,10 +232,6 @@ Print dimmer info on serial port
 
     +i2ct=17,89,53
 
-## DIMMER_COMMAND_RESET
-
-Reset ATmega via WDT
-
 ## DIMMER_COMMAND_ZC_TIMINGS_OUTPUT
 
 If ZC_MAX_TIMINGS is enabled, the dimmer outputs the zero crossing timings to the serial console every ZC_MAX_TIMINGS_INTERVAL milliseconds. ZC_MAX_TIMINGS needs to be equal or higher than the amount of expected data within this period. Collecting the data does not cause a delay of the ZC interrupt.
