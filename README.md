@@ -21,10 +21,13 @@ I've finished testing the new power monitoring feature based on HLW8012 and comp
 The new design uses the Hi-link 3.3V/1A power supply and the MP150, an offline primary side buck regulator, for the non-isolated 5V rail. The regular dimmer got an update as well and 4 MOSFETs can be installed to increase the maximum power up to 200/400W.
 
 [1 Channel Dimmer with Power Monitor](https://easyeda.com/sascha23095123423/iot_1ch_dimmer_copy_copy_copy)
+
 [1 Channel Dimmer with 4 MOSFETs](https://easyeda.com/sascha23095123423/iot_1ch_dimmer_copy_copy_copy_copy)
+
 [New WiFi control board](https://easyeda.com/sascha23095123423/esp12e_iot_module_copy)
 
 ![New PCBs](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/1ch_dimmer_with_pm.jpg)
+
 ![KFC Firmware UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui3.jpg)
 
 ## WiFi Firmware update
