@@ -10,7 +10,6 @@ The examples are using the UART protocol and can send to the dimmer using any te
 
 Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
 
-
     // +i2ct=17,89,22
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
     Wire.write(DIMMER_REGISTER_COMMAND);
@@ -23,7 +22,6 @@ Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoW
             Wire.readBytes(reinterpret_cast<const uint8_t *>(&vcc), sizeof(vcc));
         }
     }
-
 
 ## DIMMER_COMMAND_FADE
 
@@ -117,12 +115,10 @@ If the temperature is requested last, it is not required to set read length and 
     +i2ct=17,89,22,89,21
     +i2cr=17,06
 
-
 Read AC frequency
 
     +i2ct=17,89,23
     +i2cr=17,04
-
 
 ## DIMMER_COMMAND_READ_CHANNELS
 
@@ -248,7 +244,6 @@ The first argument is the return value of micros() hex encoded. Every following 
 
     +REM=ZC,17f8c010 20b8 20b4 20b4 20b8 20b4 20b8 ...
 
-
 ### Compile options
 
 `+REM=options=EEPROM,NTC=19,Int.Temp,Temp.Chk,VCC,Fade,LCF,ACFrq=60,Pr=UART,CE=1,Addr=17,CPU=8,Pre=8/64,Ticks=1.000/0.125,Lvls=8333,Chs=4`
@@ -359,7 +354,6 @@ The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*,
 ## Zero Crossing calibration
 
 Following commands are available for calibration. For more commands see "FOR CALIBRATION" in i2c_slave.cpp
-
 
 Increase zero crossing delay
 
