@@ -15,6 +15,16 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [Change Log v2.1.4](CHANGELOG.md)
 
+## Updated 4 Channel Dimmer with Power Monitoring
+
+Non isolated version with an offline primary side buck regulator (LNK306), reduced standby consumption of 0.45W compared to 0.58W of the 1 Channel dimmer. Up to 500W with heatsink.
+
+![4 Channel Dimmer](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/new_4ch_dimmer.jpg)
+
+[4 Channel Dimmer Schematics and PCB TO-252-2](https://easyeda.com/sascha23095123423/iot-4-channel-dimmer-with-pm)
+
+[4 Channel Dimmer Schematics and PCB TO-220](https://easyeda.com/sascha23095123423/iot-4-channel-dimmer-with-pm_copy)
+
 ## Power Monitoring
 
 I've finished testing the new power monitoring feature based on HLW8012 and compatible chips.

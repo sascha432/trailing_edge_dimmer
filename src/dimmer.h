@@ -174,7 +174,6 @@ static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 #define DIMMER_US_TO_TICKS(us, ticks_per_us)                    (us * ticks_per_us)
 #define DIMMER_TICKS_TO_US(ticks, ticks_per_us)                 (ticks / ticks_per_us)
 
-
 #if DIMMER_TICKS_PER_HALFWAVE > 32767
     #error TICKS are limited to 32767 per half wave, increase prescaler
 #endif
