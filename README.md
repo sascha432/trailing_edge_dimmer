@@ -69,7 +69,9 @@ Test environment: 4x10W LED + 60W incandescent bulb, 50% dimmed, random 1000-250
 
 [Open image](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_3d_model.jpg)
 
-[3D model download](stl/housing)
+[3D model in-wall version](stl/housing)
+
+[3D model plugin version](stl/housing/plugin)
 
 ## Tested PCB Rev 3.3 is online
 
