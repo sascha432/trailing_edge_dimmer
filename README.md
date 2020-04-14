@@ -2,18 +2,24 @@
 
 Firmware for a trailing edge MOSFET dimmer.
 
-* 16666 different dimming levels
+* 14bit / 16666 different dimming levels
 * Up to 8 different channels
 * Store last levels in EEPROM and restore during startup
 * EEPROM wear level protection
 * Serial protocol to control the dimmer
 * I2C or UART interface
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
-* Highly configurable to match hardware
+* Highly configurable to match any hardware
 
 [I2C/UART protocol](docs/protocol.md)
 
 [Change Log v2.1.4](CHANGELOG.md)
+
+## New plugin version for 1 Channel Dimmer
+
+Check section [3D models](#3D-models-released) for a plugin housing.
+
+![Plugin Dimmer](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/plugin.jpg)
 
 ## Updated 4 Channel Dimmer with Power Monitoring
 
@@ -92,7 +98,7 @@ Test environment: 4x10W LED + 60W incandescent bulb, 50% dimmed, random 1000-250
 
 Testing it with a PWM generator to simulate the zero crossing signal, dimming a LED instead switching the MOSFET. The 120V part is waiting for opto couplers.
 
- ![Testing PCB](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/IMG_9100.JPG)
+![Testing PCB](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/IMG_9100.JPG)
 
 ## Schematics of the final design
 
