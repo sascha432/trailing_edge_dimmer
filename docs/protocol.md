@@ -370,3 +370,11 @@ Set zero crossing delay to 7F and print setting
 The settings need to be stored in the EEPROM. The following command forces to write the EEPROM
 
     +i2ct=17,89,93
+
+Restore factory settings
+
+    +i2ct=17,89,51
+
+Dimmer info
+
+    +i2ct=17,89,53
