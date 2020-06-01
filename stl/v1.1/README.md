@@ -72,7 +72,7 @@ Warping is usually the result of an incorrect z-height, dirty surface, flow rate
 - Layer height 0.16mm
 - Wall 1.2mm
 - Top/Bottom 1.2mm
-- Horizontal expansion **-0.16mm**. Make sure to run a test print if holes and dimensions are correct. If not use scaling (100.25% for example) and adjust horizontal expansion
+- Horizontal expansion and hole horizontal expansion *-0.16mm*. Make sure to run a test print if holes and dimensions are correct
 - Housing (ABS): 20-30% infill, cubic or gyroid
 - Plate and rocker switch: 75-85% infill, lines
 - Speed 50mm, 15mm for intial layer
