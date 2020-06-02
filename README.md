@@ -15,6 +15,20 @@ Firmware for a trailing edge MOSFET dimmer.
 
 [Change Log v2.1.4](CHANGELOG.md)
 
+## New and improved in-wall dimmer STL files
+
+I have improved and updated the housing for the in-wall dimmer and added print instructions.
+
+* Switches can be mounted on a PCB attached to the plate
+* Space for 2 optional LEDs
+* Invisible hole for reset switch
+* Space for a 20mm fuse holder
+* Labels for wires
+
+[3D model in-wall version 1.1](stl/housing/v1.1)
+
+[Instructions](stl/housing/v1.1/README.md)
+
 ## New plugin version for 1 Channel Dimmer
 
 Check section [3D models](#3D-models-released) for a plugin housing.
