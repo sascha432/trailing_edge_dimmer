@@ -2,7 +2,7 @@
 
 The dimmer is controlled via I2C or UART interface.
 
-The default address is 0x17 for the slave. When sending data, the dimmer acts as master and sends to address 0x18 (slave address + 1).
+The default address is 0x17 (referred to as ADDRESS) for the slave. When sending data, the dimmer acts as master and sends to address 0x18 (slave address + 1, refred to as MASTER_ADDRESS).
 
 The values for the registers and commands can be found in [dimmer_protocol.h](../src/dimmer_protocol.h)
 
@@ -10,18 +10,16 @@ The examples are using the UART protocol and can send to the dimmer using any te
 
 Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
 
-    // +i2ct=17,89,22
-TODO_CMD:    // +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_READ_VCC (RAW_CMD:+I2CT=17,0a,22)
+    // to slave +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_VCC (RAW_CMD:+I2CT=17,0a,22)
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
     Wire.write(DIMMER_REGISTER_COMMAND);
     Wire.write(DIMMER_COMMAND_READ_VCC);
     if (Wire.endTransmission() == 0) {
 
-        // +i2cr=17,02
-TODO_CMD:        // +I2CR=REGISTER_CH5_LEVEL,02 (RAW_CMD:+I2CR=17,02)
+        // to slave +I2CR=ADDRESS,02 (RAW_CMD:+I2CR=17,02)
         uint16_t vcc;
-        if (Wire.requestFrom(DIMMER_I2C_ADDRESS, sizeof(vcc)) == sizeof(vcc)) {
-            Wire.readBytes(reinterpret_cast<const uint8_t *>(&vcc), sizeof(vcc));
+        if (Wire.requestFrom(DIMMER_I2C_ADDRESS, sizeof(vcc)) == sizeof(vcc)) {         // from slave: +I2CT=ADDRESS,CD,12 (RAW_CMD:+I2CR=17,CD,12)
+            Wire.readBytes(reinterpret_cast<const uint8_t *>(&vcc), sizeof(vcc));       // vcc = 0x12CD/4813 (4.813V)
         }
     }
 
@@ -30,6 +28,24 @@ TODO_CMD:        // +I2CR=REGISTER_CH5_LEVEL,02 (RAW_CMD:+I2CR=17,02)
 Writing HEX commands is cumbersome. There is a python script that can translate constants into HEX commands. It can process single commands or an entire file.
 
 `scripts/trans_cmd.py`
+
+Supported values are:
+
+- ADDRESS
+- MASTER_ADDRESS
+- Name of the constant (DIMMER_REGISTER_FROM_LEVEL, DIMMER_COMMAND_READ_VCC, ...)
+- Short version of the constant (REGISTER_FROM_LEVEL, COMMAND_READ_VCC)
+- int8 (ff or b-1)
+- uint8 (ff or b255)
+- int16 (ffff or w-1)
+- uint16 (ffff or w65535)
+- Float (ffffffff or 100.5)
+- Hex uint32 (eeeeeeee or q4008636142)
+
+Example:
+
+    # trans_cmd.py command "I2CT=ADDRESS,COMMAND_READ_VCC,DIMMER_REGISTER_FROM_LEVEL,1f,2faa,100.5,4a3b2c1d,b-1,w1000,w-1"
+    +I2CT=17,22,01,1F,2F,AA,42,c9,00,00,4A,3B,2C,1D,FF,03,E8,FF,FF
 
 ## DIMMER_COMMAND_FADE
 
@@ -52,24 +68,13 @@ Channels are 0 based and -1 / 0xff means all channels
 
 ### Examples
 
-Set *from level* to -1, *channel* to 0, *to level* to 0x0301, *time* 7.5 (seconds) and execute fade command
+Set **from level** to current level (0xffff = -1), **channel** to 0, **to level** to 0x0301, **time** 7.5 (seconds) and execute fade command
 
-    +i2ct=17,80,ff,ff,00,03,01,00,00,f0,40,11
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_START_ADDR,ff,ff,00,REGISTER_CHANNEL,REGISTER_START_ADDR,00,00,RESPONSE_METRICS_REPORT,40,REGISTER_CH2_LEVEL (RAW_CMD:+I2CT=17,01,ff,ff,00,03,01,00,00,f0,40,11)
-                ^^^^^ from level           ^^ command
-                      ^^ channnel
-                         ^^^^^ to level
-                               ^^^^^^^^^^^ time
+    +I2CT=ADDRESS,REGISTER_FROM_LEVEL,ffff,00,0301,7.5,COMMAND_FADE (RAW_CMD:x)
 
-Short version
+Set **channel** to all channels (0xff = -1), **to level** to 0x0301, **time** 7.5 and execute fade
 
-    +i2ct=7580ffff0003000000f04011
-TODO_CMD:    +I2CT=75,REGISTER_START_ADDR,ff,ff,00,REGISTER_CHANNEL,00,00,00,RESPONSE_METRICS_REPORT,40,REGISTER_CH2_LEVEL (RAW_CMD:+I2CT=75,01,ff,ff,00,03,00,00,00,f0,40,11)
-
-Assuming *from level* is the default -1, set *channel* to -1, *to level* to 0x0301, *time* 7.5
-
-    +i2ct=17,82,ff,03,01,00,00,f0,40,11
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_CHANNEL,ff,REGISTER_CHANNEL,REGISTER_START_ADDR,00,00,RESPONSE_METRICS_REPORT,40,REGISTER_CH2_LEVEL (RAW_CMD:+I2CT=17,03,ff,03,01,00,00,f0,40,11)
+    +I2CT=ADDRESS,REGISTER_CHANNEL,00,0301,7.5,COMMAND_FADE (RAW_CMD:x)
 
 ## DIMMER_COMMAND_SET_LEVEL
 
@@ -78,17 +83,14 @@ The fading command uses following registers
 - DIMMER_REGISTER_CHANNEL (int8)
 - DIMMER_REGISTER_TO_LEVEL (int16)
 
-Set *channel* to 1, *to level* to 777 (0x0309) and execute set level command
+Set **channel** to 1, **to level** to 777 (0x0309) and execute set level command
 
-    +i2ct=17,82,01,09,03
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_CHANNEL,REGISTER_START_ADDR,09,REGISTER_CHANNEL (RAW_CMD:+I2CT=17,03,01,09,03)
-    +i2ct=17,89,10
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_SET_LEVEL (RAW_CMD:+I2CT=17,0a,10)
+    +I2CT=ADDRESS,REGISTER_CHANNEL,01,09,03 (RAW_CMD:+I2CT=17,03,01,09,03)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SET_LEVEL (RAW_CMD:+I2CT=17,0a,10)
 
 To send the command in one transmission, the time can be filled with any data
 
-    +i2ct=17,82,01,09,03,00,00,00,00,10
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_CHANNEL,REGISTER_START_ADDR,09,REGISTER_CHANNEL,00,00,00,00,COMMAND_SET_LEVEL (RAW_CMD:+I2CT=17,03,01,09,03,00,00,00,00,10)
+    +I2CT=ADDRESS,REGISTER_CHANNEL,01,0903,0.0,COMMAND_SET_LEVEL (RAW_CMD:+I2CT=17,03,01,09,03,00,00,00,00,10)
 
 ## DIMMER_COMMAND_READ_xxx
 
@@ -101,49 +103,33 @@ This applies to
 If no further data is sent after the read command, the register is set automatically to
 
 - DIMMER_REGISTER_TEMP (float)
+- DIMMER_REGISTER_INT_TEMP (float)
 - DIMMER_REGISTER_VCC (uint16)
+
+**NOTE:** Reading VCC and temperature takes ~50ms. The +I2CR command must be delayed that long.
 
 Read VCC
 
-    +i2ct=17,89,22
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_READ_VCC (RAW_CMD:+I2CT=17,0a,22)
-    +i2cr=17,02
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,02 (RAW_CMD:+I2CR=17,02)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_VCC (RAW_CMD:+I2CT=17,0a,22)
+    +I2CR=ADDRESS,02 (RAW_CMD:+I2CR=17,02)
 
-Response (0x3613 = 4.918V)
+Response ("\x21\x13" = 0x1321 = 4.897V)
 
-    +I2CT=753613
-TODO_CMD:    +I2CT=75,REGISTER_CH0_CUBIC_INT,REGISTER_CH3_LEVEL (RAW_CMD:+I2CT=75,36,13)
+    +I2CT=ADDRESS,21,13 (RAW_CMD:+I2CT=172113)
 
 Read internal temperature
 
-    +i2ct=17,89,21
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,REGISTER_VCC (RAW_CMD:+I2CT=17,0a,21)
-    +i2cr=17,04
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,REGISTER_TO_LEVEL (RAW_CMD:+I2CR=17,04)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_INT_TEMP (RAW_CMD:+I2CT=17,0a,21)
+    +I2CR=ADDRESS,04 (RAW_CMD:+I2CR=17,04)
 
-Read int. temp and VCC
+Response ("\x55\x5C\x86\x41" = 16.795°C)
 
-In this example, *DIMMER_REGISTER_READ_LENGTH* is set manually to 6 byte, followed by the start address *DIMMER_REGISTER_TEMP*
-
-    +i2ct=17,89,21,89,22,8a,06,9c
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,REGISTER_VCC,89,COMMAND_READ_VCC,8a,REGISTER_TIME,9c (RAW_CMD:+I2CT=17,0a,21,89,22,8a,06,9c)
-    +i2cr=17,06
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,REGISTER_TIME (RAW_CMD:+I2CR=17,06)
-
-If the temperature is requested last, it is not required to set read length and register address
-
-    +i2ct=17,89,22,89,21
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_READ_VCC,89,REGISTER_VCC (RAW_CMD:+I2CT=17,0a,22,89,21)
-    +i2cr=17,06
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,REGISTER_TIME (RAW_CMD:+I2CR=17,06)
+    +I2CT=ADDRESS,55,5C,86,41 (RAW_CMD:+I2CT=x)
 
 Read AC frequency
 
-    +i2ct=17,89,23
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,REGISTER_CONFIG_OFS (RAW_CMD:+I2CT=17,0a,23)
-    +i2cr=17,04
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,REGISTER_TO_LEVEL (RAW_CMD:+I2CR=17,04)
+    +I2CT=ADDRESS,REGISTER_COMMAND,23 (RAW_CMD:+I2CT=17,0a,23)
+    +I2CR=ADDRESS,04 (RAW_CMD:+I2CR=17,04)
 
 ## DIMMER_COMMAND_READ_CHANNELS
 
@@ -160,40 +146,32 @@ Read one or more channel
 
 The byte after command specifies the number of channels and start address, each 4 bit. If omitted, all 8 channels are read.
 
-Channel 1 - 4
+Channel 1 - 4 (0x40)
 
-    +i2ct=17,89,12,40
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_READ_CHANNELS,40 (RAW_CMD:+I2CT=17,0a,12,40)
-    +i2cr=17,08
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,08 (RAW_CMD:+I2CR=17,08)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_CHANNELS,40 (RAW_CMD:+I2CT=17,0a,12,40)
+    +I2CR=ADDRESS,08 (RAW_CMD:+I2CR=17,08)
 
-Channel 8
+Channel 8 (0x17)
 
-    +i2ct=17,89,12,17
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_READ_CHANNELS,REGISTER_CH5_LEVEL (RAW_CMD:+I2CT=17,0a,12,17)
-    +i2cr=17,02
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,02 (RAW_CMD:+I2CR=17,02)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_CHANNELS,17 (RAW_CMD:+I2CT=17,0a,12,17)
+    +I2CR=ADDRESS,02 (RAW_CMD:+I2CR=17,02)
 
-Channel 2 and 3
+Channel 2 and 3 (0x21)
 
-    +i2ct=17,89,12,21
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_READ_CHANNELS,REGISTER_VCC (RAW_CMD:+I2CT=17,0a,12,21)
-    +i2cr=17,04
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,REGISTER_TO_LEVEL (RAW_CMD:+I2CR=17,04)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_CHANNELS,21 (RAW_CMD:+I2CT=17,0a,12,21)
+    +I2CR=ADDRESS,04 (RAW_CMD:+I2CR=17,04)
 
 ## DIMMER_COMMAND_WRITE_EEPROM
 
 Store configuration and current levels in EEPROM
 
-    +i2ct=17,89,50
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_WRITE_EEPROM (RAW_CMD:+I2CT=17,0a,50)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_WRITE_EEPROM (RAW_CMD:+I2CT=17,0a,50)
 
 ## DIMMER_COMMAND_RESTORE_FS
 
 Restore factory settings and re-initialize EEPROM wear leveling
 
-    +i2ct=17,89,51
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_RESTORE_FS (RAW_CMD:+I2CT=17,0a,51)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_RESTORE_FS (RAW_CMD:+I2CT=17,0a,51)
 
 ## DIMMER_COMMAND_READ_TIMINGS
 
@@ -207,17 +185,15 @@ Read timings for fine tuning. The return type is float and all values are in mic
 
 Read zero crossing delay
 
-    +i2ct=17,89,23,03
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,REGISTER_CONFIG_OFS,REGISTER_CHANNEL (RAW_CMD:+I2CT=17,0a,23,03)
-    +i2cr=17,04
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,REGISTER_TO_LEVEL (RAW_CMD:+I2CR=17,04)
+    +I2CT=ADDRESS,REGISTER_COMMAND,REGISTER_CONFIG_OFS,TIMINGS_ZC_DELAY_IN_US (RAW_CMD:+I2CT=17,0a,23,03)
+    +I2CR=ADDRESS,04 (RAW_CMD:+I2CR=17,04)
 
 **NOTE:** Values are stored in ticks in the EEPROM. DIMMER_TIMINGS_TMR1_TICKS_PER_US and DIMMER_TIMINGS_TMR2_TICKS_PER_US can be used to translate time to ticks.
 
 ## Reading and writing the dimmer settings
 
 - DIMMER_REGISTER_OPTIONS (uint8)
-- DIMMER_REGISTER_MAX_TEMP (uint8, Â°C)
+- DIMMER_REGISTER_MAX_TEMP (uint8, °C)
 - DIMMER_REGISTER_FADE_IN_TIME (float, seconds)
 - DIMMER_REGISTER_TEMP_CHECK_INT (uint8, seconds)
 - DIMMER_REGISTER_LC_FACTOR (float)
@@ -235,42 +211,40 @@ To make any changes permanent, **DIMMER_COMMAND_WRITE_EEPROM** needs to be execu
 
 Read all settings
 
-    +i2ct=17,8a,10,a2
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_READ_LENGTH,COMMAND_SET_LEVEL,a2 (RAW_CMD:+I2CT=17,0b,10,a2)
-    +i2cr=17,10
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,COMMAND_SET_LEVEL (RAW_CMD:+I2CR=17,10)
+length is sizeof(register_mem_cfg_t), 0x10 in this example
+
+    +I2CT=ADDRESS,REGISTER_READ_LENGTH,10,REGISTER_OPTIONS (RAW_CMD:+I2CT=17,0b,10,a2)
+    +I2CR=ADDRESS,10 (RAW_CMD:+I2CR=17,10)
 
 Read temperature check interval
 
-    +i2ct=17,8a,01,a8
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_READ_LENGTH,REGISTER_START_ADDR,a8 (RAW_CMD:+I2CT=17,0b,01,a8)
-    +i2cr=17,01
-TODO_CMD:    +I2CR=REGISTER_CH5_LEVEL,REGISTER_START_ADDR (RAW_CMD:+I2CR=17,01)
+    +I2CT=ADDRESS,REGISTER_READ_LENGTH,REGISTER_START_ADDR,REGISTER_TEMP_CHECK_INT (RAW_CMD:+I2CT=17,0b,01,29)
+    +I2CR=ADDRESS,01 (RAW_CMD:+I2CR=17,01)
 
-Response (0x1e, 30 seconds)
+Response (0x02, 2 seconds)
 
-    +I2CT=751E
-TODO_CMD:    +I2CT=75,1e (RAW_CMD:+I2CT=75,1e)
+    +I2CT=ADDRESS,02 (RAW_CMD:+I2CT=75,1e)
 
 Set temperature check interval/metrics reporting to 30 seconds
 
-    +i2ct=17,a8,1e
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_TEMP_CHECK_INT,1e (RAW_CMD:+I2CT=17,29,1e)
+    +I2CT=ADDRESS,REGISTER_TEMP_CHECK_INT,1e (RAW_CMD:+I2CT=17,29,1e)
 
-**Note:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+i2ct=17,89,54*) can be used to force a check without waiting
-TODO_CMD:**Note:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_FORCE_TEMP_CHECK (RAW_CMD:+I2CT=17,0a,54)*) can be used to force a check without waiting
-
-Setting the linear correction factor to 1.0
-
-    +i2ct=17,a9,00,00,80,3f
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_ZC_DELAY_TICKS,00,00,80,3f (RAW_CMD:+I2CT=17,2a,00,00,80,3f)
+**NOTE:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_FORCE_TEMP_CHECK (RAW_CMD:+I2CT=17,0a,54)*) can be used to force a check without waiting
 
 ## DIMMER_COMMAND_PRINT_INFO
 
 Print dimmer info on serial port
 
-    +i2ct=17,89,53
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_PRINT_INFO (RAW_CMD:+I2CT=17,0a,53)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_PRINT_INFO (RAW_CMD:+I2CT=17,0a,53)
+
+Response
+
+Signature, compile options, current values and errors are returned
+
+    +REM=sig=1e-95-0f,fuses=l:ff,h:da,e:fd,MCU=ATmega328P@16Mhz
+    +REM=options=EEPROMwr=0,NTC=A0,IntTemp,TempChk,VCC,Fade,ACFrq=60,Pr=UART,CE=1,Addr=17,Pre=8/128,Ticks=2.0/0.125us,MaxLvls=16666,GPIO/lvl=6/0,8/0,9/0,10/0
+    +REM=values=Restore=1,MainsFrq=60.24,Ref11=1.1,NTC=24.19/+0.0C,IntTemp=16.80/-10.0C,MaxTmp=65/2s,MetricsInt=30s,VCC=4.876,MinOn=240/120.00us,AdjHW=400/200.00us,ZCDelay=10/80.00us
+    +REM=errors=FrqHi/Low=0/0,ZCmisfire=0,EEPROMCrcErr=1
 
 ## DIMMER_COMMAND_ZC_TIMINGS_OUTPUT
 
@@ -278,87 +252,37 @@ If ZC_MAX_TIMINGS is enabled, the dimmer outputs the zero crossing timings to th
 
 The data expected is a boolean. Non-zero values enable the output on.
 
-    +i2ct=17,89,60,1
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_ZC_TIMINGS_OUTPUT,REGISTER_START_ADDR (RAW_CMD:+I2CT=17,0a,60,01)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_ZC_TIMINGS_OUTPUT,01 (RAW_CMD:+I2CT=17,0a,60,01)
 
 ### Outut format
 
-The first argument is the return value of micros() hex encoded. Every following the difference to the previous time.
+The first argument is the return value of micros() (uint32) hex encoded. Every following the difference to the previous time (uint16).
 
 +REM=ZC,\<microseconds\> [\<delay\> [\<delay\> ...]]
 
     +REM=ZC,17f8c010 20b8 20b4 20b4 20b8 20b4 20b8 ...
 
-### Compile options
-
-`+REM=options=EEPROM,NTC=19,Int.Temp,Temp.Chk,VCC,Fade,LCF,ACFrq=60,Pr=UART,CE=1,Addr=17,CPU=8,Pre=8/64,Ticks=1.000/0.125,Lvls=8333,Chs=4`
-
-- EEPROM = EEPROM enabled
-- NTC=19 = NTC enabled on PIN 19 (A5)
-- Int.Temp = Internal temperature sensor enabled
-- Temp.Chk = Temperature check and metrics enabled
-- VCC = Read VCC enabled
-- Fade = Fading enabled
-- LCF = Linear correction factor enabled
-- ACFrq=60 - AC frequency 60Hz
-- Pr=UART - Protocol UART
-- CE=1 - Fading completion event enabled
-- Addr=17 - Device address 0x17
-- CPU=8 - CPU 8Mhz
-- Pre=8/64 - Prescaler for timer1=8, timer2=64
-- Ticks=1.000/0.125 - Timer1/2 ticks per Âµs
-- Lvls=8333 - Max. brightness level 8333
-- P=6,8,9,10 - MOSFET pins / number of channels supported
-
-### Parameters and values
-
-`+REM=values=Restore=1,ACFrq=61.871,ref11=1.100,NTC=50.30,Int.Temp=38.78,VCC=3.322,Max.Temp=75,rtime=60,LCF=1.000,Min.on=200,Adj.hw=200,ZC.delay=13`
-
-- Restore=1 - Restore brightness after start`*`
-- ACFreq=61.871 - Measured AC frequency
-- ref11=1.100 - Reference voltage`*`
-- NTC=50.30 - NTC temperature in Â°C
-- Int.temp=38.78 - Atmega internal temperature in Â°C
-- VCC=3.322 - Supply voltage in V
-- Max.Temp=75 - Maximum temperature before emergency shutoff`*`
-- rtime=60 - Interval for metrics reporting`*`
-- LCF=1.000 - Linear correction factor`*`
-- Min.on=200 - Minimum on time in ticks (timer1)`*`
-- Adj.hw=200 - Adjust havewave time in ticks (timer1)`*`
-- ZC.delay=13 - Zero crossing delay in ticks (timer2)`*`
-
-**Note:** `*` These parameters can be changed
-
 ## DIMMER_COMMAND_PRINT_METRICS
 
 Print metrics every 5 seconds on serial port in human readable form. The following byte enables (non 0) or disables the output
 
-    +i2ct=17,89,55,01
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_PRINT_METRICS,REGISTER_START_ADDR (RAW_CMD:+I2CT=17,0a,55,01)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_PRINT_METRICS,05 (RAW_CMD:+I2CT=17,0a,55,01)
 
 ## DIMMER_COMMAND_FORCE_TEMP_CHECK
 
 Force temperature check and report metrics if enabled
 
-    +i2ct=17,89,54
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_FORCE_TEMP_CHECK (RAW_CMD:+I2CT=17,0a,54)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_FORCE_TEMP_CHECK (RAW_CMD:+I2CT=17,0a,54)
 
 ## DIMMER_COMMAND_DUMP_xxx
 
 - DIMMER_COMMAND_DUMP_MEM
-- DIMMER_COMMAND_DUMP_MACROS
 
 This is only available with enabled debugging.
 
 Dump the content of the register memory
 
-    +i2ct=17,89,ee
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,ee (RAW_CMD:+I2CT=17,0a,ee)
-
-Dump macros for the register memory.
-
-    +i2ct=17,89,ef
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,ef (RAW_CMD:+I2CT=17,0a,ef)
+    +I2CT=ADDRESS,REGISTER_COMMAND,ee (RAW_CMD:+I2CT=17,0a,ee)
 
 ## Temperature, VCC status and AC Frequency (DIMMER_RESPONSE_METRICS_REPORT)
 
@@ -367,15 +291,15 @@ This can also be trigger with the command DIMMER_COMMAND_FORCE_TEMP_CHECK. The m
 
 If data is not available, 0 (for VCC) or NaN (for any float) is returned.
 
-    +I2CT=18F02...
-TODO_CMD:    +I2CT=18,71,02 (RAW_CMD:+I2CT=18,71,02)...
+    +I2CT=MASTER_ADDRESS,RESPONSE_METRICS_REPORT,02,... (RAW_CMD:+I2CT=18,71,02)
 
 ## Temperature Alarm (DIMMER_RESPONSE_TEMPERATURE_ALERT)
 
 If the max. temperature was exceeded, it sends one alarm with register address DIMMER_RESPONSE_TEMPERATURE_ALERT, the current temperature (uint8) and the temperature threshold (uint8)
 
-    +I2CT=18F16A64
-TODO_CMD:    +I2CT=18,72,6a,64 (RAW_CMD:+I2CT=18,72,6a,64)
+Current temperature 37°C, threshold 85°C
+
+    +I2CT=MASTER_ADDRESS,RESPONSE_TEMPERATURE_ALERT,25,55 (RAW_CMD:+I2CT=18,72,6a,64)
 
 ## Fading completed (DIMMER_RESPONSE_FADING_COMPLETE)
 
@@ -383,20 +307,17 @@ When fading to a new level has been completed, the dimmer sends DIMMER_RESPONSE_
 
 Channel 0 and 1 reached 0x1234 and fading is complete:
 
-    +I2CT=18F2001234011234
-TODO_CMD:    +I2CT=18,73,00,COMMAND_READ_CHANNELS,34,REGISTER_START_ADDR,COMMAND_READ_CHANNELS,34 (RAW_CMD:+I2CT=18,73,00,12,34,01,12,34)
+    +I2CT=MASTER_ADDRESS,RESPONSE_FADING_COMPLETE,00,12,34,01,12,34 (RAW_CMD:+I2CT=18,73,00,12,34,01,12,34)
 
 Channel 0 reached level 0:
 
-    +I2CT=18F2000000
-TODO_CMD:    +I2CT=18,73,00,00,00 (RAW_CMD:+I2CT=18,73,00,00,00)
+    +I2CT=MASTER_ADDRESS,RESPONSE_FADING_COMPLETE,00,00,00 (RAW_CMD:+I2CT=18,73,00,00,00)
 
 ## EEPROM written event (DIMMER_RESPONSE_EEPROM_WRITTEN)
 
 EEPROM writes might be delayed due to wear leveling. Once written, DIMMER_RESPONSE_EEPROM_WRITTEN with structure DIMMER_RESPONSE_EEPROM_WRITTEN_t is sent.
 
-    +I2CT=18F301000000000000
-TODO_CMD:    +I2CT=18,74,REGISTER_START_ADDR,00,00,00,00,00,00 (RAW_CMD:+I2CT=18,74,01,00,00,00,00,00,00)
+    +I2CT=MASTER_ADDRESS,RESPONSE_EEPROM_WRITTEN,01,00,00,00,21,00,DC (RAW_CMD:x)
 
 ## Frequency warning (DIMMER_RESPONSE_FREQUENCY_WARNING)
 
@@ -411,30 +332,24 @@ Following commands are available for calibration. For more commands see "FOR CAL
 
 Increase zero crossing delay
 
-    +i2ct=17,89,82
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,82 (RAW_CMD:+I2CT=17,0a,82)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_ZC_DECREASE (RAW_CMD:+I2CT=17,0a,82)
 
 Decrease zero crossing delay
 
-    +i2ct=17,89,83
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,83 (RAW_CMD:+I2CT=17,0a,83)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_ZC_INCREASE (RAW_CMD:+I2CT=17,0a,83)
 
 Set zero crossing delay to 7F and print setting
 
-    +i2ct=17,89,92,7F
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,DIMMER_COMMAND_SET_ZC,7f (RAW_CMD:+I2CT=17,0a,92,7f)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SET_ZC,7f (RAW_CMD:+I2CT=17,0a,92,7f)
 
 The settings need to be stored in the EEPROM. The following command forces to write the EEPROM
 
-    +i2ct=17,89,93
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,REGISTER_CONFIG_SZ (RAW_CMD:+I2CT=17,0a,93)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_FORCE_WRITE_EEPROM (RAW_CMD:+I2CT=17,0a,93)
 
 Restore factory settings
 
-    +i2ct=17,89,51
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_RESTORE_FS (RAW_CMD:+I2CT=17,0a,51)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_RESTORE_FS (RAW_CMD:+I2CT=17,0a,51)
 
 Display dimmer info
 
-    +i2ct=17,89,53
-TODO_CMD:    +I2CT=REGISTER_CH5_LEVEL,REGISTER_COMMAND,COMMAND_PRINT_INFO (RAW_CMD:+I2CT=17,0a,53)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_PRINT_INFO (RAW_CMD:+I2CT=17,0a,53)
