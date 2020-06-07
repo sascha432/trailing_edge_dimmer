@@ -11,11 +11,13 @@ Firmware for a trailing edge MOSFET dimmer.
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
 * Highly configurable to match any hardware
 
-[I2C/UART protocol](blob/aabc243a570f12f377fd4b94965764b3ff974f6c/docs/protocol.md)
 
-[Change Log v2.1.4](blob/aabc243a570f12f377fd4b94965764b3ff974f6c/CHANGELOG.md)
 
-[Release](releases/tag/2.1.4)
+[I2C/UART protocol](https://github.com/sascha432/trailing_edge_dimmer/blob/aabc243a570f12f377fd4b94965764b3ff974f6c/docs/protocol.md)
+
+[Change Log v2.1.4](https://github.com/sascha432/trailing_edge_dimmer/blob/aabc243a570f12f377fd4b94965764b3ff974f6c/CHANGELOG.md)
+
+[Release](https://github.com/sascha432/trailing_edge_dimmer/releases/tag/2.1.4)
 
 ## Master Branch
 
