@@ -93,13 +93,17 @@ class DimmerConst(object):
             'COMMAND_STATUS_OK': 0x00,
             'COMMAND_STATUS_ERROR': 0xffffffff,
             'OPTIONS_RESTORE_LEVEL': 0x01,
-            'OPTIONS_REPORT_TEMP': 0x02,
+            'OPTIONS_REPORT_METRICS': 0x02,
             'OPTIONS_TEMP_ALERT_TRIGGERED': 0x04,
+            'OPTIONS_FREQ_LOW_ALERT': 0x08,
+            'OPTIONS_FREQ_HIGH_ALERT': 0x10,
+            'OPTIONS_CUBIC_INT': 0x20,
             'TIMINGS_TMR1_TICKS_PER_US': 0x01,
             'TIMINGS_TMR2_TICKS_PER_US': 0x02,
             'TIMINGS_ZC_DELAY_IN_US': 0x03,
             'TIMINGS_MIN_ON_TIME_IN_US': 0x04,
             'TIMINGS_ADJ_HW_TIME_IN_US': 0x05,
+            'COMMAND_SIMULATE_ZC': 0xe0,
         }
 
     def get_by_value(self, value):
@@ -132,29 +136,40 @@ class DimmerConst(object):
         return (type, data)
 
     def float_to_hex(self, value):
-        return hex(struct.unpack('<I', struct.pack('<f', value))[0])[2:]
+        return hex(struct.unpack('<I', struct.pack('<f', value))[0])[2:].upper()
 
     def to_hex(self, value, type, split_bytes = True):
 
-        def to_hex_str(value, type):
-            if type.endswith('int32'):
-                if value<0:
-                    value = (1<<32) + value
-                return '%08X' % value
-            elif type.endswith('int16'):
-                if value<0:
-                    value = (1<<16) + value
-                return '%04X' % value
-            elif type=='float':
-                return self.float_to_hex(value)
+        if type.endswith('int32'):
             if value<0:
-                value = (1<<8) + value
-            return '%02X' % value
-
-        hex_str = to_hex_str(value, type)
-        if split_bytes:
-            return ','.join(re.findall('..', hex_str))
-        return hex_str
+                value = (1<<32) + value
+            hex_str = '%02X' % (value & 0xff)
+            if split_bytes:
+                hex_str = hex_str + ','
+            hex_str = hex_str + '%02X' % ((value >> 8) & 0xff)
+            if split_bytes:
+                hex_str = hex_str + ','
+            hex_str = hex_str + '%02X' % ((value >> 16) & 0xff)
+            if split_bytes:
+                hex_str = hex_str + ','
+            hex_str = hex_str + '%02X' % ((value >> 24) & 0xff)
+            return hex_str
+        elif type.endswith('int16'):
+            if value<0:
+                value = (1<<16) + value
+            hex_str = '%02X' % (value & 0xff)
+            if split_bytes:
+                hex_str = hex_str + ','
+            hex_str = hex_str + '%02X' % ((value >> 8) & 0xff)
+            return hex_str
+        elif type=='float':
+            hex_str = self.float_to_hex(value)
+            if split_bytes:
+                return ','.join(re.findall('..', hex_str))
+            return hex_str
+        if value<0:
+            value = (1<<8) + value
+        return '%02X' % value
 
     def translate_command(self, command):
         type, data = command

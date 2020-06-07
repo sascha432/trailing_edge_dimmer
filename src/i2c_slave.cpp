@@ -4,6 +4,7 @@
 
 #include "i2c_slave.h"
 #include "helpers.h"
+#include <EEPROM.h>
 
 register_mem_union_t register_mem;
 
@@ -32,44 +33,6 @@ void set_level(dimmer_channel_id_t channel, dimmer_level_t level) {
         dimmer_set_level(channel, level);
     }
 }
-
-#if DEBUG
-void dump_macros() {
-#if 0
-    char str[100];
-
-    #define DUMP_MACRO(name) { memset(str, 32, sizeof(str)); strcpy_P(str, ({static const char __c[] PROGMEM = {#name}; &__c[0];}))[strlen(str)] = 32; str[35] = 0; Serial.printf("#define %s ", str); Serial.printf("0x%02x\n", name); }
-
-    DUMP_MACRO(DIMMER_REGISTER_FROM_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CHANNEL);
-    DUMP_MACRO(DIMMER_REGISTER_TO_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_TIME);
-    DUMP_MACRO(DIMMER_REGISTER_COMMAND);
-    DUMP_MACRO(DIMMER_REGISTER_READ_LENGTH);
-    DUMP_MACRO(DIMMER_REGISTER_COMMAND_STATUS);
-    DUMP_MACRO(DIMMER_REGISTER_CH0_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CH1_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CH2_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CH3_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CH4_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CH5_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CH6_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_CH7_LEVEL);
-    DUMP_MACRO(DIMMER_REGISTER_TEMP);
-    DUMP_MACRO(DIMMER_REGISTER_VCC);
-    DUMP_MACRO(DIMMER_REGISTER_OPTIONS);
-    DUMP_MACRO(DIMMER_REGISTER_MAX_TEMP);
-    DUMP_MACRO(DIMMER_REGISTER_FADE_IN_TIME);
-    DUMP_MACRO(DIMMER_REGISTER_TEMP_CHECK_INT);
-    DUMP_MACRO(DIMMER_REGISTER_LC_FACTOR);
-    DUMP_MACRO(DIMMER_REGISTER_ZC_DELAY_TICKS);
-    DUMP_MACRO(DIMMER_REGISTER_MIN_ON_TIME_TICKS);
-    DUMP_MACRO(DIMMER_REGISTER_ADJ_HALFWAVE_TICKS);
-    DUMP_MACRO(DIMMER_REGISTER_ADDRESS);
-    DUMP_MACRO(DIMMER_REGISTER_END_ADDR);
-#endif
-}
-#endif
 
 uint8_t validate_register_address() {
     uint8_t offset = register_mem.data.address - DIMMER_REGISTER_START_ADDR;
@@ -117,12 +80,6 @@ void _dimmer_i2c_on_receive(int length) {
         else if (addr == DIMMER_REGISTER_READ_LENGTH) {
             register_mem.data.address = DIMMER_REGISTER_ADDRESS;
         }
-#if DIMMER_USE_LINEAR_CORRECTION
-        else if (addr == DIMMER_REGISTER_LC_FACTOR + sizeof(register_mem.data.cfg.linear_correction_factor) - 1) {
-            _D(5, debug_printf_P(PSTR("I2C set LCF = %.5f\n"), register_mem.data.cfg.linear_correction_factor));
-            dimmer_set_lcf(register_mem.data.cfg.linear_correction_factor);
-        }
-#endif
         else if (addr == DIMMER_REGISTER_COMMAND) {
             _D(5, debug_printf_P(PSTR("I2C command = %#02x\n"), register_mem.data.cmd.command));
             switch(register_mem.data.cmd.command) {
@@ -145,7 +102,7 @@ void _dimmer_i2c_on_receive(int length) {
                     break;
 #if DIMMER_USE_FADING
                 case DIMMER_COMMAND_FADE:
-                    _D(5, debug_printf_P(PSTR("I2C fade from=%d, to=%d, channel=%d, fade_time=%f\n"), register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
+                    _D(5, Serial_printf_P(PSTR("I2C fade from=%d, to=%d, channel=%d, fade_time=%f\n"), register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
                     fade(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time); // 0-655 seconds in 10ms steps
                     break;
 #endif
@@ -182,6 +139,9 @@ void _dimmer_i2c_on_receive(int length) {
 #if USE_EEPROM
                 case DIMMER_COMMAND_WRITE_EEPROM:
                     write_config();
+                    break;
+                case DIMMER_COMMAND_FORCE_WRITE_EEPROM:
+                    _write_config(true);
                     break;
 #endif
                 case DIMMER_COMMAND_RESTORE_FS:
@@ -238,6 +198,16 @@ void _dimmer_i2c_on_receive(int length) {
                     break;
 #endif
 
+#if DIMMER_CUBIC_INTERPOLATION
+                case DIMMER_COMMAND_PRINT_CUBIC_INT:
+                    for(int i = 0; i < DIMMER_CHANNELS; i++)  {
+                        rem();
+                        print_cubic_int_table(i);
+                    }
+                    break;
+
+#endif
+
 #if ZC_MAX_TIMINGS
                 case DIMMER_COMMAND_ZC_TIMINGS_OUTPUT:
                     zc_timings_output = (length-- > 0 && Wire.read() != 0);
@@ -286,14 +256,14 @@ void _dimmer_i2c_on_receive(int length) {
                     register_mem.data.cfg.ntc_temp_offset--;
                     Serial_printf_P(PSTR("+REM=ntctmpofs=%d\n"), register_mem.data.cfg.ntc_temp_offset);
                     break;
-                case 0x88:
-                    register_mem.data.cfg.linear_correction_factor += 0.001f;
-                    Serial_printf_P(PSTR("+REM=LCF=%.4f\n"), register_mem.data.cfg.linear_correction_factor);
-                    break;
-                case 0x89:
-                    register_mem.data.cfg.linear_correction_factor -= 0.001f;
-                    Serial_printf_P(PSTR("+REM=LCF=%.4f\n"), register_mem.data.cfg.linear_correction_factor);
-                    break;
+                // case 0x88:
+                //     register_mem.data.cfg.linear_correction_factor += 0.001f;
+                //     Serial_printf_P(PSTR("+REM=LCF=%.4f\n"), register_mem.data.cfg.linear_correction_factor);
+                //     break;
+                // case 0x89:
+                //     register_mem.data.cfg.linear_correction_factor -= 0.001f;
+                //     Serial_printf_P(PSTR("+REM=LCF=%.4f\n"), register_mem.data.cfg.linear_correction_factor);
+                //     break;
 #if 0
                 case 0x90: { // toggle pins on/off
                         if (length-- > 1) {
@@ -367,12 +337,8 @@ void _dimmer_i2c_on_receive(int length) {
                             Serial_printf_P(PSTR("%02x"), register_mem.raw[i - DIMMER_REGISTER_START_ADDR]);
                         }
                         Serial.println();
-                    } break;
-#if USE_EEPROM
-                case 0x93:
-                    _write_config(true);
+                    }
                     break;
-#endif
 #endif
 
 #if USE_TEMPERATURE_CHECK
@@ -381,6 +347,26 @@ void _dimmer_i2c_on_receive(int length) {
                     break;
 #endif
 
+                case DIMMER_COMMAND_SIMULATE_ZC: {
+                        uint8_t seconds = 1;
+                        if (length-- > 0) {
+                            seconds = Wire.read();
+                        }
+                        float freq = dimmer_get_frequency();
+                        uint8_t freq_byte = round(freq);
+                        uint32_t _delay = (1000000UL / 2) / freq;
+                        for (uint8_t second = 0; second < seconds; second++) {
+#if DIMMER_SIMULATE_ZC
+                            Serial_printf_P(PSTR("zc second %u\n"), second + 1);
+#endif
+                            for(uint8_t i = 0; i < freq_byte; i++) {
+                                dimmer_zc_interrupt_handler();
+                                delayMicroseconds(_delay);
+                            }
+                        }
+                    }
+                    break;
+
 #if DEBUG
                 case DIMMER_COMMAND_DUMP_MEM:
                     for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++) {
@@ -388,9 +374,6 @@ void _dimmer_i2c_on_receive(int length) {
                         uint8_t data = *ptr;
                         Serial_printf_P(PSTR("[%02x]: %u (%#02x)\n"), addr, data, data);
                     }
-                    break;
-                case DIMMER_COMMAND_DUMP_MACROS:
-                    dump_macros();
                     break;
 #endif
             }
@@ -420,9 +403,74 @@ void dimmer_i2c_slave_setup() {
     Wire.begin(DIMMER_I2C_ADDRESS);
     Wire.onReceive(_dimmer_i2c_on_receive);
     Wire.onRequest(_dimmer_i2c_on_request);
+}
 
-#if DEBUG
-    dump_macros();
-#endif
+config_t::config_t() : cfg(register_mem.data.cfg) {
+    clear();
+}
 
+void config_t::clear() {
+    eeprom_cycle = 0;
+    crc16 = 0;
+    memset(&level, 0, sizeof(level));
+}
+
+void config_t::read(size_t position) {
+    EEPROM.get(position, eeprom_cycle);
+    position += sizeof(eeprom_cycle);
+    EEPROM.get(position, crc16);
+    position += sizeof(crc16);
+    EEPROM.get(position, level);
+    position += sizeof(level);
+    EEPROM.get(position, register_mem.data.cfg);
+}
+
+size_t config_t::write(size_t position) {
+    EEPROM.put(position, eeprom_cycle);
+    position += sizeof(eeprom_cycle);
+    EEPROM.put(position, crc16);
+    position += sizeof(crc16);
+    EEPROM.put(position, level);
+    position += sizeof(level);
+    EEPROM.put(position, register_mem.data.cfg);
+    position += sizeof(register_mem.data.cfg);
+    return position;
+}
+
+bool config_t::compare(size_t position) {
+    uint32_t tmp_eeprom_cycle;
+    EEPROM.get(position, tmp_eeprom_cycle);
+    if (tmp_eeprom_cycle != eeprom_cycle) {
+        return false;
+    }
+    position += sizeof(tmp_eeprom_cycle);
+
+    uint16_t tmp_crc16;
+    EEPROM.get(position, tmp_crc16);
+    if (tmp_crc16 != crc16) {
+        return false;
+    }
+    position += sizeof(tmp_crc16);
+
+    int16_t tmp_level;
+    for(int i = 0; i < DIMMER_CHANNELS; i++)  {
+        EEPROM.get(position, tmp_level);
+        if (tmp_level != level[i]) {
+            return false;
+        }
+        position += sizeof(tmp_level);
+    }
+    auto ptr = reinterpret_cast<const uint8_t *>(&register_mem.data.cfg);
+    for(size_t i = 0; i < sizeof(register_mem.data.cfg); i++)  {
+        auto data = EEPROM.read(position);
+        if (*ptr++ != data) {
+            return false;
+        }
+        position++;
+    }
+        return true;
+}
+
+size_t config_t::size() const {
+    return sizeof(eeprom_cycle) + sizeof(crc16) + sizeof(level) + sizeof(register_mem.data.cfg);
 }

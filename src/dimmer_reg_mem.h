@@ -20,8 +20,13 @@ typedef struct {
     uint8_t temperature_alert: 1;
     uint8_t frequency_low: 1;
     uint8_t frequency_high: 1;
-    uint8_t ___reserved: 3;
+    uint8_t cubic_interpolation: 1;
+    uint8_t ___reserved: 2;
 } config_options_t;
+
+typedef struct __attribute__packed__ {
+    uint8_t points[16];
+} register_mem_cubic_int_t;
 
 typedef struct __attribute__packed__ {
     union {
@@ -31,7 +36,7 @@ typedef struct __attribute__packed__ {
     uint8_t max_temp;
     float fade_in_time;
     uint8_t temp_check_interval;
-    float linear_correction_factor;
+    // float linear_correction_factor;
     uint8_t zero_crossing_delay_ticks;
     uint16_t minimum_on_time_ticks;
     uint16_t adjust_halfwave_time_ticks;
@@ -39,6 +44,9 @@ typedef struct __attribute__packed__ {
     int8_t int_temp_offset;
     int8_t ntc_temp_offset;
     uint8_t report_metrics_max_interval;
+#if DIMMER_CUBIC_INTERPOLATION
+    register_mem_cubic_int_t cubic_int[8];
+#endif
 } register_mem_cfg_t;
 
 typedef struct __attribute__packed__ {
@@ -62,6 +70,8 @@ typedef struct __attribute__packed__ {
     uint8_t address;
 } register_mem_t;
 
+typedef char _adjust_SERIALTWOWIRE_MAX_INPUT_LENGTH_if_this_fails[(sizeof(register_mem_t) + 1) >= SERIALTWOWIRE_MAX_INPUT_LENGTH ? -1 : 0];
+
 typedef union __attribute__packed__ {
     register_mem_t data;
     uint8_t raw[sizeof(register_mem_t)];
@@ -79,5 +89,5 @@ typedef struct __attribute__packed__ {
     uint32_t write_cycle;
     uint16_t write_position;
     uint8_t bytes_written;      // might be 0 if the data has not been changed
-} dimmer_eeprom_written_t;
+} DIMMER_RESPONSE_EEPROM_WRITTEN_t;
 

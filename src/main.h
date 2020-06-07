@@ -85,6 +85,8 @@
 #define EEPROM_WRITE_DELAY                      500
 #define EEPROM_REPEATED_WRITE_DELAY             5000
 
+void rem(); // print "+REM="
+
 void read_config();
 void write_config();
 void init_eeprom();

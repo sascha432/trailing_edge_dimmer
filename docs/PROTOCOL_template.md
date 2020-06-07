@@ -223,7 +223,7 @@ Read temperature check interval
 
 Response (0x02, 2 seconds)
 
-    +I2CT=ADDRESS,02 (RAW_CMD:+I2CT=75,1e)
+    +I2CT=ADDRESS,02 (RAW_CMD:+I2CT=17,1e)
 
 Set temperature check interval/metrics reporting to 30 seconds
 
@@ -276,13 +276,17 @@ Force temperature check and report metrics if enabled
 
 ## DIMMER_COMMAND_DUMP_xxx
 
-- DIMMER_COMMAND_DUMP_MEM
-
 This is only available with enabled debugging.
 
 Dump the content of the register memory
 
-    +I2CT=ADDRESS,REGISTER_COMMAND,ee (RAW_CMD:+I2CT=17,0a,ee)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_DUMP_MEM (RAW_CMD:+I2CT=17,0a,ee)
+
+## DIMMER_COMMAND_SIMULATE_ZC
+
+Simulate zero crossing events for 8 seconds. This will cause misfire if DIMMER_SIMULATE_ZC is not set.
+
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SIMULATE_ZC,08 (RAW_CMD:+I2CT=17,0a,e0,08)
 
 ## Temperature, VCC status and AC Frequency (DIMMER_RESPONSE_METRICS_REPORT)
 

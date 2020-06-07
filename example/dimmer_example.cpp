@@ -138,7 +138,7 @@ void setup() {
     Wire.onReceive([](int length) {
         // Serial_printf_P(PSTR("Wire.onReceive(): length %u, type %#02x\n"), length, Wire.peek());
         switch((uint8_t)Wire.read()) {
-            case DIMMER_METRICS_REPORT:
+            case DIMMER_RESPONSE_METRICS_REPORT:
                 if (length >= (int)sizeof(dimmer_metrics_t)) {
                     dimmer_metrics_t metrics;
                     Wire.readBytes(reinterpret_cast<uint8_t *>(&metrics), sizeof(metrics));
@@ -146,14 +146,14 @@ void setup() {
                     Serial_printf_P(PSTR("VCC %.3fV AC frequency %.2f Hz\n"), metrics.vcc / 1000.0, metrics.frequency);
                 }
                 break;
-            case DIMMER_TEMPERATURE_ALERT:
+            case DIMMER_RESPONSE_TEMPERATURE_ALERT:
                 if (length == 3) {
                     uint8_t temperature = Wire.read();
                     uint8_t tempThreshold = Wire.read();
                     Serial_printf_P(PSTR("Temperature alarm: %u > %u\n"), temperature, tempThreshold);
                 }
                 break;
-            case DIMMER_FADING_COMPLETE: {
+            case DIMMER_RESPONSE_FADING_COMPLETE: {
                     int8_t channel;
                     int16_t level;
                     const int len = sizeof(channel) + sizeof(level);
@@ -168,9 +168,9 @@ void setup() {
                     Serial.println();
                 }
                 break;
-            case DIMMER_EEPROM_WRITTEN: {
-                    if (length >= sizeof(dimmer_eeprom_written_t)) {
-                        dimmer_eeprom_written_t eeprom;
+            case DIMMER_RESPONSE_EEPROM_WRITTEN: {
+                    if (length >= sizeof(DIMMER_RESPONSE_EEPROM_WRITTEN_t)) {
+                        DIMMER_RESPONSE_EEPROM_WRITTEN_t eeprom;
                         Wire.readBytes(reinterpret_cast<uint8_t *>(&eeprom), sizeof(eeprom));
                         Serial_printf_P(PSTR("EEPROM written: cycle %lu, position %u, bytes written %u\n"), (unsigned long)eeprom.write_cycle, eeprom.write_position, eeprom.bytes_written);
                     }

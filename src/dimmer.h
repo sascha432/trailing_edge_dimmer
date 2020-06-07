@@ -5,6 +5,25 @@
 #pragma once
 
 #include <Arduino.h>
+#if DIMMER_CUBIC_INTERPOLATION
+#include "cubic_interpolation.h"
+
+#ifndef DIMMER_INTERPOLATION_METHOD
+#define DIMMER_INTERPOLATION_METHOD		CatmullSpline
+// #define DIMMER_INTERPOLATION_METHOD		ConstrainedSpline
+#endif
+
+#endif
+
+#ifndef DIMMER_SIMULATE_ZC
+#define DIMMER_SIMULATE_ZC                                      0
+#endif
+
+#ifndef DIMMER_MAX_TEMP
+#define DIMMER_MAX_TEMP                                         80
+#endif
+
+#define DIMMER_TEMP_OFFSET_DIVIDER                              4.0f
 
 #ifndef ZC_SIGNAL_PIN
 #define ZC_SIGNAL_PIN                                           3
@@ -82,7 +101,6 @@
 // fading command
 #define DIMMER_USE_FADING                                       1
 
-// for more than 10 channels it might be necessary to disable the linear correction or use a different method to calculate it. see DIMMER_LINEAR_LEVEL()
 #ifndef DIMMER_CHANNELS
 #define DIMMER_CHANNELS                                         4
 #endif
@@ -102,23 +120,13 @@ static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
     // #define DIMMER_MAX_LEVEL                            100
 #endif
 
-// adjust the time to have a linear level. most LEDs have a built in compensation.
-// using the factor 1.0 disables the time consuming calculations with having the option
-// to change it without a firmware upgrade
-#ifndef DIMMER_USE_LINEAR_CORRECTION
-    #define DIMMER_USE_LINEAR_CORRECTION                        1
-#endif
-
-#ifndef DIMMER_LINEAR_FACTOR
-    #define DIMMER_LINEAR_FACTOR                                1.0
-#endif
-
-#if DIMMER_USE_LINEAR_CORRECTION
-// pow() is pretty slow
-#define DIMMER_LINEAR_LEVEL(level)                              (dimmer_config.linear_correction_factor == 1 ? level : (float)pow(level, dimmer_config.linear_correction_factor) * dimmer.linear_correction_divider)
+#if DIMMER_CUBIC_INTERPOLATION
+#define DIMMER_LINEAR_LEVEL(level, channel)                     (dimmer_config.bits.cubic_interpolation == 1 ? level : getInterpolatedLevel(level, channel))
 #else
-#define DIMMER_LINEAR_LEVEL(level)                              level
+#define DIMMER_LINEAR_LEVEL(level, channel)                     level
 #endif
+
+
 
 // the prescaler should be chosen to have maximum precision while having enough range for fine tuning
 
@@ -174,6 +182,10 @@ static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 #define DIMMER_US_TO_TICKS(us, ticks_per_us)                    (us * ticks_per_us)
 #define DIMMER_TICKS_TO_US(ticks, ticks_per_us)                 (ticks / ticks_per_us)
 
+#define DIMMER_ZC_TICKS_TO_US(ticks)                            DIMMER_TICKS_TO_US(ticks, DIMMER_TMR2_TICKS_PER_US)
+#define DIMMER_MIN_ON_TICKS_TO_US(ticks)                        DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
+#define DIMMER_ADJ_HW_TICKS_TO_US(ticks)                        DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
+
 #if DIMMER_TICKS_PER_HALFWAVE > 32767
     #error TICKS are limited to 32767 per half wave, increase prescaler
 #endif
@@ -198,8 +210,8 @@ static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 float dimmer_get_frequency();
 #endif
 
-#define DIMMER_VERSION_WORD                                     ((2 << 10) | (1 << 5) | 4)
-#define DIMMER_VERSION                                          "2.1.4"
+#define DIMMER_VERSION_WORD                                     ((2 << 10) | (2 << 5) | 0)
+#define DIMMER_VERSION                                          "2.2.0"
 #define DIMMER_INFO                                             "Author sascha_lammers@gmx.de"
 
 #ifndef DIMMER_I2C_SLAVE

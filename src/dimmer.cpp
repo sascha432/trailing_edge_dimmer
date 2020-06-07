@@ -18,6 +18,9 @@ volatile uint16_t zero_crossing_frequency_period; // milliseconds for DIMMER_AC_
 volatile ulong zc_min_time = 0;
 
 float dimmer_get_frequency() {
+#if DIMMER_SIMULATE_ZC
+    return DIMMER_SIMULATE_ZC;
+#else
     if (!zero_crossing_frequency_period) {
         return NAN;
     }
@@ -29,6 +32,7 @@ float dimmer_get_frequency() {
         return NAN;
     }
     return 500 * DIMMER_AC_FREQUENCY / (float)zero_crossing_frequency_period;
+#endif
 }
 
 #endif
@@ -75,7 +79,11 @@ void dimmer_zc_interrupt_handler() {
 #if ZC_MAX_TIMINGS
             dimmer_record_zc_timings(time);
 #endif
+#if DIMMER_SIMULATE_ZC
+            // ignore any zc errors
+#else
             return;
+#endif
         }
     }
     if (dimmer_config.zero_crossing_delay_ticks) {
@@ -89,13 +97,16 @@ void dimmer_zc_interrupt_handler() {
 #endif
     memcpy(dimmer.ordered_channels, dimmer.ordered_channels_buffer, sizeof(dimmer.ordered_channels));
     sei();
-#if DIMMER_USE_FADING
-    dimmer_apply_fading();
-#endif
+
+    _D(10, Serial.println(F("ZC Signal Int")));
+
 #if FREQUENCY_TEST_DURATION
     zero_crossing_int_counter++;
     if (zero_crossing_int_counter == DIMMER_AC_FREQUENCY) {
-        auto _millis = millis();
+        auto _millis = millis(); // get millis first
+#if DIMMER_USE_FADING
+        dimmer_apply_fading();  // depending on the number of channels and interpolation level, this might take a few milliseconds
+#endif
         zero_crossing_frequency_period = (_millis - zero_crossing_frequency_time);
         zero_crossing_int_counter = 0;
         zero_crossing_frequency_time = _millis;
@@ -108,8 +119,14 @@ void dimmer_zc_interrupt_handler() {
             register_mem.data.errors.frequency_high++;
         }
     }
+    else {
+#if DIMMER_USE_FADING
+        dimmer_apply_fading();
 #endif
-    _D(10, Serial.println(F("ZC Signal Int")));
+    }
+#else // DIMMER_USE_FADING
+    dimmer_apply_fading();
+#endif
 }
 
 void dimmer_zc_setup() {
@@ -123,20 +140,9 @@ void dimmer_zc_setup() {
     }
 #endif
 
-#if DIMMER_USE_LINEAR_CORRECTION
-    dimmer_set_lcf(DIMMER_LINEAR_FACTOR);
-#endif
-
     pinMode(ZC_SIGNAL_PIN, INPUT);
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), dimmer_zc_interrupt_handler, DIMMER_ZC_INTERRUPT_MODE);
 }
-
-#if DIMMER_USE_LINEAR_CORRECTION
-void dimmer_set_lcf(float lcf) {
-    dimmer_config.linear_correction_factor = lcf;
-    dimmer.linear_correction_divider = DIMMER_MAX_LEVEL / pow(DIMMER_MAX_LEVEL, dimmer_config.linear_correction_factor);
-}
-#endif
 
 void dimmer_timer_setup() {
 
@@ -144,9 +150,6 @@ void dimmer_timer_setup() {
     _D(5, debug_printf_P(PSTR("Timer prescaler %u / %u\n"), DIMMER_TIMER1_PRESCALER, DIMMER_TIMER2_PRESCALER));
     _D(5, debug_printf_P(PSTR("Half wave resolution %lu ticks\n"), (unsigned long)DIMMER_TICKS_PER_HALFWAVE));
     _D(5, debug_printf_P(PSTR("Dimming levels %u\n"), DIMMER_MAX_LEVEL));
-#if DIMMER_USE_LINEAR_CORRECTION
-    _D(5, debug_printf_P(PSTR("Linear correction factor %.3f\n"), dimmer_config.linear_correction_factor));
-#endif
 
     for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
         digitalWrite(dimmer_pins[i], LOW);
@@ -256,6 +259,10 @@ static inline void dimmer_bubble_sort(dimmer_channel_t channels[], dimmer_channe
 // calculate ticks for each channel and sort them
 void dimmer_calculate_channels() {
 
+#if DIMMER_SIMULATE_ZC
+    auto start = micros();
+#endif
+
     dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];
     dimmer_channel_id_t count = 0;
 
@@ -267,7 +274,7 @@ void dimmer_calculate_channels() {
             ordered_channels[count].channel = i;
             count++;
         } else if (dimmer_level(i) != 0) {
-            uint16_t ticks = DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(i)));
+            uint16_t ticks = DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(i), i));
             if (ticks) {
                 ordered_channels[count].ticks = ticks + dimmer_config.zero_crossing_delay_ticks;
                 ordered_channels[count].channel = i;
@@ -280,6 +287,14 @@ void dimmer_calculate_channels() {
     cli(); // copy double buffer with interrupts disabled
     memcpy(dimmer.ordered_channels_buffer, ordered_channels, sizeof(dimmer.ordered_channels_buffer));
     sei();
+
+#if DIMMER_SIMULATE_ZC
+    auto dur = micros() - start;
+    for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
+        Serial_printf_P(PSTR("%u=%u(%u) "), ordered_channels[i].channel, ordered_channels[i].ticks, dimmer_level(i));
+    }
+    Serial.println(dur);
+#endif
 }
 
 dimmer_level_t dimmer_normalize_level(dimmer_level_t level) {
@@ -307,7 +322,7 @@ void dimmer_set_level(dimmer_channel_id_t channel, dimmer_level_t level) {
         (unsigned)channel,
         (unsigned)dimmer_level(channel),
         (unsigned)DIMMER_GET_TICKS(dimmer_level(channel)),
-        (unsigned)DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(channel)))
+        (unsigned)DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(channel), channel))
     ));
 
 }
@@ -343,7 +358,8 @@ void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_le
 
     if (!absolute_time) { // calculate relative fading time depending on "diff"
         time = abs(diff / DIMMER_MAX_LEVEL * time);
-        _D(5, debug_printf_P(PSTR("Relative fading time %.3f\n"), time));
+        _D(5, Serial_printf_P(PSTR("Relative fading time %.3f\n"), time));
+        // Serial_printf_P(PSTR("Relative fading time %.3f\n"), time);
     }
 
     fade.count = DIMMER_AC_FREQUENCY * 2.0f * time;
@@ -355,8 +371,10 @@ void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_le
         fade.count = 1;
     }
 
-    _D(5, debug_printf_P(PSTR("Set fading for channel %u: %.2f to %.2f"), channel, from, to));
+    _D(5, Serial_printf_P(PSTR("Set fading for channel %u: %.2f to %.2f"), channel, from, to));
     _D(5, Serial_printf_P(PSTR(", step %.3f, count %u\n"), fade.step, fade.count));
+    // Serial_printf_P(PSTR("Set fading for channel %u: %.2f to %.2f"), channel, from, to);
+    // Serial_printf_P(PSTR(", step %.3f, count %u\n"), fade.step, fade.count);
 }
 
 void dimmer_apply_fading() {
@@ -373,9 +391,10 @@ void dimmer_apply_fading() {
             } else {
                 dimmer_level(i) = dimmer_normalize_level(fade.level);
             }
+Serial_printf_P(PSTR("Fading channel %u: %u ticks %.2f\n"), i, dimmer_level(i), DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(i), i)));
 #if DEBUG
             if (fade.count % 60 == 0) {
-                _D(5, debug_printf_P(PSTR("Fading channel %u: %u ticks %.2f\n"), i, dimmer_level(i), DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(i)))));
+                _D(5, debug_printf_P(PSTR("Fading channel %u: %u ticks %.2f\n"), i, dimmer_level(i), DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(i), i))));
             }
 #endif
         }

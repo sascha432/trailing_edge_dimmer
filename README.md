@@ -11,9 +11,23 @@ Firmware for a trailing edge MOSFET dimmer.
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
 * Highly configurable to match any hardware
 
-[I2C/UART protocol](docs/protocol.md)
+[I2C/UART protocol](blob/aabc243a570f12f377fd4b94965764b3ff974f6c/docs/protocol.md)
 
-[Change Log v2.1.4](CHANGELOG.md)
+[Change Log v2.1.4](blob/aabc243a570f12f377fd4b94965764b3ff974f6c/CHANGELOG.md)
+
+[Release](releases/tag/2.1.4)
+
+## Master Branch
+
+The current master is work in progress and should not be used for any production dimmer.
+
+* Breaking protocol updates
+* Linear correction removed
+* Cubic interpolation to adjust the brightness curve per channel
+
+[I2C/UART protocol](docs/PROTOCOL.md)
+
+[Change Log v2.2.0](CHANGELOG.md)
 
 ## New and improved in-wall dimmer STL files
 
