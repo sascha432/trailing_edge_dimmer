@@ -8,110 +8,31 @@ import sys
 import argparse
 import re
 import struct
+import json
 from os import path
 
 # .\scripts\trans_cmd.py -v command "I2CT=ADDRESS,COMMAND_READ_VCC,DIMMER_REGISTER_FROM_LEVEL,1f,2faa,100.5,4a3b2c1d,b-1,w1000,w-1"
-# .\scripts\trans_cmd.py -v -O file .\docs\PROTOCOL_template.md -o .\docs\PROTOCOL.md
-# .\scripts\trans_cmd.py -v compile - -D DIMMER_CUBIC_INTERPOLATION=1 -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
-# .\scripts\trans_cmd.py -v -O compile "C:/SPB_Data/dimmer_const.cpp" -D DIMMER_CUBIC_INTERPOLATION=1 -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
+# .\scripts\trans_cmd.py -O file .\docs\PROTOCOL_template.md -o .\docs\PROTOCOL.md
+# .\scripts\trans_cmd.py compile - -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
+# .\scripts\trans_cmd.py -O compile "C:/SPB_Data/dimmer_const.cpp" -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
+
+# I2C/UART protocol
+#.\scripts\trans_cmd.py command "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w-1,00,w16665,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w0,00,w16665,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w16665,00,w0,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_DUMP_MEM" "+I2CT=ADDRESS,REGISTER_COMMAND,DIMMER_COMMAND_DUMP_CFG"
 
 class DimmerConst(object):
     def __init__(self):
-        self.list = {
-            'REGISTER_START_ADDR': 0x01,
-            'REGISTER_SIZE': 0xbb,
-            'REGISTER_FROM_LEVEL': 0x01,
-            'REGISTER_CHANNEL': 0x03,
-            'REGISTER_TO_LEVEL': 0x04,
-            'REGISTER_TIME': 0x06,
-            'REGISTER_COMMAND': 0x0a,
-            'REGISTER_READ_LENGTH': 0x0b,
-            'REGISTER_COMMAND_STATUS': 0x0c,
-            'REGISTER_CHANNELS_START': 0x0d,
-            'REGISTER_CH0_LEVEL': 0x0d,
-            'REGISTER_CH1_LEVEL': 0x0f,
-            'REGISTER_CH2_LEVEL': 0x11,
-            'REGISTER_CH3_LEVEL': 0x13,
-            'REGISTER_CH4_LEVEL': 0x15,
-            'REGISTER_CH5_LEVEL': 0x17,
-            'REGISTER_CH6_LEVEL': 0x19,
-            'REGISTER_CH7_LEVEL': 0x1b,
-            'REGISTER_CHANNELS_END': 0x1d,
-            'REGISTER_TEMP': 0x1d,
-            'REGISTER_VCC': 0x21,
-            'REGISTER_CONFIG_OFS': 0x23,
-            'REGISTER_CONFIG_SZ': 0x93,
-            'REGISTER_OPTIONS': 0x23,
-            'REGISTER_MAX_TEMP': 0x24,
-            'REGISTER_FADE_IN_TIME': 0x25,
-            'REGISTER_TEMP_CHECK_INT': 0x29,
-            'REGISTER_ZC_DELAY_TICKS': 0x2a,
-            'REGISTER_MIN_ON_TIME_TICKS': 0x2b,
-            'REGISTER_ADJ_HALFWAVE_TICKS': 0x2d,
-            'REGISTER_INT_1_1V_REF': 0x2f,
-            'REGISTER_INT_TEMP_OFS': 0x33,
-            'REGISTER_METRICS_INT': 0x35,
-            'REGISTER_ERRORS_FREQ_LOW': 0xb8,
-            'REGISTER_ERRORS_FREQ_HIGH': 0xb9,
-            'REGISTER_ERRORS_ZC_MISFIRE': 0xba,
-            'REGISTER_CH0_CUBIC_INT': 0x36,
-            'REGISTER_CH1_CUBIC_INT': 0x46,
-            'REGISTER_CH2_CUBIC_INT': 0x56,
-            'REGISTER_CH3_CUBIC_INT': 0x66,
-            'REGISTER_CH4_CUBIC_INT': 0x76,
-            'REGISTER_CH5_CUBIC_INT': 0x86,
-            'REGISTER_CH6_CUBIC_INT': 0x96,
-            'REGISTER_CH7_CUBIC_INT': 0xa6,
-            'REGISTER_VERSION': 0xb6,
-            'REGISTER_ADDRESS': 0xbb,
-            'REGISTER_END_ADDR': 0xbc,
-            'RESPONSE_METRICS_REPORT': 0xf0,
-            'RESPONSE_TEMPERATURE_ALERT': 0xf1,
-            'RESPONSE_FADING_COMPLETE': 0xf2,
-            'RESPONSE_EEPROM_WRITTEN': 0xf3,
-            'RESPONSE_FREQUENCY_WARNING': 0xf4,
-            'COMMAND_SET_LEVEL': 0x10,
-            'COMMAND_FADE': 0x11,
-            'COMMAND_READ_CHANNELS': 0x12,
-            'COMMAND_READ_NTC': 0x20,
-            'COMMAND_READ_INT_TEMP': 0x21,
-            'COMMAND_READ_VCC': 0x22,
-            'COMMAND_READ_AC_FREQUENCY': 0x23,
-            'COMMAND_WRITE_EEPROM': 0x50,
-            'COMMAND_RESTORE_FS': 0x51,
-            'COMMAND_READ_TIMINGS': 0x52,
-            'COMMAND_PRINT_INFO': 0x53,
-            'COMMAND_FORCE_TEMP_CHECK': 0x54,
-            'COMMAND_PRINT_METRICS': 0x55,
-            'COMMAND_PRINT_CUBIC_INT': 0x56,
-            'COMMAND_ZC_TIMINGS_OUTPUT': 0x60,
-            'COMMAND_ZC_DECREASE': 0x82,
-            'COMMAND_ZC_INCREASE': 0x83,
-            'COMMAND_SET_ZC': 0x92,
-            'COMMAND_FORCE_WRITE_EEPROM': 0x93,
-            'COMMAND_DUMP_MEM': 0xee,
-            'COMMAND_STATUS_OK': 0x00,
-            'COMMAND_STATUS_ERROR': 0xffffffff,
-            'OPTIONS_RESTORE_LEVEL': 0x01,
-            'OPTIONS_REPORT_METRICS': 0x02,
-            'OPTIONS_TEMP_ALERT_TRIGGERED': 0x04,
-            'OPTIONS_FREQ_LOW_ALERT': 0x08,
-            'OPTIONS_FREQ_HIGH_ALERT': 0x10,
-            'OPTIONS_CUBIC_INT': 0x20,
-            'TIMINGS_TMR1_TICKS_PER_US': 0x01,
-            'TIMINGS_TMR2_TICKS_PER_US': 0x02,
-            'TIMINGS_ZC_DELAY_IN_US': 0x03,
-            'TIMINGS_MIN_ON_TIME_IN_US': 0x04,
-            'TIMINGS_ADJ_HW_TIME_IN_US': 0x05,
-            'COMMAND_SIMULATE_ZC': 0xe0,
-        }
+        self.list = {}
+
+    def read_json(self, file):
+        with open(file, "rt") as file:
+            self.list = json.loads(file.read())
+            file.close()
 
     def get_by_value(self, value):
         for key, val in self.list.items():
             if val==value:
                 return key
         return False
-
 
     def get(self, name):
         if name in self.list:
@@ -164,9 +85,12 @@ class DimmerConst(object):
             return hex_str
         elif type=='float':
             hex_str = self.float_to_hex(value)
+            hex_bytes = re.findall('..', hex_str)
+            hex_bytes.reverse()
+            ch = ''
             if split_bytes:
-                return ','.join(re.findall('..', hex_str))
-            return hex_str
+                ch = ','
+            return ch.join(hex_bytes)
         if value<0:
             value = (1<<8) + value
         return '%02X' % value
@@ -587,7 +511,9 @@ def verbose(msg):
 
 # main()
 
-src_dir = path.join(path.dirname(sys.argv[0]), '..', 'src') + path.sep;
+script_dir = path.dirname(sys.argv[0])
+src_dir = path.join(script_dir, '..', 'src') + path.sep
+json_file = path.join(script_dir, 'trans_cmd_cfg_struct.json')
 
 parser = argparse.ArgumentParser(prog='trans-cmd', description='Translate constants to HEX code', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 subparsers  = parser.add_subparsers(help='sub-command help')
@@ -605,6 +531,7 @@ compile_parser.add_argument('-D', '--define', help='define constant', action='ap
 compile_parser.add_argument('-p', '--protocol-header', help='protocol header', action=DelayedFileAction, type=DelayedFileType('rt'), default=src_dir + 'dimmer_protocol.h')
 compile_parser.add_argument('-s', '--structures-header', help='structures header', action=DelayedFileAction, type=DelayedFileType('rt'), default=src_dir + 'dimmer_reg_mem.h')
 
+parser.add_argument('-j', '--json', help='JSON configuration', default=json_file)
 parser.add_argument('-O', '--overwrite', action='store_true', default=False, help='overwrite existing files')
 parser.add_argument('-v', '--verbose', help='verbose output', action='store_true', default=False)
 parser.add_argument('--slave-address', type=str, default='0x17', help='I2C slave address')
@@ -623,6 +550,7 @@ verbose('slave address: 0x%02X' % args.slave_address)
 verbose('master address: 0x%02X' % args.master_address)
 
 if 'command' in args:
+    dimmer.read_json(args.json)
     verbose('commands: %s' % (args.command))
     for command in args.command:
         try:
@@ -633,6 +561,7 @@ if 'command' in args:
             sys.exit(1)
 
 elif 'source' in args:
+    dimmer.read_json(args.json)
     args.source.check_overwrite(args.overwrite)
     verbose('source output file: %s%s' % (args.source.name, args.source.exists() and ' (file exists, overwrite flag set)' or ''))
     verbose('protocol header: ' + path.normpath(args.protocol_header.name))
@@ -651,14 +580,18 @@ elif 'source' in args:
         fprint('#include <stdio.h>')
         fprint('#include "%s"' % args.structures_header.name)
         fprint('int main() {')
+        fprint('printf("{\\n");')
 
+        n = 0
         for define in defines:
+            n = n + 1
             name = define[0]
             if name.startswith('DIMMER_'):
                 short = name[7:]
-                if short.split('_', 2)[0] in ['COMMAND', 'REGISTER', 'OPTIONS', 'TIMINGS', 'RESPONSE']:
-                    fprint('printf("\'%s\': 0x%%02x,\\n", %s);' % (short, name))
+                if short.split('_', 2)[0] in ['COMMAND', 'REGISTER', 'OPTIONS', 'TIMINGS', 'RESPONSE', 'CONFIG']:
+                    fprint('printf("\\\"%s\\\": %%u%s\\n", %s);' % (short, (n < len(defines) and ',' or ''), name))
 
+        fprint('printf("}\\n");')
         fprint('return 0; }')
 
 elif 'file' in args:
