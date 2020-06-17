@@ -24,6 +24,9 @@ void reset_config()
     register_mem.data.cfg.max_temp = DIMMER_MAX_TEMP;
     register_mem.data.cfg.bits.restore_level = true;
     register_mem.data.cfg.bits.report_metrics = true;
+#if DIMMER_CUBIC_INTERPOLATION
+    register_mem.data.cfg.bits.cubic_interpolation = true;
+#endif
     register_mem.data.cfg.fade_in_time = 7.5;
     register_mem.data.cfg.temp_check_interval = 2;
     register_mem.data.cfg.zero_crossing_delay_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_ZC_DELAY_US);
@@ -34,11 +37,7 @@ void reset_config()
 #ifdef INTERNAL_TEMP_OFS
     register_mem.data.cfg.int_temp_offset = INTERNAL_TEMP_OFS;
 #endif
-// #if DIMMER_CUBIC_INTERPOLATION
-//     register_mem.data.cfg.bits.cubic_interpolation = 1;
-// #endif
     config.crc16 = UINT16_MAX - 1;
-//    memcpy(&config.cfg, &register_mem.data.cfg, sizeof(config.cfg));
 }
 
 void bzero(void *ptr, size_t size)
@@ -63,7 +62,7 @@ void init_eeprom()
         EEPROM.write(i, 0);
     }
     config.updateCrc();
-    EEPROM.put(eeprom_position, config);
+    config.write(eeprom_position);
     EEPROM.end();
 }
 
@@ -174,6 +173,7 @@ float get_internal_temperature()
     delay(40); // 20 was not enough. It takes quite a while when switching from reading VCC to temp.
     ADCSRA |= _BV(ADSC);
     while (bit_is_set(ADCSRA, ADSC)) ;
+    // TODO verify calculation, it is way off for a couple of chips
     return ((ADCW - (is_Atmega328PB ? 247.0f : 324.31f)) / 1.22f) + (float)(register_mem.data.cfg.int_temp_offset / DIMMER_TEMP_OFFSET_DIVIDER);
 }
 
@@ -334,8 +334,9 @@ void display_dimmer_info()
         DIMMER_T1_TICKS_TO_US_FLOAT(register_mem.data.cfg.zero_crossing_delay_ticks)
     );
     rem();
-    Serial_printf_P(PSTR("errors=ZCmisfire=%u,EEPROMCrcErr=%u\n"),
+    Serial_printf_P(PSTR("errors=ZCmisfire=%u,temp=%u,EEPROMCrc=%u\n"),
         register_mem.data.errors.zc_misfire,
+        register_mem.data.errors.temperature,
         eeprom_crc_error
     );
     Serial.flush();
@@ -343,8 +344,10 @@ void display_dimmer_info()
 
 void setup()
 {
+#if HAVE_READ_INT_TEMP
     uint8_t buf[3];
     is_Atmega328PB = memcmp_P(get_signature(buf), PSTR("\x1e\x95\x16"), 3) == 0;
+#endif
 
     Serial.begin(DEFAULT_BAUD_RATE);
     #if SERIAL_I2C_BRDIGE && DEBUG
@@ -509,7 +512,9 @@ void loop()
         next_temp_check = millis() + (register_mem.data.cfg.temp_check_interval * 1000UL);
 
         if (register_mem.data.cfg.max_temp && current_temp > (int)register_mem.data.cfg.max_temp) {
+            // max. temperature exceeded, turn all channels off
             fade(-1, DIMMER_FADE_FROM_CURRENT_LEVEL, 0, 10);
+            // store alert and save
             register_mem.data.cfg.bits.temperature_alert = 1;
             register_mem.data.errors.temperature++;
             write_config();

@@ -187,7 +187,8 @@ public:
     } cfg;
 #endif
     dimmer_fade_t fade[DIMMER_CHANNELS];                                // calculated fading data
-    dimmer_channel_id_t channel_ptr;
+    dimmer_channel_id_t channel_number;
+    dimmer_channel_t *channel_ptr;
     dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];             // current dimming levels in ticks
     dimmer_channel_t ordered_channels_buffer[DIMMER_CHANNELS + 1];      // next dimming levels
 

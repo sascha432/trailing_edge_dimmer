@@ -379,9 +379,10 @@ void Dimmer::_overflow()
 
 void Dimmer::_startHalfwave()
 {
-    auto channel = &ordered_channels[0];
+    auto channel = ordered_channels;
     if (channel->ticks) { // any channel active?
-        channel_ptr = 0;
+        channel_number = 0;
+        channel_ptr = channel;
         OCR1A += channel->ticks;
 #if DEBUG_FAULTS
         if (channel->ticks < (128 / DIMMER_TIMER1_PRESCALER)) {
@@ -391,9 +392,10 @@ void Dimmer::_startHalfwave()
 #endif
         // turn channels on first
         // the delay between turning on a channel is ~2µs @ 16MHz (or 16µs between channel 0 and 7, having 8 channels and all of them enabled)
-        for(; channel->ticks; channel++) {
+        do {
             enableChannel(channel->channel);
-        }
+            channel++;
+        } while(channel->ticks);
 
         FOR_CHANNELS(i) {
             if (!dimmer_level(i)) {
@@ -414,9 +416,12 @@ void Dimmer::_startHalfwave()
 
 void Dimmer::_dimmingCycle()
 {
+    //TODO something isn't working correctly here and channels seem to be mixed up though they are stored correctly in "ordered_channels_buffer"
+    // didnt check "ordered_channels" yet
     uint16_t startOCR1A = OCR1A;
-    dimmer_channel_t *channel = &ordered_channels[channel_ptr++];
-    dimmer_channel_t *next_channel = &ordered_channels[channel_ptr];
+    auto channel = &ordered_channels[channel_number++];
+    // auto channel = channel_ptr++;
+    auto next_channel = &ordered_channels[channel_number];
     for(;;) {
         disableChannel(channel->channel);    // turn off current channel
 #if DEBUG_FAULTS
@@ -481,8 +486,9 @@ void Dimmer::_dimmingCycle()
             break;
         }
         channel = next_channel;
-        channel_ptr++;
-        next_channel = &ordered_channels[channel_ptr];
+        channel_number++;
+        //next_channel = &ordered_channels[channel_number];
+        next_channel++;
     }
 }
 
@@ -513,7 +519,7 @@ void Dimmer::_fault(const char *msg)
     uint8_t _TIFR1 = TIFR1;
     uint8_t __state = (uint8_t)_state;
     uint8_t __intFlags = _intFlags;
-    uint8_t _channel_ptr = channel_ptr;
+    uint8_t _channel_number = channel_number;
     uint8_t channels[DIMMER_CHANNELS];
     FOR_CHANNELS(i) {
         channels[i] = !!(*_pinsAddr[i] & _pinsMask[i]);
@@ -524,7 +530,7 @@ void Dimmer::_fault(const char *msg)
     Serial_printf("prevOCR1B=%u,dcOCR1A=%u,", __prevOCR1B, __dcOCR1A);
     Serial_printf("OCIE1A=%u,OCIE1B=%u,IFZCI=%u,IFCAB=%u,", _TIMSK1 & _BV(OCIE1A), _TIMSK1 & _BV(OCIE1B), __intFlags & _BV(_IFZCI), __intFlags & _BV(_IFCAB));
     Serial_printf("OCF1A=%u,OCF1B=%u\n", _TIFR1 & _BV(OCF1A), _TIFR1 & _BV(OCF1B));
-    Serial_printf("state=%u,channel_ptr=%u\n", __state, _channel_ptr);
+    Serial_printf("state=%u,channel_number=%u\n", __state, _channel_number);
     for(dimmer_channel_id_t i = 0; ordered_channels[i].ticks; i++) {
         auto channel = ordered_channels[i].channel;
         Serial_printf("num=%u,ch=%d,ticks=%d,OCR1A=%u,pin=%u\n", i, channel, ordered_channels[i].ticks, ordered_channels[i]._OCR1A, channels[channel]);

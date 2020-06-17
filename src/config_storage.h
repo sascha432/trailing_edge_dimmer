@@ -29,7 +29,11 @@ public:
     void updateCrc();
 
     static constexpr size_t cubicIntSize() {
+#if DIMMER_CUBIC_INTERPOLATION
         return sizeof(register_mem_cubic_int_t) * DIMMER_CHANNELS;
+#else
+        return 0;
+#endif
     }
     static constexpr size_t size() {
         return sizeof(eeprom_cycle) + sizeof(crc16) + sizeof(level) + cubicIntSize() + sizeof(register_mem_cfg_t);

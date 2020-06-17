@@ -28,12 +28,14 @@ void ConfigStorage::read(size_t position)
     position += sizeof(crc16);
     EEPROM.get(position, level);
     position += sizeof(level);
+#if DIMMER_CUBIC_INTERPOLATION
     {
         register_mem_cubic_int_t tmp_cubic_int[DIMMER_CHANNELS];
         EEPROM.get(position, tmp_cubic_int);
         memcpy(register_mem.data.cubic_int, tmp_cubic_int, sizeof(tmp_cubic_int));
         position += sizeof(tmp_cubic_int);
     }
+#endif
     EEPROM.get(position, register_mem.data.cfg);
 }
 
@@ -45,12 +47,14 @@ size_t ConfigStorage::write(size_t position)
     position += sizeof(crc16);
     EEPROM.put(position, level);
     position += sizeof(level);
+#if DIMMER_CUBIC_INTERPOLATION
     {
         register_mem_cubic_int_t tmp_cubic_int[DIMMER_CHANNELS];
         memcpy(tmp_cubic_int, register_mem.data.cubic_int, sizeof(tmp_cubic_int));
         EEPROM.put(position, tmp_cubic_int);
         position += sizeof(tmp_cubic_int);
     }
+#endif
     EEPROM.put(position, register_mem.data.cfg);
     position += sizeof(register_mem.data.cfg);
     return position;
@@ -82,6 +86,7 @@ bool ConfigStorage::compare(size_t position)
         }
         position += sizeof(tmp_level);
     }
+#if DIMMER_CUBIC_INTERPOLATION
     {
         register_mem_cubic_int_t tmp_cubic_int[DIMMER_CHANNELS];
         EEPROM.get(position, tmp_cubic_int);
@@ -90,6 +95,7 @@ bool ConfigStorage::compare(size_t position)
         }
         position += sizeof(tmp_cubic_int);
     }
+#endif
     {
         auto ptr = reinterpret_cast<const uint8_t *>(&register_mem.data.cfg);
         for(size_t i = 0; i < sizeof(register_mem.data.cfg); i++)  {
@@ -112,7 +118,9 @@ uint16_t ConfigStorage::crc() const
 {
     uint16_t crc = crc16_update(~0, reinterpret_cast<const uint8_t *>(&register_mem.data.cfg), sizeof(register_mem.data.cfg));
     crc = crc16_update(crc, reinterpret_cast<const uint8_t *>(level), sizeof(level));
+#if DIMMER_CUBIC_INTERPOLATION
     crc = crc16_update(crc, reinterpret_cast<const uint8_t *>(register_mem.data.cubic_int), cubicIntSize());
+#endif
     return crc;
 }
 
