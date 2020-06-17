@@ -18,14 +18,12 @@ typedef struct {
     uint8_t restore_level: 1;
     uint8_t report_metrics: 1;
     uint8_t temperature_alert: 1;
-    uint8_t frequency_low: 1;
-    uint8_t frequency_high: 1;
     uint8_t cubic_interpolation: 1;
-    uint8_t ___reserved: 2;
+    uint8_t ____reserved: 4;
 } config_options_t;
 
 typedef struct __attribute__packed__ {
-    uint8_t points[16];
+    uint8_t points[DIMMER_CUBIC_INT_TABLE_SIZE];
 } register_mem_cubic_int_t;
 
 typedef struct __attribute__packed__ {
@@ -36,22 +34,17 @@ typedef struct __attribute__packed__ {
     uint8_t max_temp;
     float fade_in_time;
     uint8_t temp_check_interval;
-    // float linear_correction_factor;
-    uint8_t zero_crossing_delay_ticks;
-    uint16_t minimum_on_time_ticks;
-    uint16_t adjust_halfwave_time_ticks;
+    int16_t zero_crossing_delay_ticks;
+    uint16_t min_on_ticks;
+    uint16_t max_on_ticks;
     float internal_1_1v_ref;
     int8_t int_temp_offset;
     int8_t ntc_temp_offset;
-    uint8_t report_metrics_max_interval;
-#if DIMMER_CUBIC_INTERPOLATION
+    uint8_t report_metrics_max_interval;    // multiple of "temp_check_interval"
     register_mem_cubic_int_t cubic_int[8];
-#endif
 } register_mem_cfg_t;
 
 typedef struct __attribute__packed__ {
-    uint8_t frequency_low;
-    uint8_t frequency_high;
     uint8_t zc_misfire;
 } register_mem_errors_t;
 
@@ -91,3 +84,8 @@ typedef struct __attribute__packed__ {
     uint8_t bytes_written;      // might be 0 if the data has not been changed
 } DIMMER_RESPONSE_EEPROM_WRITTEN_t;
 
+typedef struct __attribute__packed__ {
+    int16_t start_level;
+    uint8_t level_count;
+    uint8_t step_size;
+} dimmer_get_cubic_int_header_t;

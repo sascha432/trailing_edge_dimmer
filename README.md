@@ -11,8 +11,6 @@ Firmware for a trailing edge MOSFET dimmer.
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
 * Highly configurable to match any hardware
 
-
-
 [I2C/UART protocol](https://github.com/sascha432/trailing_edge_dimmer/blob/aabc243a570f12f377fd4b94965764b3ff974f6c/docs/protocol.md)
 
 [Change Log v2.1.4](https://github.com/sascha432/trailing_edge_dimmer/blob/aabc243a570f12f377fd4b94965764b3ff974f6c/CHANGELOG.md)
@@ -24,8 +22,10 @@ Firmware for a trailing edge MOSFET dimmer.
 The current master is work in progress and should not be used for any production dimmer.
 
 * Breaking protocol updates
-* Linear correction removed
 * Cubic interpolation to adjust the brightness curve per channel
+* Mains frequency detection between 45 and 65 Hz
+* Linear correction removed
+* Improved and more precise timings
 
 [I2C/UART protocol](docs/PROTOCOL.md)
 

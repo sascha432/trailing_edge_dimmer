@@ -5,14 +5,27 @@
 #pragma once
 
 #include <Arduino.h>
-#if DIMMER_CUBIC_INTERPOLATION
-#include "cubic_interpolation.h"
 
+#if DIMMER_CUBIC_INTERPOLATION
+//#include "cubic_interpolation.h"
 #ifndef DIMMER_INTERPOLATION_METHOD
 #define DIMMER_INTERPOLATION_METHOD		CatmullSpline
 // #define DIMMER_INTERPOLATION_METHOD		ConstrainedSpline
 #endif
+#endif
 
+// enable extra debugging to detect invalid states
+#ifndef DEBUG_FAULTS
+#define DEBUG_FAULTS                                            0
+#endif
+
+#ifndef DEBUG_COMPARE_B_PIN
+// toggle pin each time the compare B interrupt gets called
+#define DEBUG_COMPARE_B_PIN                                     0
+#endif
+
+#ifndef DIMMER_CUBIC_INT_TABLE_SIZE
+#define DIMMER_CUBIC_INT_TABLE_SIZE                             8
 #endif
 
 #ifndef DIMMER_SIMULATE_ZC
@@ -29,30 +42,9 @@
 #define ZC_SIGNAL_PIN                                           3
 #endif
 
-// **********************************
-//  NOTE:
-//  for timing see docs/timings.svg
-// **********************************
-
-// the exact delay depends on the zero crossing detection, the prescaler and the CPU speed, the propagation delay and overall
-// capacitiy of the circuit. I strongly recommend to check with an oscilloscope to get the exact timings. It can be tuned very
-// well by software to be accurate in the 200-300 nano second range.
-
-// 60 Hz example, time in milliseconds
-
-//  0.000 zero crossing
-//  6.658 zero crossing interrupt
-//  1.675 zero crossing delay (DIMMER_ZC_DELAY_US=1675)
-//        NOTE: there is an additional delay of 22.8us (atmega328p, 16mhz) between the interrupt and the MOSFETs being turned on
-//        depending on the circuit, there will be a propagation delay of 100-500ns, or even more. The delay needs to be adjusted accordingly
-//  8.333 next zero crossing, turn on mosfets - dimmer level 0%
-//  8.533 keep mosfets on (DIMMER_MIN_ON_TIME_US=200) until level 2.49%
-// 14.991 zero crossing interrupt
-// 16.366 dimming level reached 100%, turn mosfets off if still on
-//        depending on the level set, the MOSFETs can be turned off between 2.49% and 100% (between 0.200-8.033ms of the 8333ms half wave)
-// 16.666 next zero crossing
-
-// default for DIMMER_REGISTER_ZC_DELAY_TICKS
+// a positive value adds a delay after the ZC interrupt, the ZC signal occurs before the actual ZC
+// a negative value assumes that the ZC signal occurs after the actual ZC
+// time in microseconds
 #ifndef DIMMER_ZC_DELAY_US
 #define DIMMER_ZC_DELAY_US                                      144  // in µs
 #endif
@@ -61,45 +53,23 @@
 #define DIMMER_ZC_INTERRUPT_MODE                                RISING
 #endif
 
-// default for DIMMER_REGISTER_MIN_ON_TIME_TICKS
+// minimum on time in microseconds
 #ifndef DIMMER_MIN_ON_TIME_US
-// minimum on time is dead space at the dimming range. a level lower than the minimum on
-// time does not have any affect until it is 0 and the mosfets are turned off completely
-#define DIMMER_MIN_ON_TIME_US                                   200 // minimum "on"-time in µs
+#define DIMMER_MIN_ON_TIME_US                                   100
 #endif
 
-// default for DIMMER_REGISTER_ADJ_HALFWAVE_TICKS
-#ifndef DIMMER_ADJUST_HALFWAVE_US
-// some LEDs have issues and are flickering if the mosfets are turned on over 95% of the half wave, but not 100%
-// this adjustment reduces the maximum on time while it does not reduce the dimming range (max level). if max level
-// is set to 100%, the mosfets do not turn off anymore.
-// basically: HALFWAVE_TIME_US - DIMMER_ADJUST_HALFWAVE_US = DIMMER_MAX_ON_TIME_US
-#define DIMMER_ADJUST_HALFWAVE_US                               200 // reduce "on"-time in µs
+// the maximum on time is the halfwave in microseconds minus DIMMER_MAX_ON_TIME_US
+// if the value is exceeded, mosfets are not turned off anymore.
+#ifndef DIMMER_MAX_ON_TIME_US
+#define DIMMER_MAX_ON_TIME_US                                   300
+#endif
+#if DIMMER_MAX_ON_TIME_US < 200
+#error DIMMER_MAX_ON_TIME_US must be greater than 200
 #endif
 
-// some LEDs have a soft start function. to get smooth fading, the minimum level is set
-// and a specific delay occurs before fading starts. that leaves enough time until the
-// LED has finished the soft start.
-#ifndef DIMMER_MIN_LEVEL
-#define DIMMER_MIN_LEVEL                                        0 // 8
-#define DIMMER_MIN_LEVEL_TIME_IN_MS                             800
+#ifndef DIMMER_MEASURE_CYCLES
+#define DIMMER_MEASURE_CYCLES                                   30
 #endif
-
-// used to calculate the length of the half wave
-#ifndef DIMMER_AC_FREQUENCY
-    #define DIMMER_AC_FREQUENCY                                 60      // Hz
-#endif
-
-#ifndef DIMMER_LOW_FREQUENCY
-#define DIMMER_LOW_FREQUENCY                                    0.75    // 75%
-#endif
-
-#ifndef DIMMER_HIGH_FREQUENCY
-#define DIMMER_HIGH_FREQUENCY                                   1.2     // 120%
-#endif
-
-// fading command
-#define DIMMER_USE_FADING                                       1
 
 #ifndef DIMMER_CHANNELS
 #define DIMMER_CHANNELS                                         4
@@ -109,117 +79,67 @@
     #define DIMMER_MOSFET_PINS                                  { 6, 8, 9, 10 }
 #endif
 
-static const uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
+static constexpr uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 
-// sets the maximum level (100%)
-#ifndef DIMMER_MAX_LEVEL
-    #define DIMMER_MAX_LEVEL                                    min(32767, DIMMER_TICKS_PER_HALFWAVE)
-    // #define DIMMER_MAX_LEVEL                            8191
-    // #define DIMMER_MAX_LEVEL                            1023
-    // #define DIMMER_MAX_LEVEL                            255
-    // #define DIMMER_MAX_LEVEL                            100
+// 0 to (DIMMER_MAX_LEVELS-1)
+// default 0 - 8191
+#ifndef DIMMER_MAX_LEVELS
+#define DIMMER_MAX_LEVELS                                       8192
 #endif
 
 #if DIMMER_CUBIC_INTERPOLATION
-#define DIMMER_LINEAR_LEVEL(level, channel)                     (dimmer_config.bits.cubic_interpolation == 1 ? level : getInterpolatedLevel(level, channel))
+#define DIMMER_LINEAR_LEVEL(level, channel)                     (dimmer_config.bits.cubic_interpolation == 1 ? level : cubicInterpolation.getLevel(level, channel))
 #else
 #define DIMMER_LINEAR_LEVEL(level, channel)                     level
 #endif
 
+// enable ZC interrupt filter
+// it ignores all zc interrupts that occur before the halfwave cycle reached 94% (~88%/53Hz for 60Hz)
+#define DIMMER_ZC_FILTER                                        0
 
+// #define DIMMER_TIMER1_PRESCALER                                 1
+// #define DIMMER_TIMER1_PRESCALER_BV                              _BV(CS10)
 
-// the prescaler should be chosen to have maximum precision while having enough range for fine tuning
-
-// timer1, 16 bit, used for turning MOSFETs on and off
-#ifndef DIMMER_TIMER1_PRESCALER
 #define DIMMER_TIMER1_PRESCALER                                 8
-#endif
+#define DIMMER_TIMER1_PRESCALER_BV                              _BV(CS11)
 
-// timer2, 8bit, used to delay the turn on after receiving the ZC signal
-#ifndef DIMMER_TIMER2_PRESCALER
-#define DIMMER_TIMER2_PRESCALER                                 64
-#endif
+// #define DIMMER_TIMER1_PRESCALER                                 256
+// #define DIMMER_TIMER1_PRESCALER_BV                              _BV(CS12)
 
-#if DIMMER_TIMER2_PRESCALER == 64
-#define DIMMER_TIMER2_PRESCALER_BV                              (1 << CS22)
-#elif DIMMER_TIMER2_PRESCALER == 128
-#define DIMMER_TIMER2_PRESCALER_BV                              ((1 << CS22) | (1 << CS20))
-#elif DIMMER_TIMER2_PRESCALER == 256
-#define DIMMER_TIMER2_PRESCALER_BV                              ((1 << CS22) | (1 << CS21))
-#elif DIMMER_TIMER2_PRESCALER == 1024
-#define DIMMER_TIMER2_PRESCALER_BV                              ((1 << CS22) | (1 << CS21) | (1 << CS20))
-#else
-#error prescaler not supported
-#endif
+// extra ticks for compare B interrupt to finish
+// requires ~176-184 cpu cycles
+#define DIMMER_COMPARE_B_EXTRA_TICKS                            (512 / DIMMER_TIMER1_PRESCALER)
 
-#if DIMMER_TIMER1_PRESCALER == 8
-    #define DIMMER_TIMER1_PRESCALER_BV                          (1 << CS11)
-    #define DIMMER_EXTRA_TICKS                                  8           // add some extra ticks that the timer interrupt doesn't skip turning off a mosfet if the timer interrupts are very close
-#elif DIMMER_TIMER1_PRESCALER == 64
-    #define DIMMER_TIMER1_PRESCALER_BV                          ((1 << CS11) | (1 << CS10))
-    #define DIMMER_EXTRA_TICKS                                  1
-#elif DIMMER_TIMER1_PRESCALER == 256
-    #define DIMMER_TIMER1_PRESCALER_BV                          (1 << CS12)
-    #define DIMMER_EXTRA_TICKS                                  1
-#else
-    #error prescaler not supported
-#endif
-
-#define DIMMER_START_TIMER1()                                   TCCR1B |= DIMMER_TIMER1_PRESCALER_BV;
-#define DIMMER_PAUSE_TIMER1()                                   TCCR1B = 0;
-#define DIMMER_START_TIMER2()                                   TCCR2B |= DIMMER_TIMER2_PRESCALER_BV;
-#define DIMMER_PAUSE_TIMER2()                                   TCCR2B = 0;
-
-#define DIMMER_GET_TICKS(level)                                 max(dimmer_config.minimum_on_time_ticks, (level * DIMMER_TICKS_PER_HALFWAVE) / DIMMER_MAX_LEVEL - dimmer_config.adjust_halfwave_time_ticks)
-
-#define DIMMER_ENABLE_TIMERS()                                  { TIMSK1 |= (1 << OCIE1A); TCCR1A = 0; TCCR1B = 0; TIMSK2 |= (1 << OCIE2A); TCCR2A = 0; TCCR2B = 0; }
-#define DIMMER_DISABLE_TIMERS()                                 { TIMSK1 &= ~(1 << OCIE1A); TIMSK2 &= ~(1 << OCIE2A); }
-
-#define DIMMER_TICKS_PER_HALFWAVE                               (F_CPU / DIMMER_TIMER1_PRESCALER / (DIMMER_AC_FREQUENCY * 2))
-#define DIMMER_TMR1_TICKS_PER_US                                (F_CPU / DIMMER_TIMER1_PRESCALER / 1000000.0)
-#define DIMMER_TMR2_TICKS_PER_US                                (F_CPU / DIMMER_TIMER2_PRESCALER / 1000000.0)
+#define DIMMER_TMR1_TICKS_PER_US                                (clockCyclesPerMicrosecond() / (float)DIMMER_TIMER1_PRESCALER)
 
 #define DIMMER_US_TO_TICKS(us, ticks_per_us)                    (us * ticks_per_us)
 #define DIMMER_TICKS_TO_US(ticks, ticks_per_us)                 (ticks / ticks_per_us)
 
-#define DIMMER_ZC_TICKS_TO_US(ticks)                            DIMMER_TICKS_TO_US(ticks, DIMMER_TMR2_TICKS_PER_US)
+#define DIMMER_ZC_TICKS_TO_US(ticks)                            DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
 #define DIMMER_MIN_ON_TICKS_TO_US(ticks)                        DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
 #define DIMMER_ADJ_HW_TICKS_TO_US(ticks)                        DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
 
-#if DIMMER_TICKS_PER_HALFWAVE > 32767
-    #error TICKS are limited to 32767 per half wave, increase prescaler
-#endif
-
 #ifndef HAVE_FADE_COMPLETION_EVENT
-#if DIMMER_USE_FADING == 0
-#define HAVE_FADE_COMPLETION_EVENT                              0
-#else
 #define HAVE_FADE_COMPLETION_EVENT                              1
 #endif
-#endif
 
-#ifndef HIDE_DIMMER_INFO
-#define HIDE_DIMMER_INFO                                        0
-#endif
-
-// the frequency is updated twice per second
-// 0 disables frequency messuring
-#ifndef FREQUENCY_TEST_DURATION
-#define FREQUENCY_TEST_DURATION                                 600
-
-float dimmer_get_frequency();
-#endif
-
-#define DIMMER_VERSION_WORD                                     ((2 << 10) | (2 << 5) | 0)
-#define DIMMER_VERSION                                          "2.2.0"
+#define DIMMER_VERSION_WORD                                     ((3 << 10) | (0 << 5) | 0)
+#define DIMMER_VERSION                                          "3.0.0"
 #define DIMMER_INFO                                             "Author sascha_lammers@gmx.de"
 
 #ifndef DIMMER_I2C_SLAVE
 #define DIMMER_I2C_SLAVE                                        1
 #endif
 
+#define DIMMER_REGISTER_MEM_END_PTR                             &register_mem.raw[sizeof(register_mem_t)]
+
+#define _STRINGIFY(...)                                         ___STRINGIFY(__VA_ARGS__)
+#define ___STRINGIFY(...)                                       #__VA_ARGS__
+
 typedef int8_t dimmer_channel_id_t;
 typedef int16_t dimmer_level_t;
+
+#define FOR_CHANNELS(var)                                       for(dimmer_channel_id_t var = 0; var < DIMMER_CHANNELS; var++)
 
 struct dimmer_fade_t {
     float level;
@@ -231,6 +151,9 @@ struct dimmer_fade_t {
 struct dimmer_channel_t {
     uint8_t channel;
     uint16_t ticks;
+#if DEBUG_FAULTS
+    uint16_t _OCR1A;
+#endif
 };
 
 typedef struct __attribute__packed__ {
@@ -248,69 +171,140 @@ typedef struct __attribute__packed__ {
 #define dimmer_config           dimmer.cfg
 #endif
 
-struct dimmer_t {
+class dimmer_t
+{
+public:
+    dimmer_t() = default;
+
 #if !DIMMER_I2C_SLAVE
     dimmer_level_t level[DIMMER_CHANNELS];                              // current level
     struct {
         uint8_t zero_crossing_delay_ticks;
         uint16_t minimum_on_time_ticks;
         uint16_t adjust_halfwave_time_ticks;
-        float linear_correction_factor;
     } cfg;
 #endif
-#if DIMMER_USE_FADING
     dimmer_fade_t fade[DIMMER_CHANNELS];                                // calculated fading data
-#endif
-#if DIMMER_USE_LINEAR_CORRECTION
-    float linear_correction_divider;
-#endif
     dimmer_channel_id_t channel_ptr;
     dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];             // current dimming levels in ticks
     dimmer_channel_t ordered_channels_buffer[DIMMER_CHANNELS + 1];      // next dimming levels
 
 #if HAVE_FADE_COMPLETION_EVENT
-    dimmer_level_t fadingCompleted[DIMMER_CHANNELS];
+    volatile dimmer_level_t fadingCompleted[DIMMER_CHANNELS];
 #endif
 };
 
-#define DIMMER_FADE_FROM_CURRENT_LEVEL -1
+#define DIMMER_FADE_FROM_CURRENT_LEVEL                          -1
 
-extern dimmer_t dimmer;
+class Dimmer : public dimmer_t
+{
+public:
+    enum class StateEnum : uint8_t {
+        MEASURE,            // measuring active
+        STOPPED,            // waiting to be enabled
+        START_HALFWAVE,     // waiting for halfwave to begin
+        HALFWAVE,           // dimming cycle
+        NEXT_HALFWAVE,      // waiting for next ZC interrupt
+    };
 
-#ifndef ZC_MAX_TIMINGS
-// 4 byte RAM required for each timing
-#define ZC_MAX_TIMINGS                                          0
+    static constexpr uint8_t _IFCAB  = 0;           // compare A/B lock
+    static constexpr uint8_t _IFZCI  = 1;           // ZC interrupt lock
+    static constexpr uint8_t _IFCHL  = 2;           // calculate channel lock
+    static constexpr uint8_t _IFCHA  = 3;           // calculate channel abort request
+
+public:
+    Dimmer();
+
+    void disableTimer1() const;
+    void enableTimer1() const;
+
+    void begin();
+    void end();
+
+    // enable dimmer after the frequency measurement has been completed
+    void enable();
+
+public:
+    inline uint16_t getHalfWaveTicks() const {
+        return _halfwaveTicks;
+    }
+    float getFrequency() const;
+
+    bool measure(uint16_t timeout);             // run measurement cycles
+    void addEvent(uint16_t counter);
+
+    uint32_t getTicks(uint16_t counter);        // return ticks since last call
+
+    // toggle mosfet gates
+    void enableChannel(dimmer_channel_id_t channel);
+    void disableChannel(dimmer_channel_id_t channel);
+
+    uint16_t getChannel(dimmer_level_t level) const;    // returns level in ticks or 0xffff for 100%
+
+public:
+    // calculate channel helpers
+    inline void unlockCalc() {
+        _intFlags &= ~_BV(_IFCHL);
+    }
+    inline void lockCalc() {
+        _intFlags |= _BV(_IFCHL);
+    }
+    inline bool isCalcLocked() const {
+        return _intFlags & _BV(_IFCHL);
+    }
+    inline void setAbortCalc() {
+        _intFlags |= _BV(_IFCHA);
+    }
+    inline void unsetAbortCalc() {
+        _intFlags &= ~_BV(_IFCHA);
+    }
+    inline bool isAbortCalc() const {
+        return _intFlags & _BV(_IFCHA);
+    }
+
+public:
+    // interrupt handler
+    void _zcHandler(uint16_t counter);
+    void _compareA();
+    void _compareB();
+    void _overflow();
+
+private:
+    void _startHalfwave();
+    void _dimmingCycle();
+    void _endHalfwave();
+
+private:
+    volatile uint16_t _halfwaveTicks;
+
+    volatile int32_t _ticks;
+    volatile uint8_t _cycleCounter;
+
+#if DIMMER_ZC_FILTER
+    volatile uint32_t _zcIntTimer;
+    volatile uint32_t _zcIntMinTime;
 #endif
 
-#if ZC_MAX_TIMINGS > 255
-#error ZC_MAX_TIMINGS is limited to 255, decrease ZC_MAX_TIMINGS_INTERVAL to collect more data
+#if DEBUG_FAULTS
+private:
+    void _fault(const char *msg);
+
+    volatile uint16_t _prevOCR1B;
+    volatile uint16_t _dcOCR1A;
 #endif
 
-#ifndef ZC_MAX_TIMINGS_INTERVAL
-#define ZC_MAX_TIMINGS_INTERVAL                                 500
-#endif
+private:
+    volatile StateEnum _state;
+    volatile uint8_t _intFlags;
+    volatile float _halfwaveTicksIntegral;
+    volatile uint8_t *_pinsAddr[DIMMER_CHANNELS];
+    uint8_t _pinsMask[DIMMER_CHANNELS];
+};
 
-#if ZC_MAX_TIMINGS
-extern volatile unsigned long *zc_timings;
-extern volatile uint8_t zc_timings_counter;
-extern bool zc_timings_output;
-#endif
+extern Dimmer dimmer;
 
-void dimmer_setup();
-void dimmer_zc_interrupt_handler();
-void dimmer_zc_setup();
-void dimmer_timer_setup();
-void dimmer_timer_remove();
-void dimmer_start_timer1();
-void dimmer_start_timer2();
 void dimmer_set_level(dimmer_channel_id_t channel, dimmer_level_t level);
 dimmer_level_t dimmer_get_level(dimmer_channel_id_t channel);
-#if DIMMER_USE_LINEAR_CORRECTION
-void dimmer_set_lcf(float lcf);
-#endif
-#if DIMMER_USE_FADING
 void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time = false);
 void dimmer_fade(dimmer_channel_id_t channel, dimmer_level_t to, float time_in_seconds, bool absolute_time = false);
 void dimmer_apply_fading();
-#endif
-void dimmer_set_mosfet_gate(dimmer_channel_id_t channel, bool state);

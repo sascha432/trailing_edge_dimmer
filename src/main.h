@@ -19,10 +19,6 @@
 #define DEFAULT_BAUD_RATE                       115200
 #endif
 
-#ifndef USE_EEPROM
-#define USE_EEPROM                              1
-#endif
-
 #ifndef HAVE_NTC
 #define HAVE_NTC                                1
 #endif
@@ -41,18 +37,11 @@
 #define HAVE_READ_INT_TEMP                      1
 #endif
 
-#ifndef USE_TEMPERATURE_CHECK
-#if HAVE_NTC || HAVE_READ_INT_TEMP
-#define USE_TEMPERATURE_CHECK                   1
-#else
-#define USE_TEMPERATURE_CHECK                   0
-#endif
-#endif
-
 // NTC pin
 #ifndef NTC_PIN
 #define NTC_PIN                                 A1
 #endif
+
 // beta coefficient
 #ifndef NTC_BETA_COEFF
 #define NTC_BETA_COEFF                          3950
@@ -80,8 +69,6 @@
 #define PRINT_METRICS_REPEAT                    5000
 #endif
 
-#if USE_EEPROM
-
 #define EEPROM_WRITE_DELAY                      500
 #define EEPROM_REPEATED_WRITE_DELAY             5000
 
@@ -92,6 +79,7 @@ void write_config();
 void init_eeprom();
 void _write_config(bool force = false);
 void reset_config();
+void bzero(void *ptr, size_t size);
 
 typedef uint8_t dimmer_scheduled_calls_t;
 
@@ -101,25 +89,11 @@ typedef uint8_t dimmer_scheduled_calls_t;
     READ_VCC =              0x01,
     READ_INT_TEMP =         0x02,
     READ_NTC_TEMP =         0x04,
-    PRINT_DIMMER_INFO =     0x08,
-    EEPROM_WRITE =          0x10,
-    PRINT_METRICS =         0x20,
-    FREQUENCY_LOW =         0x40,       // frequency 75% or less
-    FREQUENCY_HIGH =        0x80,       // frequency 120% or more
-    FREQUENCY_ERROR =       FREQUENCY_LOW|FREQUENCY_HIGH
+    EEPROM_WRITE =          0x08,
+    PRINT_METRICS =         0x10,
 } dimmer_scheduled_calls_enum_t;
 
-typedef struct {
-    unsigned long next_event;
-    uint16_t vcc;
-    float frequency;
-    float int_temp;
-    float ntc_temp;
-} dimmer_metrics_event_t;
-
-#if USE_TEMPERATURE_CHECK
 extern unsigned long next_temp_check;
-#endif
 
 #if HAVE_PRINT_METRICS
 extern unsigned long print_metrics_timeout;
@@ -143,9 +117,7 @@ inline void dimmer_remove_scheduled_call(dimmer_scheduled_calls_enum_t type) {
 float get_internal_temperature();
 #endif
 
-#if HIDE_DIMMER_INFO == 0
 void display_dimmer_info();
-#endif
 
 #if HAVE_READ_VCC
 uint16_t read_vcc();
@@ -153,6 +125,4 @@ uint16_t read_vcc();
 
 #if HAVE_NTC
 float get_ntc_temperature();
-#endif
-
 #endif

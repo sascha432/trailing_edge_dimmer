@@ -42,10 +42,10 @@ Supported values are:
 - Float (ffffffff or 100.5)
 - Hex uint32 (eeeeeeee or q4008636142)
 
-Example:
-
-    # trans_cmd.py command "I2CT=ADDRESS,COMMAND_READ_VCC,DIMMER_REGISTER_FROM_LEVEL,1f,2faa,100.5,4a3b2c1d,b-1,w1000,w-1"
-    +I2CT=17,22,01,1F,2F,AA,42,c9,00,00,4A,3B,2C,1D,FF,03,E8,FF,FF
+```
+# trans_cmd.py command "I2CT=ADDRESS,COMMAND_READ_VCC,DIMMER_REGISTER_FROM_LEVEL,1f,2faa,100.5,4a3b2c1d,b-1,w1000,w-1"
++I2CT=17,22,01,1F,2F,AA,42,c9,00,00,4A,3B,2C,1D,FF,03,E8,FF,FF
+```
 
 ## DIMMER_COMMAND_FADE
 
@@ -68,13 +68,13 @@ Channels are 0 based and -1 / 0xff means all channels
 
 ### Examples
 
-Set **from level** to current level (0xffff = -1), **channel** to 0, **to level** to 0x0301, **time** 7.5 (seconds) and execute fade command
+Set **from level** to current level -1, **channel** to 0, **to level** to 2250, **time** 7.5 (seconds) and execute fade command
 
-    +I2CT=ADDRESS,REGISTER_FROM_LEVEL,ffff,00,0301,7.5,COMMAND_FADE (+I2CT=17,01,FF,FF,00,03,01,40,f0,00,00,11)
+    +I2CT=ADDRESS,REGISTER_FROM_LEVEL,w-1,00,w2250,7.5,COMMAND_FADE (+I2CT=17,01,FF,FF,00,CA,08,00,00,F0,40,11)
 
-Set **channel** to all channels (0xff = -1), **to level** to 0x0301, **time** 7.5 and execute fade
+Set **channel** to all channels (0xff = -1), **to level** to 1533, **time** 7.5 and execute fade
 
-    +I2CT=ADDRESS,REGISTER_CHANNEL,00,0301,7.5,COMMAND_FADE (+I2CT=17,03,00,03,01,40,f0,00,00,11)
+    +I2CT=ADDRESS,REGISTER_CHANNEL,b-1,w1533,7.5,COMMAND_FADE (+I2CT=17,03,FF,FD,05,00,00,F0,40,11)
 
 ## DIMMER_COMMAND_SET_LEVEL
 
@@ -83,14 +83,14 @@ The fading command uses following registers
 - DIMMER_REGISTER_CHANNEL (int8)
 - DIMMER_REGISTER_TO_LEVEL (int16)
 
-Set **channel** to 1, **to level** to 777 (0x0309) and execute set level command
+Set **channel** to 1, **to level** to 777 and execute set level command
 
-    +I2CT=ADDRESS,REGISTER_CHANNEL,01,09,03 (+I2CT=17,03,01,09,03)
+    +I2CT=ADDRESS,REGISTER_CHANNEL,01,w777 (+I2CT=17,03,01,09,03)
     +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SET_LEVEL (+I2CT=17,0A,10)
 
 To send the command in one transmission, the time can be filled with any data
 
-    +I2CT=ADDRESS,REGISTER_CHANNEL,01,0903,0.0,COMMAND_SET_LEVEL (+I2CT=17,03,01,09,03,,10)
+    +I2CT=ADDRESS,REGISTER_CHANNEL,01,w777,0.0,COMMAND_SET_LEVEL (+I2CT=17,03,01,09,03,00,00,00,00,10)
 
 ## DIMMER_COMMAND_READ_xxx
 
@@ -111,6 +111,7 @@ If no further data is sent after the read command, the register is set automatic
 Read VCC
 
     +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_VCC (+I2CT=17,0A,22)
+    ...wait 50ms
     +I2CR=ADDRESS,02 (+I2CR=17,02)
 
 Response ("\x21\x13" = 0x1321 = 4.897V)
@@ -120,6 +121,7 @@ Response ("\x21\x13" = 0x1321 = 4.897V)
 Read internal temperature
 
     +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_READ_INT_TEMP (+I2CT=17,0A,21)
+    ...wait 50ms
     +I2CR=ADDRESS,04 (+I2CR=17,04)
 
 Response ("\x55\x5C\x86\x41" = 16.795°C)
@@ -227,7 +229,7 @@ Response (0x02, 2 seconds)
 
 Set temperature check interval/metrics reporting to 30 seconds
 
-    +I2CT=ADDRESS,REGISTER_TEMP_CHECK_INT,1e (+I2CT=17,29,1E)
+    +I2CT=ADDRESS,REGISTER_TEMP_CHECK_INT,b30 (+I2CT=17,29,1E)
 
 **NOTE:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_FORCE_TEMP_CHECK (+I2CT=17,0A,54)*) can be used to force a check without waiting
 
@@ -256,7 +258,7 @@ The data expected is a boolean. Non-zero values enable the output on.
 
 ### Outut format
 
-The first argument is the return value of micros() (uint32) hex encoded. Every following the difference to the previous time (uint16).
+The first argument is the return value of micros() (uint32) hex encoded. Every following the difference to the previous time (uint16)
 
 +REM=ZC,\<microseconds\> [\<delay\> [\<delay\> ...]]
 
@@ -268,21 +270,52 @@ Print metrics every 5 seconds on serial port in human readable form. The followi
 
     +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_PRINT_METRICS,05 (+I2CT=17,0A,55,05)
 
+## DIMMER_COMMAND_PRINT_CUBIC_INT
+
+Prints the cubic interpolation tables to the serial port. The first byte is the channel, -1 for all
+
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_PRINT_CUBIC_INT,b-1 (+I2CT=17,0A,56,FF)
+
+Format:
+
+Channel, X values, Y values, interpolated values per level
+
+    +REM=ch=<num>,x=[0,1,...],y=[0,1,...],l=[0,1,7,20,300,...]
+
+## DIMMER_COMMAND_GET_CUBIC_INT
+
+Translate up to 11 levels for the provided table at once. This can be used to retrieve a preview of the entire curve. The returned values are int16
+
+Table format:
+
+`<level:int16>,<number of levels:uint8>,<x1:uint8>,<x2>,...,<y1:int16>,<y2>,...`
+
+    +I2CT=ADDRESS,REGISTER_COMMAND,DIMMER_COMMAND_GET_CUBIC_INT,w10,b11,00,02,07,w0,w2500,w8192 (+I2CT=17,0A,57,0A,00,0B,00,02,07,00,00,C4,09,00,20)
+    +I2CR=ADDRESS,b22 (+I2CR=17,16)
+
 ## DIMMER_COMMAND_FORCE_TEMP_CHECK
 
 Force temperature check and report metrics if enabled
 
     +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_FORCE_TEMP_CHECK (+I2CT=17,0A,54)
 
-## DIMMER_COMMAND_DUMP_xxx
+## DIMMER_COMMAND_DUMP_MEM
 
-- DIMMER_COMMAND_DUMP_MEM
+Dump the content of the register memory to the serial port
 
-This is only available with enabled debugging.
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_DUMP_MEM (+I2CT=17,0A,EE)
 
-Dump the content of the register memory
+## DIMMER_COMMAND_DUMP_CFG
 
-    +I2CT=ADDRESS,REGISTER_COMMAND,ee (+I2CT=17,0A,EE)
+Print the entire configration on the serial port as backup
+
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_DUMP_CFG (+I2CT=17,0A,91)
+
+## DIMMER_COMMAND_SIMULATE_ZC
+
+Simulate zero crossing events for 8 seconds. This will cause misfire if DIMMER_SIMULATE_ZC is not set
+
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SIMULATE_ZC,08 (+I2CT=17,0A,E0,08)
 
 ## Temperature, VCC status and AC Frequency (DIMMER_RESPONSE_METRICS_REPORT)
 
@@ -328,19 +361,20 @@ The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*,
 
 ## Zero Crossing calibration
 
-Following commands are available for calibration. For more commands see "FOR CALIBRATION" in i2c_slave.cpp
+Following commands are available for calibration.
 
-Increase zero crossing delay
-
-    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_ZC_DECREASE (+I2CT=17,0A,82)
-
-Decrease zero crossing delay
+Increase zero crossing delay by 1 tick
 
     +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_ZC_INCREASE (+I2CT=17,0A,83)
 
-Set zero crossing delay to 7F and print setting
+Decrease zero crossing delay
 
-    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SET_ZC,7f (+I2CT=17,0A,92,7F)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_ZC_DECREASE (+I2CT=17,0A,82)
+
+Set zero crossing delay to -31 ticks or -15.5µs and print setting
+
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SET_ZC,w-31 (+I2CT=17,0A,92,E1,FF)
+    +I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_SET_ZC,-15.5 (+I2CT=17,0A,92,00,00,78,C1)
 
 The settings need to be stored in the EEPROM. The following command forces to write the EEPROM
 

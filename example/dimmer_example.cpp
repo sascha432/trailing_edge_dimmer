@@ -534,13 +534,13 @@ void loop() {
             case '*':
                 level = get_level(selected_channel);
                 if (level != -1) {
-                    set_level(selected_channel, level + max(1, DIMMER_MAX_LEVEL / 100));
+                    set_level(selected_channel, level + max(1, DIMMER_MAX_LEVELS / 100));
                 }
                 break;
             case '/':
                 level = get_level(selected_channel);
                 if (level != -1) {
-                    set_level(selected_channel, level - max(1, DIMMER_MAX_LEVEL / 100));
+                    set_level(selected_channel, level - max(1, DIMMER_MAX_LEVELS / 100));
                 }
                 break;
 
@@ -549,7 +549,7 @@ void loop() {
                 set_level(selected_channel, 0);
                 break;
             case ',':
-                set_level(selected_channel, DIMMER_MAX_LEVEL);
+                set_level(selected_channel, DIMMER_MAX_LEVELS);
                 break;
 
             // 0-100% fadein/out "fade_time" seconds
@@ -562,7 +562,7 @@ void loop() {
             case '7':
             case '8':
             case '9':
-                fade(selected_channel, (input - '1') * 0.125 * DIMMER_MAX_LEVEL, 5.0);
+                fade(selected_channel, (input - '1') * 0.125 * DIMMER_MAX_LEVELS, 5.0);
                 break;
         }
     }

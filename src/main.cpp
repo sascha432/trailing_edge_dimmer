@@ -5,12 +5,12 @@
 // 1-8 Channel Dimmer with I2C interface
 
 #include <Arduino.h>
+#include <util/atomic.h>
 #include "i2c_slave.h"
 #include "helpers.h"
-#if USE_EEPROM
+#include "cubic_interpolation.h"
 #include <EEPROM.h>
 #include "crc16.h"
-#endif
 
 config_t config;
 uint16_t eeprom_position = 0;
@@ -18,22 +18,22 @@ unsigned long eeprom_write_timer = -EEPROM_REPEATED_WRITE_DELAY;
 
 void fade(int8_t channel, int16_t from, int16_t to, float time);
 
-void reset_config() {
+void reset_config()
+{
     config.clear();
+    register_mem.data.errors = {};
     register_mem.data.cfg = {};
-    // memset(&config, 0, sizeof(config));
-    // memset(&register_mem.data.cfg, 0, sizeof(register_mem.data.cfg));
     register_mem.data.version = DIMMER_VERSION_WORD;
     register_mem.data.cfg.max_temp = DIMMER_MAX_TEMP;
     register_mem.data.cfg.bits.restore_level = true;
     register_mem.data.cfg.bits.report_metrics = true;
     register_mem.data.cfg.fade_in_time = 7.5;
     register_mem.data.cfg.temp_check_interval = 2;
-    register_mem.data.cfg.zero_crossing_delay_ticks = DIMMER_US_TO_TICKS(DIMMER_ZC_DELAY_US, DIMMER_TMR2_TICKS_PER_US);
-    register_mem.data.cfg.minimum_on_time_ticks = DIMMER_US_TO_TICKS(DIMMER_MIN_ON_TIME_US, DIMMER_TMR1_TICKS_PER_US);
-    register_mem.data.cfg.adjust_halfwave_time_ticks = DIMMER_US_TO_TICKS(DIMMER_ADJUST_HALFWAVE_US, DIMMER_TMR1_TICKS_PER_US);
+    register_mem.data.cfg.zero_crossing_delay_ticks = DIMMER_US_TO_TICKS(DIMMER_ZC_DELAY_US, DIMMER_TMR1_TICKS_PER_US);
+    register_mem.data.cfg.min_on_ticks = DIMMER_US_TO_TICKS(DIMMER_MIN_ON_TIME_US, DIMMER_TMR1_TICKS_PER_US);
+    register_mem.data.cfg.max_on_ticks = DIMMER_US_TO_TICKS(DIMMER_MAX_ON_TIME_US, DIMMER_TMR1_TICKS_PER_US);
     register_mem.data.cfg.internal_1_1v_ref = INTERNAL_VREF_1_1V;
-    register_mem.data.cfg.report_metrics_max_interval = 30;
+    register_mem.data.cfg.report_metrics_max_interval = 10;
 #ifdef INTERNAL_TEMP_OFS
     register_mem.data.cfg.int_temp_offset = INTERNAL_TEMP_OFS;
 #endif
@@ -44,12 +44,19 @@ void reset_config() {
 //    memcpy(&config.cfg, &register_mem.data.cfg, sizeof(config.cfg));
 }
 
-unsigned long get_eeprom_num_writes(unsigned long cycle, uint16_t position) {
+void bzero(void *ptr, size_t size)
+{
+    memset(ptr, 0, size);
+}
+
+unsigned long get_eeprom_num_writes(unsigned long cycle, uint16_t position)
+{
     return ((EEPROM.length() / sizeof(config_t)) * (cycle - 1)) + (position / sizeof(config_t));
 }
 
 // initialize EEPROM and wear leveling
-void init_eeprom() {
+void init_eeprom()
+{
     EEPROM.begin();
     config.eeprom_cycle = 1;
     eeprom_position = 0;
@@ -63,28 +70,10 @@ void init_eeprom() {
     EEPROM.end();
 }
 
-#if DEBUG
-void debug_dump_config() {
-    _D(5, debug_printf_P(PSTR("CRC %04x\n"), crc16_calc(reinterpret_cast<const uint8_t *>(&config.cfg), sizeof(config.cfg))));
-    _D(5, debug_printf_P(PSTR("Report temp. and VCC %d\n"), register_mem.data.cfg.bits.report_metrics));
-    _D(5, debug_printf_P(PSTR("Restore level %d\n"), register_mem.data.cfg.bits.restore_level));
-    _D(5, debug_printf_P(PSTR("Temperature alert triggered %d\n"), register_mem.data.cfg.bits.temperature_alert));
-    _D(5, debug_printf_P(PSTR("Fade in time %.3f\n"), register_mem.data.cfg.fade_in_time));
-    _D(5, debug_printf_P(PSTR("Max. temp %u\n"), register_mem.data.cfg.max_temp));
-    _D(5, debug_printf_P(PSTR("Temp. check interval %u\n"), register_mem.data.cfg.temp_check_interval));
-    // _D(5, debug_printf_P(PSTR("Linear correction factor %.6f\n"), register_mem.data.cfg.linear_correction_factor));
-    _D(5, debug_printf_P(PSTR("ZC delay %u\n"), register_mem.data.cfg.zero_crossing_delay_ticks));
-    _D(5, debug_printf_P(PSTR("Min. on time ticks %u\n"), register_mem.data.cfg.minimum_on_time_ticks));
-    _D(5, debug_printf_P(PSTR("Adj. halfwave time ticks %u\n"), register_mem.data.cfg.adjust_halfwave_time_ticks));
-    _D(5, debug_printf_P(PSTR("Internal 1.1V ref %.6f\n"), register_mem.data.cfg.internal_1_1v_ref));
-    _D(5, debug_printf_P(PSTR("Internal temp. sensor offset %.1f\n"), register_mem.data.cfg.int_temp_offset / 10.0f));
-}
-#endif
-
 bool eeprom_crc_error = false;
 
-void read_config() {
-
+void read_config()
+{
     uint16_t pos = 0;
     uint32_t cycle;
     unsigned long eeprom_max_cycle = 0;
@@ -120,32 +109,12 @@ void read_config() {
         _D(5, debug_printf_P(PSTR("read_config, eeprom cycle %lu, position %u\n"), config.crc16, eeprom_max_cycle, eeprom_position));
     }
 
-    //memcpy(&register_mem.data.cfg, &config.cfg, sizeof(config.cfg));
     register_mem.data.version = DIMMER_VERSION_WORD;
-
-#if DEBUG
-    _D(5, debug_printf_P(PSTR("---Read config---\n")));
-    debug_dump_config();
-    for(uint8_t i = 0; i < DIMMER_CHANNELS; i++) {
-        _D(5, debug_printf_P(PSTR("Channel %u: %d\n"), i, config.level[i]));
-    }
-#endif
-
-// #if DIMMER_USE_LINEAR_CORRECTION
-//     dimmer_set_lcf(register_mem.data.cfg.linear_correction_factor);
-// #endif
 }
 
-void _write_config(bool force) {
+void _write_config(bool force)
+{
     DIMMER_RESPONSE_EEPROM_WRITTEN_t event;
-
-#if DEBUG
-    _D(5, debug_printf_P(PSTR("---Read config---\n")));
-    debug_dump_config();
-    for(uint8_t i = 0; i < DIMMER_CHANNELS; i++) {
-        _D(5, debug_printf_P(PSTR("Channel %u: %d\n"), i, register_mem.data.level[i]));
-    }
-#endif
 
     //memcpy(&config.cfg, &register_mem.data.cfg, sizeof(config.cfg));
     memcpy(&config.level, &register_mem.data.level, sizeof(config.level));
@@ -184,7 +153,8 @@ void _write_config(bool force) {
     Serial_printf_P(PSTR("+REM=EEPROMW,c=%lu,p=%u,n=%lu,w=%u,crc=%04x\n"), (unsigned long)event.write_cycle, eeprom_position, get_eeprom_num_writes(event.write_cycle, eeprom_position), event.bytes_written, config.crc16);
 }
 
-void write_config() {
+void write_config()
+{
     long lastWrite = millis() - eeprom_write_timer;
     if (!dimmer_is_call_scheduled(EEPROM_WRITE)) { // no write scheduled
         _D(5, debug_printf_P(PSTR("scheduling eeprom write cycle, last write %d seconds ago\n"), (int)(lastWrite / 1000UL)));
@@ -200,7 +170,8 @@ void write_config() {
 bool is_Atmega328PB;
 
 // https://playground.arduino.cc/Main/InternalTemperatureSensor/
-float get_internal_temperature() {
+float get_internal_temperature()
+{
     ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
     ADCSRA |= _BV(ADEN);
     delay(40); // 20 was not enough. It takes quite a while when switching from reading VCC to temp.
@@ -214,7 +185,8 @@ float get_internal_temperature() {
 #if HAVE_READ_VCC
 
 // read VCC in mV
-uint16_t read_vcc() {
+uint16_t read_vcc()
+{
     ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
     delay(40);
     ADCSRA |= _BV(ADSC);
@@ -226,7 +198,8 @@ uint16_t read_vcc() {
 
 #if HAVE_NTC
 
-uint16_t read_ntc_value(uint8_t num) {
+uint16_t read_ntc_value(uint8_t num)
+{
     uint32_t value = analogRead(NTC_PIN);
     for(uint8_t i = 1; i < num; i++) {
         delay(1);
@@ -235,7 +208,8 @@ uint16_t read_ntc_value(uint8_t num) {
     return value / num;
 }
 
-float convert_to_celsius(uint16_t value) {
+float convert_to_celsius(uint16_t value)
+{
     double steinhart;
     steinhart = 1023 / (float)value - 1;
     steinhart *= NTC_SERIES_RESISTANCE;
@@ -248,7 +222,8 @@ float convert_to_celsius(uint16_t value) {
     return steinhart;
 }
 
-float get_ntc_temperature() {
+float get_ntc_temperature()
+{
 #ifdef FAKE_NTC_VALUE
     return FAKE_NTC_VALUE;
 #else
@@ -258,28 +233,26 @@ float get_ntc_temperature() {
 
 #endif
 
-#if USE_EEPROM
-void restore_level() {
+void restore_level()
+{
     if (register_mem.data.cfg.bits.restore_level) {
-        for(uint8_t i = 0; i < DIMMER_CHANNELS; i++) {
+        FOR_CHANNELS(i) {
             fade(i, DIMMER_FADE_FROM_CURRENT_LEVEL, config.level[i], register_mem.data.cfg.fade_in_time);
         }
     }
 }
-#endif
 
 #if DIMMER_I2C_SLAVE
 
-void rem() {
+void rem()
+{
 #if SERIAL_I2C_BRDIGE
     Serial.print(F("+REM="));
 #endif
 }
 
-#if HIDE_DIMMER_INFO == 0
-
-void display_dimmer_info() {
-
+void display_dimmer_info()
+{
     rem();
     Serial.println(F("MOSFET Dimmer " DIMMER_VERSION " " __DATE__ " " __TIME__ " " DIMMER_INFO));
     Serial.flush();
@@ -297,28 +270,24 @@ void display_dimmer_info() {
 
     rem();
     Serial.print(F("options="));
-#if USE_EEPROM
     Serial_printf_P(PSTR("EEPROMwr=%lu,"), get_eeprom_num_writes(config.eeprom_cycle, eeprom_position));
-#endif
 #if HAVE_NTC
-    Serial_printf_P(PSTR("NTC=A%u,"), NTC_PIN - A0);
+    // Serial_printf_P(PSTR("NTC=A%u,"), NTC_PIN - A0);
+    Serial.print(F("NTC=" _STRINGIFY(NTC_PIN) ","));
 #endif
+#if HAVE_READ_INT_TEMP && HAVE_READ_VCC
+    Serial.print(F("IntTemp,VCC,"));
+#else
 #if HAVE_READ_INT_TEMP
     Serial.print(F("IntTemp,"));
-#endif
-#if USE_TEMPERATURE_CHECK
-    Serial.print(F("TempChk,"));
 #endif
 #if HAVE_READ_VCC
     Serial.print(F("VCC,"));
 #endif
-#if DIMMER_USE_FADING
-    Serial.print(F("Fade,"));
 #endif
 #if DIMMER_CUBIC_INTERPOLATION
     Serial.print(F("CubicInt,"));
 #endif
-    Serial_printf_P(PSTR("ACFrq=%u,"), DIMMER_AC_FREQUENCY);
 #if SERIAL_I2C_BRDIGE
     Serial.print(F("Pr=UART,"));
 #else
@@ -327,21 +296,14 @@ void display_dimmer_info() {
 #if HAVE_FADE_COMPLETION_EVENT
     Serial.print(F("CE=1,"));
 #endif
-    Serial_printf_P(PSTR("Addr=%02x,Pre=%u/%u,"),
-        DIMMER_I2C_ADDRESS,
-        DIMMER_TIMER1_PRESCALER, DIMMER_TIMER2_PRESCALER
-    );
-    Serial.print(F("Ticks="));
-    Serial_print_float(DIMMER_TMR1_TICKS_PER_US);
-    Serial.print('/');
-    Serial_print_float(DIMMER_TMR2_TICKS_PER_US);
-    Serial_printf_P(PSTR("us,MaxLvls=%u,GPIO/lvl="),
-        DIMMER_MAX_LEVEL
-    );
-    for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
+    Serial_printf_P(PSTR("Addr=%02x"), DIMMER_I2C_ADDRESS);
+    Serial.print(F(",Pre=" _STRINGIFY(DIMMER_TIMER1_PRESCALER) ",Ticks="));
+    Serial_print_float(1 / DIMMER_TMR1_TICKS_PER_US);
+    Serial.print(F("us,MaxLvls=" _STRINGIFY(DIMMER_MAX_LEVELS) ",GPIO/lvl="));
+    FOR_CHANNELS(i) {
         Serial.print((int)dimmer_pins[i]);
         Serial.print('/');
-        Serial.print(config.level[i]);
+        Serial.print(dimmer_level(i));
         if (i < DIMMER_CHANNELS - 1) {
             Serial.print(',');
         }
@@ -351,57 +313,43 @@ void display_dimmer_info() {
 
     rem();
     Serial.print(F("values="));
-    Serial_printf_P(PSTR("Restore=%u,MainsFrq=%.3f,Ref11="), register_mem.data.cfg.bits.restore_level, dimmer_get_frequency());
+    Serial_printf_P(PSTR("Restore=%u,Frq=%.3f,Ref11="), register_mem.data.cfg.bits.restore_level, dimmer.getFrequency());
     Serial_print_float(register_mem.data.cfg.internal_1_1v_ref, 4, 4);
     Serial.print(',');
 #if HAVE_NTC
-    Serial_printf_P(PSTR("NTC=%.2f"), get_ntc_temperature());
-    #if USE_TEMPERATURE_CHECK
-        Serial_printf_P(PSTR("/%+.1fC"), register_mem.data.cfg.ntc_temp_offset / DIMMER_TEMP_OFFSET_DIVIDER);
-    #endif
-    Serial.print(',');
+    Serial_printf_P(PSTR("NTC=%.2f/%+.1fC,"), get_ntc_temperature(), register_mem.data.cfg.ntc_temp_offset / DIMMER_TEMP_OFFSET_DIVIDER);
 #endif
 #if HAVE_READ_INT_TEMP
-    Serial_printf_P(PSTR("IntTemp=%.2f"), get_internal_temperature());
-    #if USE_TEMPERATURE_CHECK
-        Serial_printf_P(PSTR("/%+.1fC"), register_mem.data.cfg.int_temp_offset / DIMMER_TEMP_OFFSET_DIVIDER);
-    #endif
-    Serial.print(',');
+    Serial_printf_P(PSTR("IntTemp=%.2f/%+.1fC,"), get_internal_temperature(), register_mem.data.cfg.int_temp_offset / DIMMER_TEMP_OFFSET_DIVIDER);
 #endif
-#if USE_TEMPERATURE_CHECK
-    Serial_printf_P(PSTR("MaxTmp=%u/%us,MetricsInt=%us,"), register_mem.data.cfg.max_temp, register_mem.data.cfg.temp_check_interval, register_mem.data.cfg.report_metrics_max_interval);
-#endif
+    Serial_printf_P(PSTR("MaxTmp=%u/%us,Metrics=%us,"), register_mem.data.cfg.max_temp, register_mem.data.cfg.temp_check_interval, register_mem.data.cfg.report_metrics_max_interval);
 #if HAVE_READ_VCC
     Serial_printf_P(PSTR("VCC=%.3f,"), read_vcc() / 1000.0);
 #endif
-    Serial_printf_P(PSTR("MinOn=%u/%.2fus,"),
-        register_mem.data.cfg.minimum_on_time_ticks,
-        DIMMER_MIN_ON_TICKS_TO_US(register_mem.data.cfg.minimum_on_time_ticks)
+#if DIMMER_CUBIC_INTERPOLATION
+    Serial.print(F("CubInt="));
+    cubicInterpolation.printState();
+#endif
+    Serial_printf_P(PSTR("Min/MaxOn=%u/%.2fus,%u/%.2fus,"),
+        register_mem.data.cfg.min_on_ticks,
+        DIMMER_MIN_ON_TICKS_TO_US(register_mem.data.cfg.min_on_ticks),
+        register_mem.data.cfg.max_on_ticks,
+        DIMMER_ADJ_HW_TICKS_TO_US(register_mem.data.cfg.max_on_ticks)
     );
-    Serial_printf_P(PSTR("AdjHW=%u/%.2fus,"),
-        register_mem.data.cfg.adjust_halfwave_time_ticks,
-        DIMMER_ADJ_HW_TICKS_TO_US(register_mem.data.cfg.adjust_halfwave_time_ticks)
-    );
-    Serial_printf_P(PSTR("ZCDelay=%u/%.2fus\n"),
+    Serial_printf_P(PSTR("ZC=%d/%.2fus\n"),
         register_mem.data.cfg.zero_crossing_delay_ticks,
         DIMMER_ZC_TICKS_TO_US(register_mem.data.cfg.zero_crossing_delay_ticks)
     );
     rem();
-    Serial_printf_P(PSTR("errors=FrqHi/Low=%u/%u,ZCmisfire=%u,EEPROMCrcErr=%u\n"),
-        register_mem.data.errors.frequency_low,
-        register_mem.data.errors.frequency_high,
+    Serial_printf_P(PSTR("errors=ZCmisfire=%u,EEPROMCrcErr=%u\n"),
         register_mem.data.errors.zc_misfire,
         eeprom_crc_error
     );
     Serial.flush();
 }
 
-unsigned long frequency_wait_timeout;
-
-#endif
-
-void setup() {
-
+void setup()
+{
     uint8_t buf[3];
     is_Atmega328PB = memcmp_P(get_signature(buf), PSTR("\x1e\x95\x16"), 3) == 0;
 
@@ -410,43 +358,48 @@ void setup() {
     _debug_level = 9;
     #endif
 
-#if HIDE_DIMMER_INFO == 0
-    rem();
-    Serial.println(F("BOOT"));
+    Serial.println(F("+REM=BOOT"));
     Serial.flush();
-#endif
 
 // extern void test();
 // test();
-
-    dimmer_i2c_slave_setup();
-
-    read_config();
-    dimmer_setup();
 
 #if HAVE_NTC
     pinMode(NTC_PIN, INPUT);
 #endif
 
-#if USE_EEPROM
-    restore_level();
-#endif
+    dimmer_i2c_slave_setup();
 
-#if HIDE_DIMMER_INFO == 0
-    // run main loop till the frequency is available
-    frequency_wait_timeout = millis() + min(550, FREQUENCY_TEST_DURATION);
-    dimmer_schedule_call(PRINT_DIMMER_INFO);
-#endif
+    read_config();
+    dimmer.begin();
+
+    delay(100);
+    Serial.println(F("+REM=Measuring frequency"));
+    Serial.flush();
+    if (dimmer.measure(10000)) {
+        dimmer.enable();
+    }
+    else {
+        Serial.println(F("+REM=timeout"));
+        Serial.flush();
+    }
+
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        dimmer_set_level(0, 2048);
+        dimmer_set_level(1, 2300);
+        dimmer_set_level(2, 2301);
+        dimmer_set_level(3, 2301);
+    }
+
+    // restore_level(); //TODO remove comment
+
+    display_dimmer_info();
 }
 
 uint16_t dimmer_scheduled_calls = TYPE_NONE;
 
-#if USE_TEMPERATURE_CHECK
-
 unsigned long next_temp_check = 0;
-dimmer_metrics_event_t metrics_event = { 0, 0, NAN, NAN, NAN };
-
-#endif
+unsigned long next_event_metrics_event = 0;
 
 #if HAVE_PRINT_METRICS
 
@@ -454,23 +407,16 @@ unsigned long print_metrics_timeout;
 
 #endif
 
-#if ZC_MAX_TIMINGS
-
-unsigned long print_zc_timings = 0;
-
-#endif
-
-
 #if HAVE_FADE_COMPLETION_EVENT
 
 unsigned long next_fading_event_check = 0;
 
-void send_fading_completion_events() {
-
+void send_fading_completion_events()
+{
     FadingCompletionEvent_t buffer[DIMMER_CHANNELS];
     FadingCompletionEvent_t *ptr = buffer;
 
-    for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
+    FOR_CHANNELS(i) {
         cli(); // dimmer.fadingCompleted is modified inside an interrupt and copying needs to be an atomic operation
         if (dimmer.fadingCompleted[i] != INVALID_LEVEL) {
             auto level = dimmer.fadingCompleted[i];
@@ -494,22 +440,12 @@ void send_fading_completion_events() {
         Wire.write(reinterpret_cast<const uint8_t *>(buffer), (reinterpret_cast<const uint8_t *>(ptr) - reinterpret_cast<const uint8_t *>(buffer)));
         Wire.endTransmission();
     }
-
 }
 
 #endif
 
-void loop() {
-
-#if HIDE_DIMMER_INFO == 0
-    if (dimmer_is_call_scheduled(PRINT_DIMMER_INFO) && millis() > frequency_wait_timeout) {
-        dimmer_remove_scheduled_call(PRINT_DIMMER_INFO);
-        display_dimmer_info();
-        register_mem.data.errors = {};
-        // memset(&register_mem.data.errors, 0, sizeof(register_mem.data.errors));
-    }
-#endif
-
+void loop()
+{
 #if HAVE_READ_VCC
     if (dimmer_is_call_scheduled(READ_VCC)) {
         dimmer_remove_scheduled_call(READ_VCC);
@@ -532,31 +468,6 @@ void loop() {
     }
 #endif
 
-    if (dimmer_is_call_scheduled(FREQUENCY_ERROR)) {
-
-        Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-        Wire.write(DIMMER_RESPONSE_FREQUENCY_WARNING);
-        Wire.write(dimmer_is_call_scheduled(FREQUENCY_HIGH) ? 1 : 0);
-        Wire.write(reinterpret_cast<const uint8_t *>(&register_mem.data.errors), sizeof(register_mem.data.errors));
-        Wire.endTransmission();
-        dimmer_remove_scheduled_call(FREQUENCY_ERROR);
-
-        if (dimmer_is_call_scheduled(FREQUENCY_HIGH)) {
-            if (!register_mem.data.cfg.bits.frequency_high) {
-                register_mem.data.cfg.bits.frequency_high = true;
-                write_config();
-            }
-        }
-        else {
-            if (!register_mem.data.cfg.bits.frequency_low) {
-                register_mem.data.cfg.bits.frequency_low = true;
-                write_config();
-            }
-        }
-
-        _D(5, debug_printf_P(PSTR("Frequency warning: %s\n"), dimmer_is_call_scheduled(FREQUENCY_HIGH) ? "HIGH" : "LOW"));
-    }
-
 #if HAVE_PRINT_METRICS
     if (dimmer_is_call_scheduled(PRINT_METRICS) && millis() > print_metrics_timeout) {
         print_metrics_timeout = millis() + PRINT_METRICS_REPEAT;
@@ -570,11 +481,9 @@ void loop() {
         #if HAVE_READ_VCC
             Serial_printf_P(PSTR("VCC=%u,"), read_vcc());
         #endif
-        #if FREQUENCY_TEST_DURATION
-            Serial_printf_P(PSTR("frq=%.3f,"), dimmer_get_frequency());
-        #endif
+        Serial_printf_P(PSTR("frq=%.3f(%u),"), dimmer.getFrequency(), dimmer.getHalfWaveTicks());
         Serial.print(F("lvl="));
-        for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
+        FOR_CHANNELS(i) {
             Serial.print(register_mem.data.level[i]);
             if (i < DIMMER_CHANNELS - 1) {
                 Serial.print(',');
@@ -592,30 +501,10 @@ void loop() {
     }
 #endif
 
-#if USE_EEPROM
     if (dimmer_is_call_scheduled(EEPROM_WRITE) && millis() > eeprom_write_timer) {
         _write_config();
     }
-#endif
 
-#if ZC_MAX_TIMINGS
-    if (zc_timings_output && millis() > print_zc_timings) {
-        auto tmp = zc_timings[0]; // copy first timing before resetting counter
-        auto counter = zc_timings_counter;
-        zc_timings_counter = 0;
-        print_zc_timings = millis() + 1000;
-        if (counter) {
-            Serial_printf_P(PSTR("+REM=ZC,%lx "), tmp);
-            for(uint8_t i = 1; i < counter; i++) {
-                Serial_printf("%lx ", zc_timings[i] - tmp); // use relative time to reduce output
-                tmp = zc_timings[i];
-            }
-            Serial.println();
-        }
-    }
-#endif
-
-#if USE_TEMPERATURE_CHECK
     if (millis() > next_temp_check) {
 
         int current_temp;
@@ -640,39 +529,29 @@ void loop() {
                 Wire.endTransmission();
             }
         }
+
         if (register_mem.data.cfg.bits.report_metrics) {
-            bool has_significant_changes = false;
-            dimmer_metrics_t metrics = { (uint8_t)current_temp, 0, NAN, NAN, NAN };
-#if HAVE_READ_VCC
-            metrics.vcc = read_vcc();
-            if (metrics_event.vcc != 0 && (abs(metrics_event.vcc - metrics.vcc) > 300)) {       // 0.3V
-                has_significant_changes = true;
-            }
-#endif
-#if FREQUENCY_TEST_DURATION
-            metrics.frequency = dimmer_get_frequency();
-            if (!isnan(metrics_event.frequency) && (abs(metrics_event.frequency - metrics.frequency) >= 5.0f)) {        // 5Hz
-                has_significant_changes = true;
-            }
-#endif
-#if HAVE_NTC
-            metrics.ntc_temp = ntc_temp;
-            if (!isnan(metrics_event.ntc_temp) && (abs(metrics_event.ntc_temp - metrics.ntc_temp) >= 3.0f)) {        // 3°C
-                has_significant_changes = true;
-            }
-#endif
-#if HAVE_READ_INT_TEMP
-            metrics.internal_temp = int_temp;
-            if (!isnan(metrics_event.int_temp) && (abs(metrics_event.int_temp - metrics.internal_temp) >= 3.0f)) {        // 3°C
-                has_significant_changes = true;
-            }
-#endif
-            if (millis() > metrics_event.next_event || has_significant_changes) {
-                metrics_event.next_event = millis() + (register_mem.data.cfg.report_metrics_max_interval * 1000UL);
-                metrics_event.vcc = metrics.vcc;
-                metrics_event.frequency = metrics.frequency;
-                metrics_event.int_temp = metrics.internal_temp;
-                metrics_event.ntc_temp = metrics.ntc_temp;
+            if (millis() > next_event_metrics_event) {
+                dimmer_metrics_t metrics = {
+                    (uint8_t)current_temp,
+                #if HAVE_READ_VCC
+                    metrics.vcc = read_vcc(),
+                #else
+                    0,
+                #endif
+                    dimmer.getFrequency(),
+                #if HAVE_NTC
+                    ntc_temp,
+                #else
+                    NAN,
+                #endif
+                #if HAVE_READ_INT_TEMP
+                    int_temp
+                #else
+                    NAN
+                #endif
+                };
+                next_event_metrics_event = millis() + (register_mem.data.cfg.report_metrics_max_interval * 1000UL);
 
                 Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
                 Wire.write(DIMMER_RESPONSE_METRICS_REPORT);
@@ -683,5 +562,3 @@ void loop() {
     }
 #endif
 }
-
-#endif

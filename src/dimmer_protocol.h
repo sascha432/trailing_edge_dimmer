@@ -37,17 +37,13 @@
 #define DIMMER_REGISTER_MAX_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, max_temp))
 #define DIMMER_REGISTER_FADE_IN_TIME        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, fade_in_time))
 #define DIMMER_REGISTER_TEMP_CHECK_INT      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, temp_check_interval))
-// #define DIMMER_REGISTER_LC_FACTOR           (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, linear_correction_factor))
 #define DIMMER_REGISTER_ZC_DELAY_TICKS      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, zero_crossing_delay_ticks))
-#define DIMMER_REGISTER_MIN_ON_TIME_TICKS   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, minimum_on_time_ticks))
-#define DIMMER_REGISTER_ADJ_HALFWAVE_TICKS  (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, adjust_halfwave_time_ticks))
+#define DIMMER_REGISTER_MIN_ON_TIME_TICKS   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, min_on_ticks))
+#define DIMMER_REGISTER_MAX_ON_TIME_TICKS   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, max_on_ticks))
 #define DIMMER_REGISTER_INT_1_1V_REF        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, internal_1_1v_ref))
 #define DIMMER_REGISTER_INT_TEMP_OFS        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, int_temp_offset))
 #define DIMMER_REGISTER_METRICS_INT         (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, report_metrics_max_interval))
-#define DIMMER_REGISTER_ERRORS_FREQ_LOW     (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, errors) + offsetof(register_mem_errors_t, frequency_low))
-#define DIMMER_REGISTER_ERRORS_FREQ_HIGH    (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, errors) + offsetof(register_mem_errors_t, frequency_high))
 #define DIMMER_REGISTER_ERRORS_ZC_MISFIRE   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, errors) + offsetof(register_mem_errors_t, zc_misfire))
-#if DIMMER_CUBIC_INTERPOLATION
 #define DIMMER_REGISTER_CH0_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 0)
 #define DIMMER_REGISTER_CH1_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 1)
 #define DIMMER_REGISTER_CH2_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 2)
@@ -56,7 +52,6 @@
 #define DIMMER_REGISTER_CH5_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 5)
 #define DIMMER_REGISTER_CH6_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 6)
 #define DIMMER_REGISTER_CH7_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 7)
-#endif
 #define DIMMER_REGISTER_VERSION             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, version))
 #define DIMMER_REGISTER_ADDRESS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, address))
 #define DIMMER_REGISTER_END_ADDR            (DIMMER_REGISTER_START_ADDR + sizeof(register_mem_t))
@@ -123,15 +118,15 @@
 #define DIMMER_COMMAND_FORCE_TEMP_CHECK     0x54
 #define DIMMER_COMMAND_PRINT_METRICS        0x55
 #define DIMMER_COMMAND_PRINT_CUBIC_INT      0x56
+#define DIMMER_COMMAND_GET_CUBIC_INT        0x57
 #define DIMMER_COMMAND_ZC_TIMINGS_OUTPUT    0x60
 #define DIMMER_COMMAND_ZC_DECREASE          0x82
 #define DIMMER_COMMAND_ZC_INCREASE          0x83
+#define DIMMER_COMMAND_DUMP_CFG             0x91
 #define DIMMER_COMMAND_SET_ZC               0x92
 #define DIMMER_COMMAND_FORCE_WRITE_EEPROM   0x93
 #define DIMMER_COMMAND_SIMULATE_ZC          0xe0
-#if DEBUG
 #define DIMMER_COMMAND_DUMP_MEM             0xee
-#endif
 
 // DIMMER_REGISTER_COMMAND_STATUS
 #define DIMMER_COMMAND_STATUS_OK            0
@@ -141,14 +136,15 @@
 #define DIMMER_OPTIONS_RESTORE_LEVEL        0x01
 #define DIMMER_OPTIONS_REPORT_METRICS       0x02
 #define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED 0x04
-#define DIMMER_OPTIONS_FREQ_LOW_ALERT       0x08
-#define DIMMER_OPTIONS_FREQ_HIGH_ALERT      0x10
-#define DIMMER_OPTIONS_CUBIC_INT            0x20
+#define DIMMER_OPTIONS_CUBIC_INT            0x08
 
 // DIMMER_COMMAND_READ_TIMINGS
-// All timings are float and read from DIMMER_REGISTER_TEMP
+// All timings are float and stored in DIMMER_REGISTER_TEMP
 #define DIMMER_TIMINGS_TMR1_TICKS_PER_US    0x01
 #define DIMMER_TIMINGS_TMR2_TICKS_PER_US    0x02
 #define DIMMER_TIMINGS_ZC_DELAY_IN_US       0x03
 #define DIMMER_TIMINGS_MIN_ON_TIME_IN_US    0x04
-#define DIMMER_TIMINGS_ADJ_HW_TIME_IN_US    0x05
+#define DIMMER_TIMINGS_MAX_ON_TIME_IN_US    0x05
+
+#define DIMMER_CONFIG_OFFSET                DIMMER_REGISTER_CONFIG_OFS
+#define DIMMER_CONFIG_SIZE                  DIMMER_REGISTER_CONFIG_SZ

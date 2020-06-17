@@ -1,12 +1,16 @@
 # Changelog
 
-## 2.2.0
+## 3.0.0
 
-- Added cubic interpolation for dimmer level curves for each channel
-- Additional settings for dimmer info
-- Fixed temperature offsets at dimmer info
+- Rewritten timer code in C++
+- Added cubic interpolation for dimmer level curves per channel
+- Support for frequencies between 45 and 65Hz, auto detection
+- Continues measurement of the AC frequency and adjustments
+- Filtering of invalid ZC signals (i.e. caused by transients)
+- Additional settings for dimmer info and some fixes
 - Reduced max. temperature to 80°C
 - Removed linear correction
+- Changes in I2C protcol and register memory (not compatible with 2.x)
 
 ## 2.1.4
 

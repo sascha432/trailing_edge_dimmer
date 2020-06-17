@@ -9,15 +9,23 @@ import argparse
 import re
 import struct
 import json
+import tempfile
+import signal
+import os
+import platform
+import subprocess
+import shlex
+import stat
 from os import path
 
 # .\scripts\trans_cmd.py -v command "I2CT=ADDRESS,COMMAND_READ_VCC,DIMMER_REGISTER_FROM_LEVEL,1f,2faa,100.5,4a3b2c1d,b-1,w1000,w-1"
 # .\scripts\trans_cmd.py -O file .\docs\PROTOCOL_template.md -o .\docs\PROTOCOL.md
-# .\scripts\trans_cmd.py compile - -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
-# .\scripts\trans_cmd.py -O compile "C:/SPB_Data/dimmer_const.cpp" -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
+# .\scripts\trans_cmd.py compile - -D DIMMER_CUBIC_INT_TABLE_SIZE=8 -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
+# .\scripts\trans_cmd.py -O compile "C:/SPB_Data/dimmer_const.cpp" -D DIMMER_CUBIC_INT_TABLE_SIZE=8 -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1
+# .\scripts\trans_cmd.py -O compile ".\scripts\trans_cmd_cfg_struct.json" -D DIMMER_CUBIC_INT_TABLE_SIZE=8 -D SERIALTWOWIRE_MAX_INPUT_LENGTH=0xff -D DEBUG=1 -C "gcc %SRC% -o %EXE%"
 
 # I2C/UART protocol
-#.\scripts\trans_cmd.py command "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w-1,00,w16665,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w0,00,w16665,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w16665,00,w0,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_DUMP_MEM" "+I2CT=ADDRESS,REGISTER_COMMAND,DIMMER_COMMAND_DUMP_CFG"
+# .\scripts\trans_cmd.py command "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w-1,00,w8192,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w0,00,w8192,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_FROM_LEVEL,w8192,00,w0,1.72,COMMAND_FADE" "+I2CT=ADDRESS,REGISTER_COMMAND,COMMAND_DUMP_MEM" "+I2CT=ADDRESS,REGISTER_COMMAND,DIMMER_COMMAND_DUMP_CFG"
 
 class DimmerConst(object):
     def __init__(self):
@@ -57,7 +65,10 @@ class DimmerConst(object):
         return (type, data)
 
     def float_to_hex(self, value):
-        return hex(struct.unpack('<I', struct.pack('<f', value))[0])[2:].upper()
+        hex_str = ''
+        for b in struct.pack('<f', value):
+            hex_str = hex_str + ('%02X' % b)
+        return hex_str
 
     def to_hex(self, value, type, split_bytes = True):
 
@@ -85,12 +96,9 @@ class DimmerConst(object):
             return hex_str
         elif type=='float':
             hex_str = self.float_to_hex(value)
-            hex_bytes = re.findall('..', hex_str)
-            hex_bytes.reverse()
-            ch = ''
             if split_bytes:
-                ch = ','
-            return ch.join(hex_bytes)
+                return ','.join(re.findall('..', hex_str))
+            return hex_str
         if value<0:
             value = (1<<8) + value
         return '%02X' % value
@@ -177,7 +185,7 @@ class DimmerConst(object):
                 elif len(value_str)==8:
                     type = 'uint32'
                 else:
-                    if re.match('(b|w|q)?[0-9a-fA-F\.]', value_str):
+                    if re.match('(b|w|q)?[0-9a-fA-F\.-]', value_str):
                         raise RuntimeError('invalid argument length, expected 2, 4 or 8: got %u: %s' % (len(value_str), value_str))
                     raise RuntimeError('invalid argument: %s' % value_str)
             return (int(value_str, 16), type)
@@ -509,7 +517,63 @@ def verbose(msg):
     if args.verbose:
         print(msg)
 
-# main()
+def create_cpp_source(file):
+    for define in defines:
+        file.write('#define %s %s\n' % ( define[0], define[1]))
+
+    file.writelines(['#include <stdio.h>\n', '#include "%s"\n' % args.structures_header.name, 'int main() {\n', 'printf("{\\n");\n'])
+
+    n = 0
+    for define in defines:
+        n = n + 1
+        name = define[0]
+        if name.startswith('DIMMER_'):
+            short = name[7:]
+            if short.split('_', 2)[0] in ['COMMAND', 'REGISTER', 'OPTIONS', 'TIMINGS', 'RESPONSE', 'CONFIG']:
+                file.write('printf("\\\"%s\\\": %%d%s\\n", %s);\n' % (short, (n < len(defines) and ',' or ''), name))
+
+    file.writelines(['printf("}\\n");\n', 'return 0; }\n'])
+
+class CleanupTmpFiles:
+    def __init__(self):
+        signal.signal(signal.SIGINT, self.handler)
+        signal.signal(signal.SIGTERM, self.handler)
+        self.files = []
+
+    # if file is not a string, the method close() will be invoked before attempting to delete file.name
+    # any exceptions are caught to make sure all files are deleted
+    def add(self, file):
+        self.files.append(file)
+
+    def remove(self, file):
+        self.files.remove(file)
+
+    # can be called at any time to remove all files in the list
+    def cleanup(self):
+        for file in self.files:
+            if isinstance(file, str):
+                try:
+                    os.unlink(file)
+                except:
+                    pass
+            else:
+                try:
+                    file.close()
+                except:
+                    pass
+                try:
+                    os.unlink(file.name)
+                except:
+                    pass
+        self.files = []
+
+    def handler(self, sig, frame):
+        self.cleanup()
+        sys.exit(sig)
+
+# -------------------------------------------------------------------------
+# main
+# -------------------------------------------------------------------------
 
 script_dir = path.dirname(sys.argv[0])
 src_dir = path.join(script_dir, '..', 'src') + path.sep
@@ -525,11 +589,13 @@ file_parser = subparsers.add_parser('file', help='translate commands in a file')
 file_parser.add_argument('file', help='file to translate', type=argparse.FileType('rt', encoding='UTF-8'))
 file_parser.add_argument('-o', '--output', help='output of translated file', action=DelayedFileAction, type=DelayedFileType('wt', encoding='UTF-8', keep_existing='overwrite'), default='-')
 
-compile_parser = subparsers.add_parser('compile', help='create c++ source for dimmer constants', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+compile_parser = subparsers.add_parser('compile', help='create c++ source or JSON file for dimmer constants', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 compile_parser.add_argument('source', help='compile header files', action=DelayedFileAction, type=DelayedFileType('wt', keep_existing='overwrite'))
 compile_parser.add_argument('-D', '--define', help='define constant', action='append', type=str, default=[])
 compile_parser.add_argument('-p', '--protocol-header', help='protocol header', action=DelayedFileAction, type=DelayedFileType('rt'), default=src_dir + 'dimmer_protocol.h')
 compile_parser.add_argument('-s', '--structures-header', help='structures header', action=DelayedFileAction, type=DelayedFileType('rt'), default=src_dir + 'dimmer_reg_mem.h')
+compile_parser.add_argument('-C', '--compiler-cmd', help="command to compile the C++ code (i.e. gcc %SRC% -o %EXE%)", type=str, default=None)
+compile_parser.add_argument('-n', '--no-cleanup', help="do not delete temporary files on compliation error", action='store_true', default=False)
 
 parser.add_argument('-j', '--json', help='JSON configuration', default=json_file)
 parser.add_argument('-O', '--overwrite', action='store_true', default=False, help='overwrite existing files')
@@ -538,11 +604,6 @@ parser.add_argument('--slave-address', type=str, default='0x17', help='I2C slave
 parser.add_argument('--master-address', type=str, default='0x18', help='I2C master address')
 
 args = parser.parse_args()
-
-def fprint(str, end='\n'):
-    global file
-    file.write(str)
-    file.write(end)
 
 args.slave_address = parse_number(args.slave_address)
 args.master_address = parse_number(args.master_address)
@@ -572,40 +633,65 @@ elif 'source' in args:
     defines = parse_protocol_header(args.protocol_header.open(), defines)
     args.protocol_header.close()
 
-    with args.source.open() as file:
+    if args.compiler_cmd:
+        cleanup = CleanupTmpFiles()
 
-        for define in defines:
-            fprint('#define %s %s' % ( define[0], define[1]))
+        cpp_file = tempfile.NamedTemporaryFile('wt', suffix='.cpp', delete=False)
+        cleanup.add(cpp_file)
+        exe_file = tempfile.NamedTemporaryFile('wt', suffix=platform.system()=='Windows' and '.exe' or None, delete=False)
+        cleanup.add(exe_file)
+        exe_file.close()
 
-        fprint('#include <stdio.h>')
-        fprint('#include "%s"' % args.structures_header.name)
-        fprint('int main() {')
-        fprint('printf("{\\n");')
+        create_cpp_source(cpp_file)
+        cpp_file.close()
 
-        n = 0
-        for define in defines:
-            n = n + 1
-            name = define[0]
-            if name.startswith('DIMMER_'):
-                short = name[7:]
-                if short.split('_', 2)[0] in ['COMMAND', 'REGISTER', 'OPTIONS', 'TIMINGS', 'RESPONSE', 'CONFIG']:
-                    fprint('printf("\\\"%s\\\": %%u%s\\n", %s);' % (short, (n < len(defines) and ',' or ''), name))
+        compile_cmd = args.compiler_cmd.replace('%SRC%', shlex.quote(cpp_file.name)).replace('%EXE%', shlex.quote(exe_file.name));
+        compile_args = shlex.split(compile_cmd)
+        compile_cmd = ' '.join(compile_args)
+        verbose("compile command: '%s'" % compile_cmd)
 
-        fprint('printf("}\\n");')
-        fprint('return 0; }')
+        try:
+            p = subprocess.run(compile_args)
+            if p.returncode!=0:
+                if args.no_cleanup:
+                    print('temporary source file was not deleted: %s' % cpp_file.name)
+                    cleanup.remove(cpp_file)
+                raise RuntimeError("failed to compile source: exit code: %d: '%s'" % (p.returncode, compile_cmd))
+
+            with args.source.open() as file:
+                os.chmod(exe_file.name, stat.S_IXUSR)
+                proc = subprocess.Popen(exe_file.name, stdout=file)
+                returncode = proc.wait()
+                if returncode!=0:
+                    raise RuntimeError("failed to execute compiled file: exit code: %d '%s'" % (returncode, compile_cmd))
+
+        except Exception as e:
+            cleanup.cleanup()
+            if not isinstance(e, RuntimeError):
+                raise e
+            print(e)
+            sys.exit(1)
+
+        verbose('JSON output: %s' % args.source.name)
+        cleanup.cleanup()
+
+    else:
+        with args.source.open() as file:
+            create_cpp_source(file)
 
 elif 'file' in args:
 
+    dimmer.read_json(args.json)
     args.output.check_overwrite(args.overwrite)
     verbose('input: %s' % args.file.name)
     verbose('output: %s%s' % (args.output.name, args.output.exists() and ' (file exists, overwrite flag set)' or ''))
 
-    with args.output.open(newline='\n') as file:
+    with args.output.open() as file:
         n = 0
         for line in args.file:
             n = n + 1
             line = line.rstrip()
-            m = re.findall('(\+(i2c[tr]=[a-z0-9_,\.]+?)(,\.{3})? \(raw_cmd:[^\)]*\))', line, re.IGNORECASE)
+            m = re.findall('(\+(i2c[tr]=[a-z0-9_,\.-]+?)(,\.{3})? \(raw_cmd:[^\)]*\))', line, re.IGNORECASE)
             if m:
                 for arg in m:
                     try:
@@ -616,4 +702,5 @@ elif 'file' in args:
                     except RuntimeError as e:
                         print('line %u: %s' % (n, e))
                         sys.exit(1)
-            fprint(line)
+            file.write(line)
+            file.write('\n')
