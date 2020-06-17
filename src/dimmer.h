@@ -242,23 +242,38 @@ public:
     uint16_t getChannel(dimmer_level_t level) const;    // returns level in ticks or 0xffff for 100%
 
 public:
+    void setLevel(dimmer_channel_id_t channel, dimmer_level_t level);
+    dimmer_level_t getLevel(dimmer_channel_id_t channel) const;
+
+    void setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time);
+    inline void setFade(dimmer_channel_id_t channel, dimmer_channel_id_t to_level, float time_in_seconds, bool absolute_time) {
+        setFade(channel, DIMMER_FADE_FROM_CURRENT_LEVEL, to_level, time_in_seconds, absolute_time);
+    }
+
+private:
+    void _applyFading();
+    void _calculateChannels();
+
     // calculate channel helpers
-    inline void unlockCalc() {
+    inline void _unlockCalc() {
         _intFlags &= ~_BV(_IFCHL);
     }
-    inline void lockCalc() {
+    inline void _lockCalc() {
         _intFlags |= _BV(_IFCHL);
     }
-    inline bool isCalcLocked() const {
+    inline bool _isCalcLocked() const {
         return _intFlags & _BV(_IFCHL);
     }
-    inline void setAbortCalc() {
+    inline void _setAbortCalc() {
         _intFlags |= _BV(_IFCHA);
     }
-    inline void unsetAbortCalc() {
+    inline void _unsetAbortCalc() {
         _intFlags &= ~_BV(_IFCHA);
     }
-    inline bool isAbortCalc() const {
+    inline void _unsetAbortCalcAndUnlock() {
+        _intFlags &= ~(_BV(_IFCHA)|_BV(_IFCHL));
+    }
+    inline bool _isAbortCalc() const {
         return _intFlags & _BV(_IFCHA);
     }
 
@@ -302,9 +317,3 @@ private:
 };
 
 extern Dimmer dimmer;
-
-void dimmer_set_level(dimmer_channel_id_t channel, dimmer_level_t level);
-dimmer_level_t dimmer_get_level(dimmer_channel_id_t channel);
-void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time = false);
-void dimmer_fade(dimmer_channel_id_t channel, dimmer_level_t to, float time_in_seconds, bool absolute_time = false);
-void dimmer_apply_fading();

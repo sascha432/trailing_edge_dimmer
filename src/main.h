@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <util/atomic.h>
 #include "dimmer.h"
 #include "i2c_slave.h"
 

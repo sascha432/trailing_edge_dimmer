@@ -4,9 +4,6 @@
 
 #include "main.h"
 
-volatile bool dimmer_calculate_channels_lock = false;
-volatile bool dimmer_calculate_channels_abort = false;
-
 template <typename T>
 void swap(T &a, T &b) {
     T c = a;
@@ -29,95 +26,17 @@ static inline void dimmer_bubble_sort(dimmer_channel_t channels[], dimmer_channe
    }
 }
 
-// calculate ticks for each channel and sort them
-void dimmer_calculate_channels()
+static bool dimmer_is_fading()
 {
-    // using cubic interpolation can cause this function to run longer than a single have wave (8.33ms)
-    // in this case, the current calculation is stopped and the step is simply skipped during fading
-    // if it is the last step, it is postponed for one half cycle
-    // during my tests with 4 channels it rarely exceeded 0.9ms (@16Mhz)
-
-    cli();
-    if (dimmer_calculate_channels_lock) {
-        // request to abort the current calculation
-        // we cannot wait here since this is probably called from an interrupt and the actual function is paused
-        dimmer_calculate_channels_abort = true;
-        sei();
-        Serial.println(F("dimmer_calculate_channels_locked"));
-        return;
-    }
-    dimmer_calculate_channels_lock = true;
-    sei();
-
-#if 0
-    auto start = micros();
-#endif
-
-    dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];
-    dimmer_channel_id_t count = 0;
-
-    bzero(ordered_channels, sizeof(ordered_channels));
-
-    for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
-        if (dimmer_calculate_channels_abort) {
-            cli();
-            dimmer_calculate_channels_abort = false;
-            dimmer_calculate_channels_lock = false;
-            sei();
-            Serial.println("aborted");
-            return;
-        }
-        if (dimmer_level(i) >= DIMMER_MAX_LEVELS - 1) {
-            ordered_channels[count].ticks = 0xffff;
-            ordered_channels[count].channel = i;
-            count++;
-        }
-        else if (dimmer_level(i) != 0) {
-            uint16_t ticks = dimmer.getChannel(DIMMER_LINEAR_LEVEL(dimmer_level(i), i));
-            if (ticks) {
-                ordered_channels[count].ticks = ticks;
-                ordered_channels[count].channel = i;
-                count++;
-            }
+    FOR_CHANNELS(i) {
+        if (dimmer.fade[i].count) {
+            return true;
         }
     }
-
-    // if (dimmer_is_fading()) {
-    //     if ((rand()%100)==7) {
-    //         Serial.println("delay test");
-    //         for(int i = 0; i < 200; i++) {
-    //             if (dimmer_calculate_channels_abort) {
-    //                 cli();
-    //                 dimmer_calculate_channels_abort = false;
-    //                 dimmer_calculate_channels_lock = false;
-    //                 sei();
-    //                 Serial.println("aborted");
-    //                 return;
-    //             }
-    //             delay(1);
-    //         }
-    //     }
-    // }
-
-    dimmer_bubble_sort(ordered_channels, count);
-    cli(); // copy double buffer with interrupts disabled
-    memcpy(dimmer.ordered_channels_buffer, ordered_channels, sizeof(dimmer.ordered_channels_buffer));
-
-#if 0
-    if (dimmer_is_fading()) {
-        auto dur = micros() - start;
-        for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
-            Serial_printf_P(PSTR("%u=%u(%u) "), ordered_channels[i].channel, ordered_channels[i].ticks, dimmer_level(i));
-        }
-        Serial.println(dur);
-    }
-#endif
-    dimmer_calculate_channels_lock = false;
-    sei();
-
+    return false;
 }
 
-dimmer_level_t dimmer_normalize_level(dimmer_level_t level)
+static dimmer_level_t dimmer_normalize_level(dimmer_level_t level)
 {
     if (level < 0) {
         return 0;
@@ -128,43 +47,125 @@ dimmer_level_t dimmer_normalize_level(dimmer_level_t level)
     return level;
 }
 
-void dimmer_set_level(dimmer_channel_id_t channel, dimmer_level_t level)
+// calculate ticks for each channel and sort them
+void Dimmer::_calculateChannels()
 {
-    dimmer_level(channel) = dimmer_normalize_level(level);
+    // using cubic interpolation can cause this function to run longer than a single have wave (8.33ms@60Hz)
+    // in this case, the current calculation is stopped and the step is simply skipped during fading
+    // if it is the last step, it is postponed for one half cycle
+    // during my tests with 4 channels it rarely exceeded 0.9ms (@16Mhz)
 
-    dimmer.fade[channel].count = 0; // disable fading for this channel
-    dimmer.fadingCompleted[channel] = INVALID_LEVEL;
+    cli();
+    if (_isCalcLocked()) {
+        // request to abort the current calculation
+        // we cannot wait here since this is called from inside an interrupt and the actual function is paused
+        _setAbortCalc();
+        sei();
+        Serial.println(F("dimmer_calculate_channels_locked"));
+        return;
+    }
+    _lockCalc();
+    sei();
 
-    dimmer_calculate_channels();
+#if 0
+    auto start = micros();
+#endif
 
-    // _D(5,
-    Serial_printf_P(PSTR("Dimmer channel %u set %u value %u ticks %u\n"),
-        (unsigned)channel,
-        (unsigned)dimmer_level(channel),
-        (unsigned)dimmer.getChannel(dimmer_level(channel)),
-        (unsigned)dimmer.getChannel(DIMMER_LINEAR_LEVEL(dimmer_level(channel), channel))
-    );
-    // );
+    dimmer_channel_t ordered_channels_tmp[DIMMER_CHANNELS + 1];
+    dimmer_channel_id_t count = 0;
+
+    bzero(ordered_channels_tmp, sizeof(ordered_channels_tmp));
+
+    FOR_CHANNELS(i) {
+        if (_isAbortCalc()) {
+            ATOMIC_BLOCK(ATOMIC_FORCEON) {
+                _unsetAbortCalcAndUnlock();
+            }
+            Serial.println("aborted");
+            return;
+        }
+        if (dimmer_level(i) >= DIMMER_MAX_LEVELS - 1) {
+            ordered_channels_tmp[count].ticks = 0xffff;
+            ordered_channels_tmp[count].channel = i;
+            count++;
+        }
+        else if (dimmer_level(i) != 0) {
+            uint16_t ticks = getChannel(DIMMER_LINEAR_LEVEL(dimmer_level(i), i));
+            if (ticks) {
+                ordered_channels_tmp[count].ticks = ticks;
+                ordered_channels_tmp[count].channel = i;
+                count++;
+            }
+        }
+    }
+
+#if 0
+    if (dimmer_is_fading()) {
+        if ((rand()%100)==7) {
+            Serial.println("delay test");
+            for(int i = 0; i < 200; i++) {
+                if (_isAbortCalc()) {
+                    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+                        _unsetAbortCalcAndUnlock();
+                    }
+                    Serial.println("aborted");
+                    return;
+                }
+                delay(1);
+            }
+        }
+    }
+#endif
+
+    dimmer_bubble_sort(ordered_channels_tmp, count);
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        // copy double buffer with interrupts disabled
+        memcpy(ordered_channels_buffer, ordered_channels_tmp, sizeof(ordered_channels_buffer));
+        _unlockCalc();
+    }
+
+#if 0
+    if (dimmer_is_fading()) {
+        auto dur = micros() - start;
+        FOR_CHANNELS(i) {
+            Serial_printf_P(PSTR("%u=%u(%u) "), ordered_channels_tmp[i].channel, ordered_channels_tmp[i].ticks, dimmer_level(i));
+        }
+        Serial.println(dur);
+    }
+#endif
 
 }
 
-dimmer_level_t dimmer_get_level(dimmer_channel_id_t channel)
+void Dimmer::setLevel(dimmer_channel_id_t channel, dimmer_level_t level)
+{
+    dimmer_level(channel) = dimmer_normalize_level(level);
+
+    fade[channel].count = 0; // disable fading for this channel
+    fadingCompleted[channel] = INVALID_LEVEL;
+
+    _calculateChannels();
+
+    _D(5,
+        Serial_printf_P(PSTR("Dimmer channel %u set %u value %u ticks %u\n"),
+            (unsigned)channel,
+            (unsigned)dimmer_level(channel),
+            (unsigned)getChannel(dimmer_level(channel)),
+            (unsigned)getChannel(DIMMER_LINEAR_LEVEL(dimmer_level(channel), channel))
+        )
+    );
+}
+
+dimmer_level_t Dimmer::getLevel(dimmer_channel_id_t channel) const
 {
     return dimmer_level(channel);
 }
 
-void dimmer_fade(dimmer_channel_id_t channel, dimmer_channel_id_t to_level, float time_in_seconds, bool absolute_time)
-{
-    dimmer_set_fade(channel, DIMMER_FADE_FROM_CURRENT_LEVEL, to_level, time_in_seconds, absolute_time);
-}
-
-// dimmer_set_level() + dimmer_fade()
-void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time)
+void Dimmer::setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time)
 {
     float diff;
-    dimmer_fade_t &fade = dimmer.fade[channel];
+    dimmer_fade_t &fade = this->fade[channel];
 #if HAVE_FADE_COMPLETION_EVENT
-    dimmer.fadingCompleted[channel] = INVALID_LEVEL;
+    fadingCompleted[channel] = INVALID_LEVEL;
 #endif
 
     from = dimmer_normalize_level(from == DIMMER_FADE_FROM_CURRENT_LEVEL ? dimmer_level(channel) : from);
@@ -175,7 +176,7 @@ void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_le
         _D(5, Serial_printf_P(PSTR("Relative fading time %.3f\n"), time));
     }
 
-    fade.count = 2 * dimmer.getFrequency() * time;
+    fade.count = 2 * getFrequency() * time;
     fade.step = diff / (float)fade.count;
     fade.level = from;
     fade.targetLevel = to;
@@ -188,23 +189,13 @@ void dimmer_set_fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_le
     _D(5, Serial_printf_P(PSTR(", step %.3f, count %u\n"), fade.step, fade.count));
 }
 
-bool dimmer_is_fading()
-{
-    for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
-        if (dimmer.fade[i].count) {
-            return true;
-        }
-    }
-    return false;
-}
-
 // this function is called from an interrupt at the rate of the AC frequency
-void dimmer_apply_fading()
+void Dimmer::_applyFading()
 {
-    for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
-        dimmer_fade_t &fade = dimmer.fade[i];
+    FOR_CHANNELS(i) {
+        dimmer_fade_t &fade = this->fade[i];
         if (fade.count) {
-            if (dimmer_calculate_channels_lock && fade.count == 1) {
+            if (_isCalcLocked() && fade.count == 1) {
                 // postpone last step
             }
             else {
@@ -212,7 +203,7 @@ void dimmer_apply_fading()
                 if (--fade.count == 0) {
                     dimmer_level(i) = dimmer_normalize_level(fade.targetLevel);
 #if HAVE_FADE_COMPLETION_EVENT
-                    dimmer.fadingCompleted[i] = dimmer_level(i);
+                    fadingCompleted[i] = dimmer_level(i);
 #endif
                 } else {
                     dimmer_level(i) = dimmer_normalize_level(fade.level);
@@ -226,5 +217,5 @@ void dimmer_apply_fading()
         }
     }
 
-    dimmer_calculate_channels();
+    _calculateChannels();
 }

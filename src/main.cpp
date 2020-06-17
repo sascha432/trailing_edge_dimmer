@@ -5,7 +5,6 @@
 // 1-8 Channel Dimmer with I2C interface
 
 #include <Arduino.h>
-#include <util/atomic.h>
 #include "i2c_slave.h"
 #include "helpers.h"
 #include "cubic_interpolation.h"
@@ -384,11 +383,11 @@ void setup()
         Serial.flush();
     }
 
-    ATOMIC_BLOCK(ATOMIC_FORCEON) {
-        dimmer_set_level(0, 2048);
-        dimmer_set_level(1, 2300);
-        dimmer_set_level(2, 2301);
-        dimmer_set_level(3, 2301);
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {//TODO debug remove
+        dimmer.setLevel(0, 2048);
+        dimmer.setLevel(1, 2300);
+        dimmer.setLevel(2, 2301);
+        dimmer.setLevel(3, 2301);
     }
 
     // restore_level(); //TODO remove comment

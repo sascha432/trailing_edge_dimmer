@@ -21,7 +21,7 @@ Firmware for a trailing edge MOSFET dimmer.
 
 The current master is work in progress and should not be used for any production dimmer.
 
-* Breaking protocol updates
+* Breaking I2C protocol updates
 * Cubic interpolation to adjust the brightness curve per channel
 * Mains frequency detection between 45 and 65 Hz
 * Linear correction removed

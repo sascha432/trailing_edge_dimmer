@@ -2,7 +2,6 @@
  * Author: sascha_lammers@gmx.de
  */
 
-#include <util/atomic.h>
 #include "helpers.h"
 #include "dimmer.h"
 #include "i2c_slave.h"
@@ -97,7 +96,9 @@ void Dimmer::addEvent(uint16_t counter)
             _halfwaveTicks = ticks / _cycleCounter;
             _halfwaveTicksIntegral = _halfwaveTicks;
 
-            Serial_printf_P(PSTR("measure %lu hw %u zcmt %lu\n"), (long)ticks, _halfwaveTicks, (long)clockCyclesToMicroseconds(_halfwaveTicks * (94UL * DIMMER_TIMER1_PRESCALER)) / 100);//TODO debug remove
+            _D(5,
+                Serial_printf_P(PSTR("measure %lu hw %u zcmt %lu\n"), (long)ticks, _halfwaveTicks, (long)clockCyclesToMicroseconds(_halfwaveTicks * (94UL * DIMMER_TIMER1_PRESCALER)) / 100)
+            );
 
 #if DIMMER_ZC_FILTER
             _zcIntMinTime = clockCyclesToMicroseconds(_halfwaveTicks * (94UL * DIMMER_TIMER1_PRESCALER)) / 100;
@@ -304,7 +305,7 @@ void Dimmer::_zcHandler(uint16_t counter)
         sei();
 
         _D(10, Serial.println(F("ZC int")));
-        dimmer_apply_fading();
+        _applyFading();
     }
 }
 

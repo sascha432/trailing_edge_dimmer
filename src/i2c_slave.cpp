@@ -14,10 +14,10 @@ void fade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, f
     _D(5, debug_printf_P(PSTR("fade %d: %d to %d, time %f\n"), channel, from, to, time));
     if (channel == -1) {
         FOR_CHANNELS(i) {
-            fade(i, from, to, time);
+            dimmer.setFade(i, from, to, time);
         }
     } else {
-        dimmer_set_fade(channel, from, to, time);
+        dimmer.setFade(channel, from, to, time);
     }
 }
 
@@ -26,10 +26,10 @@ void set_level(dimmer_channel_id_t channel, dimmer_level_t level)
     _D(5, debug_printf_P(PSTR("set level %d: %d\n"), channel, level));
     if (channel == -1) {
         FOR_CHANNELS(i) {
-            dimmer_set_level(i, level);
+            dimmer.setLevel(i, level);
         }
     } else {
-        dimmer_set_level(channel, level);
+        dimmer.setLevel(channel, level);
     }
 }
 
