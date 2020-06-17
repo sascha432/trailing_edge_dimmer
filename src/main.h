@@ -66,11 +66,15 @@
 #ifndef HAVE_PRINT_METRICS
 #define HAVE_PRINT_METRICS                      1
 #endif
+
+// delay in milliseconds before metrics are printed again
 #ifndef PRINT_METRICS_REPEAT
 #define PRINT_METRICS_REPEAT                    5000
 #endif
 
+// write EEPROM after a delay in milliseconds
 #define EEPROM_WRITE_DELAY                      500
+// if writing is requested multiple times within this period, increase delay to the same time
 #define EEPROM_REPEATED_WRITE_DELAY             5000
 
 void rem(); // print "+REM="
@@ -82,17 +86,23 @@ void _write_config(bool force = false);
 void reset_config();
 void bzero(void *ptr, size_t size);
 
-typedef uint8_t dimmer_scheduled_calls_t;
+typedef struct {
+    uint8_t readVCC: 1;
+    uint8_t readIntTemp: 1;
+    uint8_t readNTCTemp: 1;
+    uint8_t writeEEPROM: 1;
+    uint8_t printMetrics: 1;
+} dimmer_scheduled_calls_t;
 
- // bitset
- typedef enum : dimmer_scheduled_calls_t {
-    TYPE_NONE =             0,
-    READ_VCC =              0x01,
-    READ_INT_TEMP =         0x02,
-    READ_NTC_TEMP =         0x04,
-    EEPROM_WRITE =          0x08,
-    PRINT_METRICS =         0x10,
-} dimmer_scheduled_calls_enum_t;
+//  // bitset
+//  typedef enum : dimmer_scheduled_calls_t {
+//     TYPE_NONE =             0,
+//     READ_VCC =              0x01,
+//     READ_INT_TEMP =         0x02,
+//     READ_NTC_TEMP =         0x04,
+//     EEPROM_WRITE =          0x08,
+//     PRINT_METRICS =         0x10,
+// } dimmer_scheduled_calls_enum_t;
 
 extern unsigned long next_temp_check;
 
@@ -100,19 +110,7 @@ extern unsigned long next_temp_check;
 extern unsigned long print_metrics_timeout;
 #endif
 
-extern uint16_t dimmer_scheduled_calls;
-
-inline void dimmer_schedule_call(dimmer_scheduled_calls_enum_t type) {
-    dimmer_scheduled_calls |= (dimmer_scheduled_calls_t)type;
-}
-
-inline bool dimmer_is_call_scheduled(dimmer_scheduled_calls_enum_t type) {
-    return (dimmer_scheduled_calls & (dimmer_scheduled_calls_t)type);
-}
-
-inline void dimmer_remove_scheduled_call(dimmer_scheduled_calls_enum_t type) {
-    dimmer_scheduled_calls &= ~((dimmer_scheduled_calls_t)type);
-}
+extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
 #if HAVE_READ_INT_TEMP
 float get_internal_temperature();

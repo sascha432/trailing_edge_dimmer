@@ -236,53 +236,48 @@ uint8_t *get_signature(uint8_t *sig) {
     return sig;
 }
 
-unique_ptr<uint8_t> get_mcu_type(char *&mcu, uint8_t *&sig, uint8_t *&fuses) {
-    const size_t mcu_size = 17;
-    auto buffer = new uint8_t[3 + 3 + mcu_size + 1];
-    auto ptr = buffer;
+void get_mcu_type(MCUInfo_t &info) {
+    get_signature(info.sig);
 
-    sig = ptr;
-    ptr = get_signature(ptr) + 3;
-
-    fuses = ptr;
+    auto ptr = info.fuses;
     *ptr++ = boot_lock_fuse_bits_get(GET_LOW_FUSE_BITS);
     *ptr++ = boot_lock_fuse_bits_get(GET_HIGH_FUSE_BITS);
     *ptr++ = boot_lock_fuse_bits_get(GET_EXTENDED_FUSE_BITS);
 
-    mcu = reinterpret_cast<char *>(ptr);
+    auto mcu = info.name;
     *mcu = 0;
-    *(mcu + mcu_size) = 0;
 
-    if (sig[0] == 0x1e) {
-        if (sig[1] == 0x93) {
-            switch(sig[2]) {
-                case 0x0a:
-                    strncpy_P(mcu, PSTR("ATmega88"), mcu_size);
-                    break;
+    // MCU name limited to 16 characters
+    if (info.sig[0] == 0x1e) {
+        // removed due to insufficient flash memory
+        // if (info.sig[1] == 0x93) {
+        //     switch(info.sig[2]) {
+        //         case 0x0a:
+        //             strcpy_P(mcu, PSTR("ATmega88"));
+        //             break;
+        //         case 0x0f:
+        //             strcpy_P(mcu, PSTR("ATmega88P"));
+        //             break;
+        //     }
+        // }
+        // else
+        if (info.sig[1] == 0x95) {
+            switch(info.sig[2]) {
+                // case 0x02:
+                //     strcpy_P(mcu, PSTR("ATmega32"));
+                //     break;
                 case 0x0f:
-                    strncpy_P(mcu, PSTR("ATmega88P"), mcu_size);
+                    strcpy_P(mcu, PSTR("ATmega328P"));
                     break;
-            }
-        }
-        else if (sig[1] == 0x95) {
-            switch(sig[2]) {
-                case 0x02:
-                    strncpy_P(mcu, PSTR("ATmega32"), mcu_size);
-                    break;
-                case 0x0f:
-                    strncpy_P(mcu, PSTR("ATmega328P"), mcu_size);
-                    break;
-                case 0x14:
-                    strncpy_P(mcu, PSTR("ATmega328-PU"), mcu_size);
-                    break;
+                // case 0x14:
+                //     strcpy_P(mcu, PSTR("ATmega328-PU"));
+                //     break;
                 case 0x16:
-                    strncpy_P(mcu, PSTR("ATmega328PB"), mcu_size);
+                    strcpy_P(mcu, PSTR("ATmega328PB"));
                     break;
             }
         }
     }
-
-    return unique_ptr<uint8_t>(buffer);
 }
 
 #if DEBUG

@@ -3,9 +3,10 @@
  */
 
 #include "main.h"
+#include "cubic_interpolation.h"
 
 template <typename T>
-void swap(T &a, T &b) {
+inline void swap(T &a, T &b) {
     T c = a;
     a = b;
     b = c;
@@ -26,7 +27,7 @@ static inline void dimmer_bubble_sort(dimmer_channel_t channels[], dimmer_channe
    }
 }
 
-static bool dimmer_is_fading()
+bool dimmer_is_fading()
 {
     FOR_CHANNELS(i) {
         if (dimmer.fade[i].count) {
@@ -118,21 +119,22 @@ void Dimmer::_calculateChannels()
 #endif
 
     dimmer_bubble_sort(ordered_channels_tmp, count);
+
     ATOMIC_BLOCK(ATOMIC_FORCEON) {
         // copy double buffer with interrupts disabled
         memcpy(ordered_channels_buffer, ordered_channels_tmp, sizeof(ordered_channels_buffer));
+#if 0
+        if (dimmer_is_fading()) {
+            auto dur = micros() - start;
+            FOR_CHANNELS(i) {
+                // Serial_printf_P(PSTR("%u=%u(%u) "), ordered_channels_buffer[i].channel, ordered_channels_buffer[i].ticks, dimmer_level(i));
+                Serial_printf_P(PSTR("%u=%u "), ordered_channels_buffer[i].channel, ordered_channels_buffer[i].ticks);
+            }
+            Serial.println(dur);
+        }
+#endif
         _unlockCalc();
     }
-
-#if 0
-    if (dimmer_is_fading()) {
-        auto dur = micros() - start;
-        FOR_CHANNELS(i) {
-            Serial_printf_P(PSTR("%u=%u(%u) "), ordered_channels_tmp[i].channel, ordered_channels_tmp[i].ticks, dimmer_level(i));
-        }
-        Serial.println(dur);
-    }
-#endif
 
 }
 
@@ -168,20 +170,21 @@ void Dimmer::setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_le
     fadingCompleted[channel] = INVALID_LEVEL;
 #endif
 
-    from = dimmer_normalize_level(from == DIMMER_FADE_FROM_CURRENT_LEVEL ? dimmer_level(channel) : from);
+    from = dimmer_normalize_level((from == DIMMER_FADE_FROM_CURRENT_LEVEL) ? dimmer_level(channel) : from);
     diff = dimmer_normalize_level(to) - from;
 
-    if (!absolute_time) { // calculate relative fading time depending on "diff"
-        time = abs(diff / DIMMER_MAX_LEVELS * time);
+    if (!absolute_time) { // calculate relative fading time depending on the level change "diff"
+        time = diff / DIMMER_MAX_LEVELS * time;
+        time = abs(time);
         _D(5, Serial_printf_P(PSTR("Relative fading time %.3f\n"), time));
     }
 
     fade.count = 2 * getFrequency() * time;
-    fade.step = diff / (float)fade.count;
+    fade.step = (fade.count <= 1) ? 0 : (diff / fade.count);
     fade.level = from;
     fade.targetLevel = to;
 
-    if (fade.count < 1 || fade.step == 0) { // time too short, force to run fading anyway = basically turns the channel on and sends events
+    if (fade.step == 0) { // time too short or no change, force to run fading anyway = basically turns the channel on and sends events
         fade.count = 1;
     }
 

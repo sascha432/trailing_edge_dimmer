@@ -8,6 +8,10 @@
 #define DIMMER_I2C_ADDRESS                  0x17
 #endif
 
+#ifndef DIMMER_I2C_MASTER_ADDRESS
+#define DIMMER_I2C_MASTER_ADDRESS           (DIMMER_I2C_ADDRESS + 1)
+#endif
+
 // #if DIMMER_I2C_SLAVE
 
 #define DIMMER_REGISTER_START_ADDR          0x01
@@ -43,16 +47,17 @@
 #define DIMMER_REGISTER_INT_1_1V_REF        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, internal_1_1v_ref))
 #define DIMMER_REGISTER_INT_TEMP_OFS        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, int_temp_offset))
 #define DIMMER_REGISTER_METRICS_INT         (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, report_metrics_max_interval))
-#define DIMMER_REGISTER_ERRORS_ZC_MISFIRE   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, errors) + offsetof(register_mem_errors_t, zc_misfire))
-#define DIMMER_REGISTER_CH0_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 0)
-#define DIMMER_REGISTER_CH1_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 1)
-#define DIMMER_REGISTER_CH2_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 2)
-#define DIMMER_REGISTER_CH3_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 3)
-#define DIMMER_REGISTER_CH4_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 4)
-#define DIMMER_REGISTER_CH5_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 5)
-#define DIMMER_REGISTER_CH6_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 6)
-#define DIMMER_REGISTER_CH7_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 7)
+#define DIMMER_REGISTER_CH0_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 0)
+#define DIMMER_REGISTER_CH1_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 1)
+#define DIMMER_REGISTER_CH2_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 2)
+#define DIMMER_REGISTER_CH3_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 3)
+#define DIMMER_REGISTER_CH4_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 4)
+#define DIMMER_REGISTER_CH5_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 5)
+#define DIMMER_REGISTER_CH6_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 6)
+#define DIMMER_REGISTER_CH7_CUBIC_INT       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int) + sizeof(register_mem_cubic_int_t) * 7)
 #define DIMMER_REGISTER_VERSION             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, version))
+#define DIMMER_REGISTER_ERRORS_ZC_MISFIRE   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, errors) + offsetof(register_mem_errors_t, zc_misfire))
+#define DIMMER_REGISTER_ERRORS_TEMPERATURE  (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, errors) + offsetof(register_mem_errors_t, temperature))
 #define DIMMER_REGISTER_ADDRESS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, address))
 #define DIMMER_REGISTER_END_ADDR            (DIMMER_REGISTER_START_ADDR + sizeof(register_mem_t))
 

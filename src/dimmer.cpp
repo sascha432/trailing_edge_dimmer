@@ -208,7 +208,6 @@ void Dimmer::disableChannel(dimmer_channel_id_t channel)
 uint16_t Dimmer::getChannel(dimmer_level_t level) const
 {
     uint16_t ticks = (level * (uint32_t)_halfwaveTicks) / DIMMER_MAX_LEVELS;
-    // TODO optimize code, precalculate min_on_level max_on_level
     if (ticks < dimmer_config.min_on_ticks) {
         return dimmer_config.min_on_ticks;
     }
@@ -219,22 +218,31 @@ uint16_t Dimmer::getChannel(dimmer_level_t level) const
     return ticks;
 }
 
+#if DIMMER_ZC_FILTER
+
+static inline uint32_t get_time_diff(uint32_t start, uint32_t end) {
+    if (end >= start) {
+        return end - start;
+    }
+    // handle overflow
+    return end + ~start + 1;
+};
+
+#endif
+
 void Dimmer::_zcHandler(uint16_t counter)
 {
-#if 1 //DEBUG
+#if DEBUG_FAULTS
     static volatile uint8_t count = 0;
     if (_intFlags & _BV(_IFZCI)) {
-        count++;
-        sei();
-        Serial_printf("zcl %u st %u ws %u\n", count, (int)_state, _intFlags & _BV(_IFCAB));
-        if (count > 100) {
-            end();
+        if (++count > 200) {
+            _fault("ZC locked 200 times");
         }
         return;
     }
     count = 0;
 #else
-    if (_zcLocked) {
+    if (_intFlags & _BV(_IFZCI)) {
         return;
     }
 #endif
@@ -254,7 +262,7 @@ void Dimmer::_zcHandler(uint16_t counter)
     }
 
 #endif
-    // lock ZC interrupt
+    // lock ZC interrupt before allowing interrupts
     _intFlags |= _BV(_IFZCI);
     sei();
 
@@ -386,9 +394,6 @@ void Dimmer::_startHalfwave()
         for(; channel->ticks; channel++) {
             enableChannel(channel->channel);
         }
-        // for(i = 0; ordered_channels[i].ticks; i++) {
-        //     enableChannel(ordered_channels[i].channel);
-        // }
 
         FOR_CHANNELS(i) {
             if (!dimmer_level(i)) {
@@ -426,7 +431,8 @@ void Dimmer::_dimmingCycle()
             // next channel has a different time slot, re-schedule
             // add the difference
             uint16_t diff = next_channel->ticks - channel->ticks;
-#define DEBUG_OVERFLOW 1
+
+#define DEBUG_OVERFLOW  DEBUG_FAULTS
 #if DEBUG_OVERFLOW
             bool ovf = false;
             uint16_t cnt2, cnt1;

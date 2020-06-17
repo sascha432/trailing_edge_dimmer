@@ -90,16 +90,17 @@ private:
     T_ptr_t _ptr;
 };
 
+typedef struct {
+    uint8_t sig[3];
+    uint8_t fuses[3];
+    char name[17];
+} MCUInfo_t;
+
 uint8_t *get_signature(uint8_t *sig);
-unique_ptr<uint8_t> get_mcu_type(char *&mcu, uint8_t *&sig, uint8_t *&fuses);
+void get_mcu_type(MCUInfo_t &info);
 
 int Serial_printf(const char *format, ...);
 int Serial_printf_P(PGM_P format, ...);
 bool Serial_readLine(String &input, bool allowEmpty);
 int Serial_print_float(double value, uint8_t max_precision = FLT_DIG, uint8_t max_decimals = 8);
 int count_decimals(double value, uint8_t max_precision = FLT_DIG, uint8_t max_decimals = 8);
-
-typedef unsigned long ulong;
-
-#define STR(s)                  _STR(s)
-#define _STR(s)                 #s

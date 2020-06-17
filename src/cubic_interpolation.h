@@ -4,10 +4,10 @@
 
 #pragma once
 
-#if DIMMER_CUBIC_INTERPOLATION
-
 #include <Arduino.h>
 #include "dimmer.h"
+
+#if DIMMER_CUBIC_INTERPOLATION
 
 class CubicInterpolation {
 public:

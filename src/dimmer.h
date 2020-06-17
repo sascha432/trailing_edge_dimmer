@@ -6,8 +6,11 @@
 
 #include <Arduino.h>
 
+#ifndef DIMMER_CUBIC_INTERPOLATION
+#define DIMMER_CUBIC_INTERPOLATION                              1
+#endif
+
 #if DIMMER_CUBIC_INTERPOLATION
-//#include "cubic_interpolation.h"
 #ifndef DIMMER_INTERPOLATION_METHOD
 #define DIMMER_INTERPOLATION_METHOD		CatmullSpline
 // #define DIMMER_INTERPOLATION_METHOD		ConstrainedSpline
@@ -95,7 +98,9 @@ static constexpr uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 
 // enable ZC interrupt filter
 // it ignores all zc interrupts that occur before the halfwave cycle reached 94% (~88%/53Hz for 60Hz)
-#define DIMMER_ZC_FILTER                                        0
+#ifndef DIMMER_ZC_FILTER
+#define DIMMER_ZC_FILTER                                        1
+#endif
 
 // #define DIMMER_TIMER1_PRESCALER                                 1
 // #define DIMMER_TIMER1_PRESCALER_BV                              _BV(CS10)
@@ -110,14 +115,11 @@ static constexpr uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 // requires ~176-184 cpu cycles
 #define DIMMER_COMPARE_B_EXTRA_TICKS                            (512 / DIMMER_TIMER1_PRESCALER)
 
-#define DIMMER_TMR1_TICKS_PER_US                                (clockCyclesPerMicrosecond() / (float)DIMMER_TIMER1_PRESCALER)
+#define DIMMER_T1_TICKS_PER_US                                  (clockCyclesPerMicrosecond() / (float)DIMMER_TIMER1_PRESCALER)
 
-#define DIMMER_US_TO_TICKS(us, ticks_per_us)                    (us * ticks_per_us)
-#define DIMMER_TICKS_TO_US(ticks, ticks_per_us)                 (ticks / ticks_per_us)
-
-#define DIMMER_ZC_TICKS_TO_US(ticks)                            DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
-#define DIMMER_MIN_ON_TICKS_TO_US(ticks)                        DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
-#define DIMMER_ADJ_HW_TICKS_TO_US(ticks)                        DIMMER_TICKS_TO_US(ticks, DIMMER_TMR1_TICKS_PER_US)
+#define DIMMER_T1_US_TO_TICKS(us )                              (us * (clockCyclesPerMicrosecond() / DIMMER_TIMER1_PRESCALER))
+#define DIMMER_T1_TICKS_TO_US(ticks)                            (ticks / (clockCyclesPerMicrosecond() / DIMMER_TIMER1_PRESCALER))
+#define DIMMER_T1_TICKS_TO_US_FLOAT(ticks)                      (ticks / (float)(clockCyclesPerMicrosecond() / DIMMER_TIMER1_PRESCALER))
 
 #ifndef HAVE_FADE_COMPLETION_EVENT
 #define HAVE_FADE_COMPLETION_EVENT                              1
@@ -207,6 +209,13 @@ public:
         NEXT_HALFWAVE,      // waiting for next ZC interrupt
     };
 
+    // typedef struct {
+    //     uint8_t compareABLock: 1;
+    //     uint8_t ZCIntLock: 1;
+    //     uint8_t calculateChannelsLock: 1;
+    //     uint8_t calculateChannelsAbort: 1;
+    // } IntFlags_t;
+
     static constexpr uint8_t _IFCAB  = 0;           // compare A/B lock
     static constexpr uint8_t _IFZCI  = 1;           // ZC interrupt lock
     static constexpr uint8_t _IFCHL  = 2;           // calculate channel lock
@@ -245,8 +254,8 @@ public:
     void setLevel(dimmer_channel_id_t channel, dimmer_level_t level);
     dimmer_level_t getLevel(dimmer_channel_id_t channel) const;
 
-    void setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time);
-    inline void setFade(dimmer_channel_id_t channel, dimmer_channel_id_t to_level, float time_in_seconds, bool absolute_time) {
+    void setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time = false);
+    inline void setFadeTo(dimmer_channel_id_t channel, dimmer_channel_id_t to_level, float time_in_seconds, bool absolute_time = false) {
         setFade(channel, DIMMER_FADE_FROM_CURRENT_LEVEL, to_level, time_in_seconds, absolute_time);
     }
 
@@ -274,6 +283,7 @@ private:
         _intFlags &= ~(_BV(_IFCHA)|_BV(_IFCHL));
     }
     inline bool _isAbortCalc() const {
+        // return ((IntFlags_t *)&_intFlags)->calculateChannelsAbort;
         return _intFlags & _BV(_IFCHA);
     }
 

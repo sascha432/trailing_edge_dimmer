@@ -41,11 +41,11 @@ typedef struct __attribute__packed__ {
     int8_t int_temp_offset;
     int8_t ntc_temp_offset;
     uint8_t report_metrics_max_interval;    // multiple of "temp_check_interval"
-    register_mem_cubic_int_t cubic_int[8];
 } register_mem_cfg_t;
 
 typedef struct __attribute__packed__ {
     uint8_t zc_misfire;
+    uint8_t temperature;
 } register_mem_errors_t;
 
 typedef struct __attribute__packed__ {
@@ -58,6 +58,7 @@ typedef struct __attribute__packed__ {
     float temp;
     uint16_t vcc;
     register_mem_cfg_t cfg;
+    register_mem_cubic_int_t cubic_int[8];
     uint16_t version;
     register_mem_errors_t errors;
     uint8_t address;

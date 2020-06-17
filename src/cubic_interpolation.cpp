@@ -2,10 +2,11 @@
  * Author: sascha_lammers@gmx.de
  */
 
+#include "main.h"
+
 #if DIMMER_CUBIC_INTERPOLATION
 
 #include "cubic_interpolation.h"
-#include "main.h"
 #include <InterpolationLib.h>
 
 CubicInterpolation cubicInterpolation;

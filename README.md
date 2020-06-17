@@ -26,10 +26,11 @@ The current master is work in progress and should not be used for any production
 * Mains frequency detection between 45 and 65 Hz
 * Linear correction removed
 * Improved and more precise timings
+* Reduced code size by 5-7Kb
 
 [I2C/UART protocol](docs/PROTOCOL.md)
 
-[Change Log v2.2.0](CHANGELOG.md)
+[Change Log v3.0.0](CHANGELOG.md)
 
 ## New and improved in-wall dimmer STL files
 
