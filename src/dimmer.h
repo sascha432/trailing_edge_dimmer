@@ -48,6 +48,9 @@
 // a positive value adds a delay after the ZC interrupt, the ZC signal occurs before the actual ZC
 // a negative value assumes that the ZC signal occurs after the actual ZC
 // time in microseconds
+// @16Mhz there is a 12µs offset between the interrupt being triggered and the first channel turned on
+// -12 would be an exact match. this time might be different depending on number of channels, optimization
+// levels, CPU speed, etc...
 #ifndef DIMMER_ZC_DELAY_US
 #define DIMMER_ZC_DELAY_US                                      144  // in µs
 #endif
@@ -114,6 +117,9 @@ static constexpr uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 // extra ticks for compare B interrupt to finish
 // requires ~176-184 cpu cycles
 #define DIMMER_COMPARE_B_EXTRA_TICKS                            (512 / DIMMER_TIMER1_PRESCALER)
+
+// extra clock cycles in Dimmer::_dimmingCycle()
+#define DIMMER_EXTRA_TICKS                                      ((64 / DIMMER_TIMER1_PRESCALER) + 1)
 
 #define DIMMER_T1_TICKS_PER_US                                  (clockCyclesPerMicrosecond() / (float)DIMMER_TIMER1_PRESCALER)
 
@@ -187,7 +193,6 @@ public:
     } cfg;
 #endif
     dimmer_fade_t fade[DIMMER_CHANNELS];                                // calculated fading data
-    dimmer_channel_id_t channel_number;
     dimmer_channel_t *channel_ptr;
     dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];             // current dimming levels in ticks
     dimmer_channel_t ordered_channels_buffer[DIMMER_CHANNELS + 1];      // next dimming levels
@@ -245,9 +250,16 @@ public:
 
     uint32_t getTicks(uint16_t counter);        // return ticks since last call
 
+#if HAVE_ASM_CHANNELS
+
+    #include "dimmer_inline_asm.h"
+
+#else
     // toggle mosfet gates
     void enableChannel(dimmer_channel_id_t channel);
     void disableChannel(dimmer_channel_id_t channel);
+
+#endif
 
     uint16_t getChannel(dimmer_level_t level) const;    // returns level in ticks or 0xffff for 100%
 
@@ -297,7 +309,7 @@ public:
 
 private:
     void _startHalfwave();
-    void _dimmingCycle();
+    void _dimmingCycle(uint16_t startOCR1A);
     void _endHalfwave();
 
 private:
@@ -323,8 +335,11 @@ private:
     volatile StateEnum _state;
     volatile uint8_t _intFlags;
     volatile float _halfwaveTicksIntegral;
+
+#if !HAVE_ASM_CHANNELS
     volatile uint8_t *_pinsAddr[DIMMER_CHANNELS];
     uint8_t _pinsMask[DIMMER_CHANNELS];
+#endif
 };
 
 extern Dimmer dimmer;

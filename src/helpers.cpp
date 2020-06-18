@@ -134,6 +134,16 @@ bool Serial_readLine(String &input, bool allowEmpty) {
     return false;
 }
 
+uint8_t bitValue2Bit(uint8_t mask)
+{
+    for(uint8_t i = 0; i < 8; i++) {
+        if (_BV(i) == mask) {
+            return i;
+        }
+    }
+    return 0xff;
+}
+
 /*
 ATmega1280      1e9703
 ATmega1281      1e9704

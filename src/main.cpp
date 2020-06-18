@@ -378,9 +378,9 @@ void setup()
     }
 
     ATOMIC_BLOCK(ATOMIC_FORCEON) {//TODO debug remove
-        dimmer.setLevel(0, 2048);
+        dimmer.setLevel(0, 2000);
         dimmer.setLevel(1, 2300);
-        dimmer.setLevel(2, 2301);
+        dimmer.setLevel(2, 7301);
         dimmer.setLevel(3, 2301);
     }
 

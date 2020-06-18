@@ -73,7 +73,9 @@ void Dimmer::_calculateChannels()
 #endif
 
     dimmer_channel_t ordered_channels_tmp[DIMMER_CHANNELS + 1];
+    // using a counter and pointer is a lot faster than accessing the array with the counter or calculating the count from the pointer address
     dimmer_channel_id_t count = 0;
+    auto channel_ptr = ordered_channels_tmp;
 
     bzero(ordered_channels_tmp, sizeof(ordered_channels_tmp));
 
@@ -85,18 +87,18 @@ void Dimmer::_calculateChannels()
             Serial.println("aborted");
             return;
         }
-        if (dimmer_level(i) >= DIMMER_MAX_LEVELS - 1) {
-            ordered_channels_tmp[count].ticks = 0xffff;
-            ordered_channels_tmp[count].channel = i;
-            count++;
-        }
-        else if (dimmer_level(i) != 0) {
+        if (dimmer_level(i) != 0) {
+#if DIMMER_CUBIC_INTERPOLATION
             uint16_t ticks = getChannel(DIMMER_LINEAR_LEVEL(dimmer_level(i), i));
-            if (ticks) {
-                ordered_channels_tmp[count].ticks = ticks;
-                ordered_channels_tmp[count].channel = i;
-                count++;
-            }
+#else
+            uint16_t ticks = (dimmer_level(i) < DIMMER_MAX_LEVELS - 1) ?
+                getChannel(DIMMER_LINEAR_LEVEL(dimmer_level(i), i)) :       // returns between min_on_ticks and (halfwave_ticks - max_on_ticks) or 0xffff
+                0xffff;                                                     // without cubic inerpolation, max. level is always 100%
+#endif
+            channel_ptr->channel = i;
+            channel_ptr->ticks = ticks;
+            channel_ptr++;
+            count++;
         }
     }
 

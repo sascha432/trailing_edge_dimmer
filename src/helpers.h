@@ -90,6 +90,11 @@ private:
     T_ptr_t _ptr;
 };
 
+// reverse _BV(), convert mask to bit, designed for a single bit and returns 0xff if multiple or none are set
+#define _BV2B(mask)             bitValue2Bit(mask)
+
+uint8_t bitValue2Bit(uint8_t mask);
+
 typedef struct {
     uint8_t sig[3];
     uint8_t fuses[3];
