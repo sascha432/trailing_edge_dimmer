@@ -305,13 +305,8 @@ void Dimmer::_zcHandler(uint16_t counter)
 
         // if the frequency increases, compare B might not be executed yet
         // this also waits until compare A has been called to intialize the halfwave
-        // uint16_t counter = 0;
-        while (_intFlags & _BV(_IFCAB)) {
-            // counter++;
+        while (_intFlags & _IFCAB) {
         }
-        // if (counter > 10) {
-        //     Serial.println(counter);
-        // }
 
         cli();
         // lock compare A/B interrupt
@@ -350,8 +345,8 @@ void Dimmer::_compareA()
 {
     switch(_state) {
         case StateEnum::START_HALFWAVE:
-            // // sync compare A/B and zero crossing interrupt
-            _intFlags &= ~_BV(_IFCAB);
+            // sync compare A/B and zero crossing interrupt
+            // _intFlags &= ~_BV(_IFCAB);
             _state = StateEnum::HALFWAVE;
             sei();
             _startHalfwave();
@@ -369,38 +364,12 @@ void Dimmer::_compareA()
 
 void Dimmer::_compareB()
 {
-// #if DEBUG_COMPARE_B_PIN
-//     *pinCmpBAddr = *pinCmpBAddr ^ pinCmpBMask;
-// #endif
-    // compare A still active
-    if (_intFlags & _BV(_IFOCA)) {
-        // disable compare B
-        TIMSK1 &= ~_BV(OCIE1B);
-        sei();
-        *pinCmpBAddr |= pinCmpBMask;
-        delayMicroseconds(10);
-        *pinCmpBAddr &= ~pinCmpBMask;
-        Serial_printf("skipB %u %u\n", OCR1A, OCR1B + DIMMER_COMPARE_B_EXTRA_TICKS);
-        _fault("compare A active");
-
-// +REM=zcdelay=-20
-// skipB 52710 52153
-// compare A active
-// TCNT1=53182,OCR1A=62907(62843),OCR1B=3219,prevOCR1B=35423,dcOCR1A=62907,OCIE1A=1,OCIE1B=1,IFZCI=0,IFCAB=1,OCF1A=0,OCF1B=0
-// state=3,channel_number=3
-// num=0,ch=0,ticks=4068,OCR1A=52099,pin=0
-// num=1,ch=1,ticks=4679,OCR1A=52710,pin=0
-// num=2,ch=3,ticks=4681,OCR1A=52735,pin=0
-// num=3,ch=2,ticks=14853,OCR1A=0,pin=1
-        return;
-    }
+#if DEBUG_COMPARE_B_PIN
+    *pinCmpBAddr = *pinCmpBAddr ^ pinCmpBMask;
+#endif
 #if DEBUG_FAULTS
-    if (_state == StateEnum::START_HALFWAVE) {
-        _fault("compare B during start");
-        return;
-    }
-    else if (_state == StateEnum::HALFWAVE) {
-        _fault("compare B during dimming cycle");
+    if (_state == StateEnum::HALFWAVE) {
+        _fault("compare B during dimming cycle"); // good change that _dimmingCycle did not finish if dcOCR1A==OCR1A
         return;
     }
     else if (TIMSK1 & _BV(OCIE1A)) {
@@ -410,8 +379,6 @@ void Dimmer::_compareB()
     _prevOCR1B = OCR1B;
 #endif
     _state = StateEnum::START_HALFWAVE;
-    // set compare A active
-    _intFlags |= _BV(_IFOCA);
     // point OCR1A to the beginning of the halfwave
     OCR1A = OCR1B + DIMMER_COMPARE_B_EXTRA_TICKS;
     // clear compare A interrupt flag
@@ -538,9 +505,8 @@ void Dimmer::_dimmingCycle(uint16_t startOCR1A)
 void Dimmer::_endHalfwave()
 {
     ATOMIC_BLOCK(ATOMIC_FORCEON) {
-            // _intFlags &= ~_BV(_IFCAB);
-        // mark compare A as done
-        _intFlags &= ~_BV(_IFOCA);
+        // sync compare A/B and zero crossing interrupt
+        _intFlags &= ~_BV(_IFCAB);
         // dimming cycle complete, wait for next halfwave
         _state = StateEnum::NEXT_HALFWAVE;
         // clear compare A interrupt flag
@@ -563,7 +529,7 @@ void Dimmer::_fault(const char *msg)
     uint8_t _TIFR1 = TIFR1;
     uint8_t __state = (uint8_t)_state;
     uint8_t __intFlags = _intFlags;
-    uint8_t _channel_number = (channel_ptr - ordered_channels);
+    uint8_t _channel_number = (channel_ptr - ordered_channels) / sizeof(*channel_ptr);
     uint8_t channels[DIMMER_CHANNELS];
     FOR_CHANNELS(i) {
         channels[i] = digitalRead(dimmer_pins[i]);
@@ -572,8 +538,8 @@ void Dimmer::_fault(const char *msg)
     Serial.println(msg);
     Serial_printf("TCNT1=%u,OCR1A=%u(%u),OCR1B=%u,", _TCNT1, _OCR1A, _OCR1A - DIMMER_COMPARE_B_EXTRA_TICKS, _OCR1B);
     Serial_printf("prevOCR1B=%u,dcOCR1A=%u,", __prevOCR1B, __dcOCR1A);
-    Serial_printf("OCIE1A=%u,OCIE1B=%u,IFZCI=%u,IFCAB=%u,", !!(_TIMSK1 & _BV(OCIE1A)), !!(_TIMSK1 & _BV(OCIE1B)), !!(__intFlags & _BV(_IFZCI)), !!(__intFlags & _BV(_IFCAB)));
-    Serial_printf("OCF1A=%u,OCF1B=%u\n", !!(_TIFR1 & _BV(OCF1A)), !!(_TIFR1 & _BV(OCF1B)));
+    Serial_printf("OCIE1A=%u,OCIE1B=%u,IFZCI=%u,IFCAB=%u,", _TIMSK1 & _BV(OCIE1A), _TIMSK1 & _BV(OCIE1B), __intFlags & _BV(_IFZCI), __intFlags & _BV(_IFCAB));
+    Serial_printf("OCF1A=%u,OCF1B=%u\n", _TIFR1 & _BV(OCF1A), _TIFR1 & _BV(OCF1B));
     Serial_printf("state=%u,channel_number=%u\n", __state, _channel_number);
     for(dimmer_channel_id_t i = 0; ordered_channels[i].ticks; i++) {
         auto channel = ordered_channels[i].channel;

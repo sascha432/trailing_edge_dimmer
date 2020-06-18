@@ -219,11 +219,17 @@ public:
         NEXT_HALFWAVE,      // waiting for next ZC interrupt
     };
 
+    // typedef struct {
+    //     uint8_t compareABLock: 1;
+    //     uint8_t ZCIntLock: 1;
+    //     uint8_t calculateChannelsLock: 1;
+    //     uint8_t calculateChannelsAbort: 1;
+    // } IntFlags_t;
+
     static constexpr uint8_t _IFCAB  = 0;           // compare A/B lock
     static constexpr uint8_t _IFZCI  = 1;           // ZC interrupt lock
     static constexpr uint8_t _IFCHL  = 2;           // calculate channel lock
     static constexpr uint8_t _IFCHA  = 3;           // calculate channel abort request
-    static constexpr uint8_t _IFOCA  = 4;           // compare A active
 
 public:
     Dimmer();
@@ -287,10 +293,14 @@ private:
     inline void _setAbortCalc() {
         _intFlags |= _BV(_IFCHA);
     }
+    inline void _unsetAbortCalc() {
+        _intFlags &= ~_BV(_IFCHA);
+    }
     inline void _unsetAbortCalcAndUnlock() {
         _intFlags &= ~(_BV(_IFCHA)|_BV(_IFCHL));
     }
     inline bool _isAbortCalc() const {
+        // return ((IntFlags_t *)&_intFlags)->calculateChannelsAbort;
         return _intFlags & _BV(_IFCHA);
     }
 
