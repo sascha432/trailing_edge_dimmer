@@ -149,20 +149,24 @@ typedef int16_t dimmer_level_t;
 
 #define FOR_CHANNELS(var)                                       for(dimmer_channel_id_t var = 0; var < DIMMER_CHANNELS; var++)
 
-struct dimmer_fade_t {
+#ifndef __attribute__packed__
+#define __attribute__packed__           __attribute__((packed))
+#endif
+
+typedef struct {
     float level;
     float step;
     uint16_t count;
     dimmer_level_t targetLevel;
-};
+} dimmer_fade_t;
 
-struct dimmer_channel_t {
+typedef struct __attribute__packed__ {
     uint8_t channel;
     uint16_t ticks;
 #if DEBUG_FAULTS
     uint16_t _OCR1A;
 #endif
-};
+} dimmer_channel_t;
 
 typedef struct __attribute__packed__ {
     dimmer_channel_id_t channel;
@@ -198,7 +202,7 @@ public:
     dimmer_channel_t ordered_channels_buffer[DIMMER_CHANNELS + 1];      // next dimming levels
 
 #if HAVE_FADE_COMPLETION_EVENT
-    volatile dimmer_level_t fadingCompleted[DIMMER_CHANNELS];
+    dimmer_level_t fadingCompleted[DIMMER_CHANNELS];
 #endif
 };
 
@@ -316,11 +320,11 @@ private:
     volatile uint16_t _halfwaveTicks;
 
     volatile int32_t _ticks;
-    volatile uint8_t _cycleCounter;
+    uint8_t _cycleCounter;
 
 #if DIMMER_ZC_FILTER
-    volatile uint32_t _zcIntTimer;
-    volatile uint32_t _zcIntMinTime;
+    uint32_t _zcIntTimer;
+    uint32_t _zcIntMinTime;
 #endif
 
 #if DEBUG_FAULTS
@@ -334,7 +338,7 @@ private:
 private:
     volatile StateEnum _state;
     volatile uint8_t _intFlags;
-    volatile float _halfwaveTicksIntegral;
+    float _halfwaveTicksIntegral;
 
 #if !HAVE_ASM_CHANNELS
     volatile uint8_t *_pinsAddr[DIMMER_CHANNELS];

@@ -53,7 +53,7 @@ void Dimmer::_calculateChannels()
 {
     // using cubic interpolation can cause this function to run longer than a single have wave (8.33ms@60Hz)
     // in this case, the current calculation is stopped and the step is simply skipped during fading
-    // if it is the last step, it is postponed for one half cycle
+    // if it is the last step, it is postponed for one half cycle. a flag is set to abort the calculation
     // during my tests with 4 channels it rarely exceeded 0.9ms (@16Mhz)
 
     cli();
@@ -167,7 +167,7 @@ dimmer_level_t Dimmer::getLevel(dimmer_channel_id_t channel) const
 void Dimmer::setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time)
 {
     float diff;
-    dimmer_fade_t &fade = this->fade[channel];
+    auto &fade = this->fade[channel];
 #if HAVE_FADE_COMPLETION_EVENT
     fadingCompleted[channel] = INVALID_LEVEL;
 #endif
@@ -194,11 +194,11 @@ void Dimmer::setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_le
     _D(5, Serial_printf_P(PSTR(", step %.3f, count %u\n"), fade.step, fade.count));
 }
 
-// this function is called from an interrupt at the rate of the AC frequency
+// this function is called from an interrupt twice the rate of the AC frequency
 void Dimmer::_applyFading()
 {
     FOR_CHANNELS(i) {
-        dimmer_fade_t &fade = this->fade[i];
+        auto &fade = this->fade[i]; // assigning the reference using "i" has the same code size as using a pointer and incrementing it at the end of the loop
         if (fade.count) {
             if (_isCalcLocked() && fade.count == 1) {
                 // postpone last step
