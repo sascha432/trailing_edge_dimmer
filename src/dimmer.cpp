@@ -22,11 +22,32 @@ Dimmer::Dimmer() : dimmer_t(), _halfwaveTicks(0), _cycleCounter(0), _state(State
     pinCmpBAddr = portOutputRegister(digitalPinToPort(DEBUG_COMPARE_B_PIN));
 #endif
 
+#if 0
+    // generate defines for inline assembler
+    for(int j = 0; j < 8; j++) {
+        for(int i = 0; i < 16; i++) {
+            Serial_printf_P(PSTR("#if xBI_CHANNEL%u==%u\n"), j, i);
+            Serial.flush();
+            Serial_printf_P(PSTR("    #define xBI_ARGS_CHANNEL%u \"0x%02x,%d\"\n"), j, portOutputRegister(digitalPinToPort(i)) - __SFR_OFFSET, _BV2B(digitalPinToBitMask(i)));
+            Serial.flush();
+            Serial.println(F("#endif"));
+            Serial.flush();
+        }
+    }
+#endif
+
+#if !HAVE_ASM_CHANNELS
     FOR_CHANNELS(i) {
 	    _pinsMask[i] = digitalPinToBitMask(dimmer_pins[i]);
 	    _pinsAddr[i] = portOutputRegister(digitalPinToPort(dimmer_pins[i]));
-        _D(5, Serial_printf_P(PSTR("Channel %u, pin %u, address %02x, mask %02x\n"), i, dimmer_pins[i], dimmer_pins_addr[i], dimmer_pins_mask[i]));
+        _D(5,
+            {
+                Serial_printf_P(PSTR("Channel %u, pin %u, address %02x, mask %02x\n"), i, dimmer_pins[i], _pinsAddr[i], _pinsMask[i]);
+                Serial.flush();
+            }
+        );
     }
+#endif
 
 #if HAVE_FADE_COMPLETION_EVENT
     FOR_CHANNELS(i) {
@@ -195,6 +216,8 @@ void Dimmer::end()
     sei();
 }
 
+#if !HAVE_ASM_CHANNELS
+
 void Dimmer::enableChannel(dimmer_channel_id_t channel)
 {
     *_pinsAddr[channel] |= _pinsMask[channel];
@@ -204,6 +227,7 @@ void Dimmer::disableChannel(dimmer_channel_id_t channel)
 {
     *_pinsAddr[channel] &= ~_pinsMask[channel];
 }
+#endif
 
 uint16_t Dimmer::getChannel(dimmer_level_t level) const
 {
@@ -328,8 +352,7 @@ void Dimmer::_compareA()
             _startHalfwave();
             break;
         case StateEnum::HALFWAVE:
-            sei();
-            _dimmingCycle();
+            _dimmingCycle(OCR1A);
             break;
         default:
 #if DEBUG_FAULTS
@@ -381,17 +404,11 @@ void Dimmer::_startHalfwave()
 {
     auto channel = ordered_channels;
     if (channel->ticks) { // any channel active?
-        channel_number = 0;
         channel_ptr = channel;
         OCR1A += channel->ticks;
-#if DEBUG_FAULTS
-        if (channel->ticks < (128 / DIMMER_TIMER1_PRESCALER)) {
-            _fault("ticks less than 128 / DIMMER_TIMER1_PRESCALER");
-            return;
-        }
-#endif
         // turn channels on first
-        // the delay between turning on a channel is ~2µs @ 16MHz (or 16µs between channel 0 and 7, having 8 channels and all of them enabled)
+        // the delay between turning on a channel is ~2µs @ 16MHz for 2 active channels (or 6.45µs for 4 active channels)
+        // using inline assembler reduces the delay to 1.25µs (or 3.6µs for 4 active channels)
         do {
             enableChannel(channel->channel);
             channel++;
@@ -414,81 +431,74 @@ void Dimmer::_startHalfwave()
     }
 }
 
-void Dimmer::_dimmingCycle()
+// uint32_t __counter;
+// uint32_t __trigger;
+// uint16_t __diff;
+
+void Dimmer::_dimmingCycle(uint16_t startOCR1A)
 {
-    //TODO something isn't working correctly here and channels seem to be mixed up though they are stored correctly in "ordered_channels_buffer"
-    // didnt check "ordered_channels" yet
-    uint16_t startOCR1A = OCR1A;
-    auto channel = &ordered_channels[channel_number++];
-    // auto channel = channel_ptr++;
-    auto next_channel = &ordered_channels[channel_number];
+    sei();
+    // channel = current channel
+    // channel_ptr = next channel
+    auto channel = channel_ptr++;
     for(;;) {
         disableChannel(channel->channel);    // turn off current channel
+
 #if DEBUG_FAULTS
         channel->_OCR1A = OCR1A;
 #endif
 
-        if (next_channel->ticks == 0 || next_channel->ticks == 0xffff) {
+        if (channel_ptr->ticks == 0 || channel_ptr->ticks == 0xffff) {
             _endHalfwave();
+
+            // for(dimmer_channel_id_t i = 0; ordered_channels[i].ticks; i++) {
+            //     auto channel = ordered_channels[i].channel;
+            //     int32_t tmp = ordered_channels[i]._OCR1A - (int32_t)_startOCR1A;
+            //     if (tmp < 0) {
+            //         tmp += 0x10000;
+            //     }
+            //     uint16_t ticks = tmp;
+            //     if (round(ticks / 2000.0) != round(ordered_channels[i].ticks / 2000.0)) { // compare if ticks and OCR1A roughly match
+            //         Serial_printf("\nnum=%u,ch=%d,ticks=%d,OCR1A=%u\n", i, channel, ordered_channels[i].ticks, ticks);
+            //         Serial.flush();
+            //         Serial_printf("c32=%lu,t32=%lu\n", __counter,__trigger);
+            //         Serial_printf("c=%u,t=%u,d=%u\n", (uint16_t)__counter,(uint16_t)__trigger,__diff);
+            //         _fault("invalid ticks");
+            //     }
+            // }
             break;
         }
-        else if (next_channel->ticks > channel->ticks) {
+        else if (channel_ptr->ticks > channel->ticks) {
             // next channel has a different time slot, re-schedule
-            // add the difference
-            uint16_t diff = next_channel->ticks - channel->ticks;
-
-#define DEBUG_OVERFLOW  DEBUG_FAULTS
-#if DEBUG_OVERFLOW
-            bool ovf = false;
-            uint16_t cnt2, cnt1;
-#endif
+            uint16_t diff = channel_ptr->ticks - channel->ticks; // add the difference
 
             ATOMIC_BLOCK(ATOMIC_FORCEON) {
+
                 // setting OCR1A close to the previous compare interrupt is a bit tricky
+                uint32_t counter = TCNT1;
                 // we cannot use TIFR1/TOV1 since interrupts were enabled before
-                // it adds up to 2µs @ 16MHz if the levels are too close
-                OCR1A += diff;
-                uint16_t cnt = (32 / DIMMER_TIMER1_PRESCALER) + TCNT1;
-                if (cnt < startOCR1A) { // overflow within the next 32 cpu cycles
-                    OCR1A = max(OCR1A, (0x10000UL + (32 / DIMMER_TIMER1_PRESCALER)) + TCNT1);
-#if DEBUG_OVERFLOW
-                    cnt2 = TCNT1;
-                    cnt1 = cnt;
-                    ovf = true;
-#endif
+                if (startOCR1A > (uint16_t)counter) { // overflow occured
+                    counter += (1UL << 16);
                 }
-                else {
-                    // add 16 extra cycles
-                    OCR1A = max(OCR1A, (16 / DIMMER_TIMER1_PRESCALER) + TCNT1);
+                startOCR1A += diff;
+                int16_t distance = startOCR1A - counter; // calculate distance between TCNT1 and next OCR1A
+                if (distance < DIMMER_EXTRA_TICKS) { // if it is getting close, add extra ticks to avoid missing the interrupt
+                    startOCR1A += (DIMMER_EXTRA_TICKS - distance); // DIMMER_EXTRA_TICKS has to cover the clock cycles from reading TCNT1 to setting OCR1A
                 }
+                OCR1A = startOCR1A; // OCR1A must be >= (TCNT1 + 1) at this point to get triggered
+
 #if DEBUG_FAULTS
-                uint16_t tmp = TCNT1;
-                // next_channel->_OCR1A = OCR1A;
                 _dcOCR1A = OCR1A;
-                if (tmp >= OCR1A) {
-                    // if compare A has not been triggered we missed TCNT1
-                    if ((TIFR1 & _BV(OCF1A)) == 0) {
-#if DEBUG_OVERFLOW
-                        if (ovf) {
-                            Serial_printf("dc ovf %u %u %u %u\n", startOCR1A, cnt1, OCR1A, cnt2);
-                        }
 #endif
-                        _fault("OCR1A missed");
-                    }
-                }
-#endif
+                // __trigger = OCR1A;
+                // __counter = counter;
+                // __diff=distance;
+
             }
-#if DEBUG_OVERFLOW && 0
-            if (ovf) {
-                Serial_printf("dc ovf %u %u %u %u\n", startOCR1A, cnt1, OCR1A, cnt2);
-            }
-#endif
             break;
         }
-        channel = next_channel;
-        channel_number++;
-        //next_channel = &ordered_channels[channel_number];
-        next_channel++;
+        channel = channel_ptr;
+        channel_ptr++;
     }
 }
 
@@ -519,10 +529,10 @@ void Dimmer::_fault(const char *msg)
     uint8_t _TIFR1 = TIFR1;
     uint8_t __state = (uint8_t)_state;
     uint8_t __intFlags = _intFlags;
-    uint8_t _channel_number = channel_number;
+    uint8_t _channel_number = (channel_ptr - ordered_channels) / sizeof(*channel_ptr);
     uint8_t channels[DIMMER_CHANNELS];
     FOR_CHANNELS(i) {
-        channels[i] = !!(*_pinsAddr[i] & _pinsMask[i]);
+        channels[i] = digitalRead(dimmer_pins[i]);
     }
     end();
     Serial.println(msg);

@@ -11,6 +11,7 @@
 - Reduced max. temperature to 80°C
 - Removed linear correction
 - Changes in I2C protcol and register memory (not compatible with 2.x)
+- Inline assembler code generation to improve switching times
 
 ## 2.1.4
 
