@@ -50,24 +50,43 @@
 #endif
 
 #define DIMMER_CHANNELS_NUM_PORTS                       3 // PORTD, PORTB, PORTC
+
+typedef uint8_t dimmer_enable_mask_t[DIMMER_CHANNELS_NUM_PORTS];
+
 #define DIMMER_CHANNEL_PORT0_SFR_IO_ADDR                _SFR_IO_ADDR(PORTD)
 #define DIMMER_CHANNEL_PORT1_SFR_IO_ADDR                _SFR_IO_ADDR(PORTB)
 #define DIMMER_CHANNEL_PORT2_SFR_IO_ADDR                _SFR_IO_ADDR(PORTC)
 
-#define DIMMER_CHANNELS_APPLY_ENABLE_MASK(src)\
+// apply mask and set ports, interrupts need to be disabled during execution
+#define DIMMER_CHANNELS_SET_ENABLE_MASK(src)\
     {\
         uint8_t tmp[3];\
-        tmp[0] = PORTD | src[0];\
-        tmp[1] = PORTB | src[1];\
-        tmp[2] = PORTC | src[2];\
+        tmp[0] = (PORTD | src[0]);\
+        tmp[1] = (PORTB | src[1]);\
+        tmp[2] = (PORTC | src[2]);\
         PORTD = tmp[0];\
         PORTB = tmp[1];\
         PORTC = tmp[2];\
     }
 
-#define DIMMER_CHANNELS_CLEAR_ENABLE_MASK(dst)          { dst[0] = 0; dst[1] = 0; dst[2] = 0; }
-#define DIMMER_CHANNELS_COPY_ENABLE_MASK(dst, src)      { dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; }
-#define DIMMER_CHANNELS_SET_ENABLE_MASK(dst, ch)\
+#define DIMMER_CHANNELS_CLEAR_ENABLE_MASK(src)\
+    {\
+        uint8_t tmp[3];\
+        tmp[0] = (PORTD & ~src[0]);\
+        tmp[1] = (PORTB & ~src[1]);\
+        tmp[2] = (PORTC & ~src[2]);\
+        PORTD = tmp[0];\
+        PORTB = tmp[1];\
+        PORTC = tmp[2];\
+    }
+
+// clear mask and set all channels to 0
+#define DIMMER_CHANNELS_ENABLE_MASK_CLEAR_CHANNELS(dst) { dst[0] = 0; dst[1] = 0; dst[2] = 0; }
+
+// copy mask
+#define DIMMER_CHANNELS_ENABLE_MASK_COPY(dst, src)      { dst[0] = src[0]; dst[1] = src[1]; dst[2] = src[2]; }
+
+#define DIMMER_CHANNELS_ENABLE_MASK_SET_CHANNEL(dst, ch)\
     switch(ch) {\
         default:\
             dst[DIMMER_CHANNEL0_PORT_NUMBER] |= DIMMER_CHANNEL0_BIT_MASK;\

@@ -249,7 +249,6 @@ void display_dimmer_info()
 {
     rem();
     Serial.println(F("MOSFET Dimmer " DIMMER_VERSION " " __DATE__ " " __TIME__ " " DIMMER_INFO));
-    Serial.flush();
 
     rem();
     MCUInfo_t mcu;
@@ -259,7 +258,6 @@ void display_dimmer_info()
         Serial_printf_P(PSTR(",MCU=%s"), mcu.name);
     }
     Serial_printf_P(PSTR("@%uMhz\n"), (unsigned)(F_CPU / 1000000UL));
-    Serial.flush();
 
     rem();
     Serial.print(F("options="));
@@ -289,10 +287,8 @@ void display_dimmer_info()
 #if HAVE_FADE_COMPLETION_EVENT
     Serial.print(F("CE=1,"));
 #endif
-    Serial_printf_P(PSTR("Addr=%02x"), DIMMER_I2C_ADDRESS);
-    Serial.print(F(",Pre=" _STRINGIFY(DIMMER_TIMER1_PRESCALER) ",Ticks="));
-    Serial_print_float(1 / DIMMER_T1_TICKS_PER_US);
-    Serial.print(F("us,MaxLvls=" _STRINGIFY(DIMMER_MAX_LEVELS) ",GPIO/lvl="));
+    Serial_printf_P(PSTR("Addr=%02x,Pre=" _STRINGIFY(DIMMER_TIMER1_PRESCALER) ",Ticks=%.1fus,MaxLvls=" _STRINGIFY(DIMMER_MAX_LEVELS) ",GPIO/lvl="), DIMMER_I2C_ADDRESS,1 / DIMMER_T1_TICKS_PER_US);
+    Serial.flush();
     FOR_CHANNELS(i) {
         Serial.print((int)dimmer_pins[i]);
         Serial.print('/');
@@ -302,11 +298,9 @@ void display_dimmer_info()
         }
     }
     Serial.println();
-    Serial.flush();
 
     rem();
-    Serial.print(F("values="));
-    Serial_printf_P(PSTR("Restore=%u,Frq=%.3f,Ref11="), register_mem.data.cfg.bits.restore_level, dimmer.getFrequency());
+    Serial_printf_P(PSTR("values=Restore=%u,Frq=%.3f,Ref11="), register_mem.data.cfg.bits.restore_level, dimmer.getFrequency());
     Serial_print_float(register_mem.data.cfg.internal_1_1v_ref, 4, 4);
     Serial.print(',');
 #if HAVE_NTC
@@ -323,13 +317,11 @@ void display_dimmer_info()
     Serial.print(F("CubInt="));
     cubicInterpolation.printState();
 #endif
-    Serial_printf_P(PSTR("Min/MaxOn=%u/%.1fus,%u/%.1fus,"),
+    Serial_printf_P(PSTR("Min/MaxOn=%u/%.1fus,%u/%.1fus,ZC=%d/%.1fus\n"),
         register_mem.data.cfg.min_on_ticks,
         DIMMER_T1_TICKS_TO_US_FLOAT(register_mem.data.cfg.min_on_ticks),
         register_mem.data.cfg.max_on_ticks,
-        DIMMER_T1_TICKS_TO_US_FLOAT(register_mem.data.cfg.max_on_ticks)
-    );
-    Serial_printf_P(PSTR("ZC=%d/%.1fus\n"),
+        DIMMER_T1_TICKS_TO_US_FLOAT(register_mem.data.cfg.max_on_ticks),
         register_mem.data.cfg.zero_crossing_delay_ticks,
         DIMMER_T1_TICKS_TO_US_FLOAT(register_mem.data.cfg.zero_crossing_delay_ticks)
     );
@@ -344,6 +336,11 @@ void display_dimmer_info()
 
 void setup()
 {
+    Serial.begin(DEFAULT_BAUD_RATE);
+    dimmer.test();
+}
+
+void xxx(){
 #if HAVE_READ_INT_TEMP
     uint8_t buf[3];
     is_Atmega328PB = memcmp_P(get_signature(buf), PSTR("\x1e\x95\x16"), 3) == 0;
@@ -439,6 +436,19 @@ void send_fading_completion_events()
 
 void loop()
 {
+#if DIMMER_SIGNAL_GENERATOR_JITTER
+    static unsigned long signalTimer = 0;
+    if (millis() > signalTimer) {
+        signalTimer = millis() + 5000;
+        if (OCR2A > 140) {
+            // while(TCNT2!=OCR2A-1) ;
+            OCR2A--;
+        }
+        else {
+            OCR2A = 150;
+        }
+    }
+#endif
 #if HAVE_READ_VCC
     if (dimmer_scheduled_calls.readVCC) {
         dimmer_scheduled_calls.readVCC = false;

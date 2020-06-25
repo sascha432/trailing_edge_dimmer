@@ -5,24 +5,30 @@ from os import path
 import sys
 import inspect
 import shlex
+import click
 from SCons.Script import ARGUMENTS
 import tempfile
+
+verbose_flag = int(ARGUMENTS.get("PIOVERBOSE", 0)) and True or False
+
+def error(msg):
+    print(msg, file=sys.stderr)
+    sys.exit(1)
+
+def verbose(msg):
+    if verbose_flag:
+        print(msg)
+
+#
+# run SFR tool
+#
 
 def run_sfr_tool(source, target, env):
 
     create_inline_asm = False
     pins = None
-    verbose_flag = False
     script = path.realpath(path.join(path.dirname(inspect.getfile(inspect.currentframe())), 'sfr_tool.py'))
     board = env["BOARD_MCU"]
-
-    def error(msg):
-        print(msg, file=sys.stderr)
-        sys.exit(1)
-
-    def verbose(msg):
-        if verbose_flag:
-            print(msg)
 
     args = [
         env.subst("$PYTHONEXE"),
@@ -32,8 +38,7 @@ def run_sfr_tool(source, target, env):
         '--pin-funcs', '2', '8', '11'
     ]
 
-    if int(ARGUMENTS.get("PIOVERBOSE", 0)):
-        verbose_flag = True
+    if verbose_flag:
         args.append('--verbose')
 
     # verbose("CPPDEFINES:")
@@ -59,47 +64,60 @@ def run_sfr_tool(source, target, env):
         if not pins:
             error('DIMMER_MOSFET_PINS not defined')
 
-        popen = subprocess.run(args, shell=True)
-        return_code = popen.returncode
+        return_code = subprocess.run(args, shell=True).returncode
         if return_code!=0:
             error("%s failed to run, exit code %u\ncommand: '%s'" % (path.basename(script), return_code, ' '.join(args)))
 
+#
+# disassemble ELF binary
+#
 
 def disassemble(source, target, env):
-    exec_obj_dump = False
-    for define in env['CPPDEFINES']:
-        if isinstance(define, str):
-            name = define
-            value = 1
-        elif isinstance(define, tuple):
-            name = define[0]
-            value = env.subst(str(define[1]))
-        if name=='EXEC_OBJ_DUMP':
-            exec_obj_dump = True
-    if exec_obj_dump:
 
-        output = path.realpath(path.join(env.subst("$BUILD_DIR"), 'firmware.lst'))
-        project_dir = path.realpath(env.subst("$PROJECT_DIR"))
-        print(project_dir)
-        args = [
-            'avr-objdump',
-            '-d',
-            '-S',
-            '-l',
-            '-C',
-            '-j',
-            '.text',
-            str(target[0]),
-            '>',
-            output
-        ]
-        print("Disassembling %s" % output)
+    input_file = str(target[0])
+    if input_file=='disassemble':
+        input_file=env.subst("$BUILD_DIR/${PROGNAME}.elf")
+    input_file = path.realpath(input_file)
+
+    try:
+        target_file = env.subst(env.GetProjectOption('custom_disassemble_target'))
+        if not target_file:
+            raise RuntimeError('disabled')
+    except:
+        verbose('custom_disassemble_target not defined')
+        return
+
+    try:
+        options = env.subst(env.GetProjectOption('custom_disassemble_options')).split(' ')
+    except:
+        options = ['-S', '-C']
+
+    if not path.exists(input_file):
+        error("no such file or directory: %s" % path.relpath(input_file))
+
+    project_dir = path.realpath(env.subst("$PROJECT_DIR"))
+    target_file = path.realpath(target_file)
+    args = [
+        'avr-objdump'
+    ] + options + [
+        input_file,
+        '>',
+        target_file
+    ]
+    click.echo('Writing disassembly to ', nl=False)
+    click.secho(path.relpath(target_file), fg='yellow')
+
+    if verbose_flag:
         print(' '.join(args))
-        subprocess.run(args, shell=True)
+
+    return_code = subprocess.run(args, shell=True).returncode
+    if return_code!=0:
+        error('Failed to disassemble binary: exit code %u: %s' % (return_code, ' '.join(args)))
+
 
 run_sfr_tool(None, None, env)
 
-env.AlwaysBuild(env.Alias("build_sfr_header", None, run_sfr_tool))
-env.AlwaysBuild(env.Alias("sfr_tool", None, run_sfr_tool))
-
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
+
+env.AlwaysBuild(env.Alias("sfr_tool", None, run_sfr_tool))
+env.AlwaysBuild(env.Alias("disassemble", None, disassemble))

@@ -232,7 +232,7 @@ write_code([
     '// Channels: %s' % pin_mapping.str(pins), 0,
     '#pragma once', 0,
     '#include <avr/io.h>', 0,
-    0
+    0,
 ])
 
 channel_to_port_sfr_io_addr = {}
@@ -273,6 +273,9 @@ write_code([
     '#endif', 0,
     0,
     '#define DIMMER_CHANNELS_NUM_PORTS', '\t', '%u' % len(ports), ' // %s' % ', '.join(ports), 0,
+    0,
+    'typedef uint8_t dimmer_enable_mask_t[DIMMER_CHANNELS_NUM_PORTS];', 0,
+    0
 ])
 
 port_range = range(0, len(ports))
@@ -283,33 +286,40 @@ for port_number in port_range:
     ])
 write_code()
 
-write_code([
-    '#define DIMMER_CHANNELS_APPLY_ENABLE_MASK(src)\\', 1,
-    '{\\', 1,
-    'uint8_t tmp[%u];\\' % len(ports)
-])
-for port_number in port_range:
-    write_code([0, 'tmp[%u] = %s | src[%u];\\' % (port_number, port_number_port[port_number], port_number)])
-for port_number in port_range:
-    write_code([0, '%s = tmp[%u];\\' % (port_number_port[port_number], port_number)])
-write_code([
-    -1,
-    '}', -1,
-    0
-])
+def write_apply_enable_mask(name, operation):
+    write_code([
+        '#define %s(src)\\' % name, 1,
+        '{\\', 1,
+        'uint8_t tmp[%u];\\' % len(ports)
+    ])
+    for port_number in port_range:
+        write_code([0, 'tmp[%u] = %s;\\' % (port_number, operation % (port_number_port[port_number], port_number))])
+    for port_number in port_range:
+        write_code([0, '%s = tmp[%u];\\' % (port_number_port[port_number], port_number)])
+    write_code([
+        -1,
+        '}', -1,
+        0
+    ])
 
-write_code(['#define DIMMER_CHANNELS_CLEAR_ENABLE_MASK(dst)', '\t', '{ ']);
+write_code(['// apply mask and set ports, interrupts need to be disabled during execution', 0])
+write_apply_enable_mask('DIMMER_CHANNELS_SET_ENABLE_MASK', '(%s | src[%u])')
+write_apply_enable_mask('DIMMER_CHANNELS_CLEAR_ENABLE_MASK', '(%s & ~src[%u])')
+
+write_code(['// clear mask and set all channels to 0', 0])
+write_code(['#define DIMMER_CHANNELS_ENABLE_MASK_CLEAR_CHANNELS(dst)', '\t', '{ ']);
 for port_number in port_range:
     write_code(['dst[%u] = 0; ' % (port_number)])
-write_code(['}', 0])
+write_code(['}', 0, 0])
 
-write_code(['#define DIMMER_CHANNELS_COPY_ENABLE_MASK(dst, src)', '\t', '{ ']);
+write_code(['// copy mask', 0])
+write_code(['#define DIMMER_CHANNELS_ENABLE_MASK_COPY(dst, src)', '\t', '{ ']);
 for port_number in port_range:
     write_code(['dst[%u] = src[%u]; ' % (port_number, port_number)])
-write_code(['}', 0])
+write_code(['}', 0, 0])
 
 write_code([
-    '#define DIMMER_CHANNELS_SET_ENABLE_MASK(dst, ch)\\', 1,
+    '#define DIMMER_CHANNELS_ENABLE_MASK_SET_CHANNEL(dst, ch)\\', 1,
     'switch(ch) {\\', 1
 ])
 for i in range(0, channel):
@@ -321,11 +331,7 @@ for i in range(0, channel):
     write_code(['break;\\'])
     if i!=channel - 1:
         write_code([-1])
-write_code([
-    -2,
-    '}', -1,
-    0
-])
+write_code([-2, '}', -1, 0])
 
 def write_set_channel(name, instr):
     write_code([
@@ -343,11 +349,7 @@ def write_set_channel(name, instr):
         ])
         if i!=channel - 1:
             write_code([-1])
-    write_code([
-        -2,
-        '}', -1,
-        0
-    ])
+    write_code([-2, '}', -1, 0])
 
 write_set_channel('DIMMER_CHANNELS_ENABLE_CHANNEL', 'sbi')
 

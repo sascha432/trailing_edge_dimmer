@@ -5,6 +5,10 @@
 #pragma once
 
 #include <Arduino.h>
+#include <util/atomic.h>
+#if DIMMER_USE_INLINE_ASM
+#include "dimmer_sfr.h"
+#endif
 
 #ifndef DIMMER_CUBIC_INTERPOLATION
 #define DIMMER_CUBIC_INTERPOLATION                              1
@@ -22,9 +26,19 @@
 #define DEBUG_FAULTS                                            0
 #endif
 
-#ifndef DEBUG_COMPARE_B_PIN
-// toggle pin each time the compare B interrupt gets called
-#define DEBUG_COMPARE_B_PIN                                     0
+// enable extra debugging to detect invalid states
+#ifndef DEBUG_STATISTICS
+#define DEBUG_STATISTICS                                        1
+#endif
+
+// internal signal generator on pin 11
+#ifndef DIMMER_SIGNAL_GENERATOR
+#define DIMMER_SIGNAL_GENERATOR                                 0
+#endif
+
+#ifndef DEBUG_PIN
+// extra pin for debug output
+#define DEBUG_PIN                                               0
 #endif
 
 #ifndef DIMMER_CUBIC_INT_TABLE_SIZE
@@ -43,6 +57,12 @@
 
 #ifndef ZC_SIGNAL_PIN
 #define ZC_SIGNAL_PIN                                           3
+#endif
+
+#if DIMMER_CHANNELS > 1
+#if !defined(DIMMER_USE_INLINE_ASM) || !DIMMER_USE_INLINE_ASM
+#warning For more than 1 channel it is recommended to activate inline assembler
+#endif
 #endif
 
 // a positive value adds a delay after the ZC interrupt, the ZC signal occurs before the actual ZC
@@ -118,6 +138,9 @@ static constexpr uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 // requires ~176-184 cpu cycles
 #define DIMMER_COMPARE_B_EXTRA_TICKS                            (512 / DIMMER_TIMER1_PRESCALER)
 
+// extra ticks before starting new halfwave
+#define DIMMER_COMPARE_A_EXTRA_TICKS                            (64 / DIMMER_TIMER1_PRESCALER)
+
 // extra clock cycles in Dimmer::_dimmingCycle()
 #define DIMMER_EXTRA_TICKS                                      ((64 / DIMMER_TIMER1_PRESCALER) + 1)
 
@@ -160,6 +183,7 @@ typedef struct {
     dimmer_level_t targetLevel;
 } dimmer_fade_t;
 
+
 typedef struct __attribute__packed__ {
     uint8_t channel;
     uint16_t ticks;
@@ -200,6 +224,10 @@ public:
     dimmer_channel_t *channel_ptr;
     dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];             // current dimming levels in ticks
     dimmer_channel_t ordered_channels_buffer[DIMMER_CHANNELS + 1];      // next dimming levels
+#if DIMMER_USE_INLINE_ASM
+    dimmer_enable_mask_t enable_channel_mask;
+    dimmer_enable_mask_t enable_channel_mask_buffer;
+#endif
 
 #if HAVE_FADE_COMPLETION_EVENT
     dimmer_level_t fadingCompleted[DIMMER_CHANNELS];
@@ -219,11 +247,11 @@ public:
         NEXT_HALFWAVE,      // waiting for next ZC interrupt
     };
 
-    static constexpr uint8_t _IFCAB  = 0;           // compare A/B lock
-    static constexpr uint8_t _IFZCI  = 1;           // ZC interrupt lock
-    static constexpr uint8_t _IFCHL  = 2;           // calculate channel lock
-    static constexpr uint8_t _IFCHA  = 3;           // calculate channel abort request
-    static constexpr uint8_t _IFOCA  = 4;           // compare A active
+    static constexpr uint8_t _IFOCB  = 0;           // compare B lock
+    static constexpr uint8_t _IFOCA  = 1;           // compare A lock
+    static constexpr uint8_t _IFZCI  = 2;           // ZC interrupt lock
+    static constexpr uint8_t _IFCHL  = 3;           // calculate channel lock
+    static constexpr uint8_t _IFCHA  = 4;           // calculate channel abort request
 
 public:
     Dimmer();
@@ -247,17 +275,11 @@ public:
     void addEvent(uint16_t counter);
 
     uint32_t getTicks(uint16_t counter);        // return ticks since last call
+    uint32_t getTicksNoRst(uint16_t counter);   // return ticks since last call of getTicks()
 
-#if HAVE_ASM_CHANNELS
-
-    #include "dimmer_inline_asm.h"
-
-#else
     // toggle mosfet gates
     void enableChannel(dimmer_channel_id_t channel);
     void disableChannel(dimmer_channel_id_t channel);
-
-#endif
 
     uint16_t getChannel(dimmer_level_t level) const;    // returns level in ticks or 0xffff for 100%
 
@@ -294,6 +316,42 @@ private:
         return _intFlags & _BV(_IFCHA);
     }
 
+    // other helpers
+    inline void _lockCompareA() {
+        _intFlags |= _BV(_IFOCA);
+    }
+    inline void _unlockCompareA() {
+        _intFlags &= ~_BV(_IFOCA);
+    }
+    inline bool  _isCompareALocked() const {
+        return _intFlags & _BV(_IFOCA);
+    }
+
+    inline void _lockCompareB() {
+        _intFlags |= _BV(_IFOCB);
+    }
+    inline void _unlockCompareB() {
+        _intFlags &= ~_BV(_IFOCB);
+    }
+    inline bool _isCompareBLocked() const {
+        return _intFlags & _BV(_IFOCB);
+    }
+
+    inline void _lockZC() {
+        _intFlags |= _BV(_IFZCI);
+    }
+    inline void _unlockZC() {
+        _intFlags &= ~_BV(_IFZCI);
+    }
+    inline bool _isZCLocked() const {
+        return _intFlags & _BV(_IFZCI);
+    }
+
+public:
+    inline bool _isOvfPending() const {
+        return TIFR1 & _BV(TOV1);
+    }
+
 public:
     // interrupt handler
     void _zcHandler(uint16_t counter);
@@ -323,17 +381,27 @@ private:
 
     volatile uint16_t _prevOCR1B;
     volatile uint16_t _dcOCR1A;
+    volatile uint8_t _startCounter;
+    volatile uint8_t _endCounter;
 #endif
 
 private:
     volatile StateEnum _state;
+    volatile uint16_t _startOCR1A;
+    volatile uint8_t _missedZCCounter;
     volatile uint8_t _intFlags;
     float _halfwaveTicksIntegral;
 
-#if !HAVE_ASM_CHANNELS
+#if !DIMMER_USE_INLINE_ASM
     volatile uint8_t *_pinsAddr[DIMMER_CHANNELS];
     uint8_t _pinsMask[DIMMER_CHANNELS];
 #endif
 };
 
 extern Dimmer dimmer;
+
+#if DEBUG_STATISTICS
+
+#include "dimmer_stats.h"
+
+#endif

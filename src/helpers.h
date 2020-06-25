@@ -109,3 +109,10 @@ int Serial_printf_P(PGM_P format, ...);
 bool Serial_readLine(String &input, bool allowEmpty);
 int Serial_print_float(double value, uint8_t max_precision = FLT_DIG, uint8_t max_decimals = 8);
 int count_decimals(double value, uint8_t max_precision = FLT_DIG, uint8_t max_decimals = 8);
+
+template <typename T>
+inline void swap(T &a, T &b) {
+    T c = a;
+    a = b;
+    b = c;
+};

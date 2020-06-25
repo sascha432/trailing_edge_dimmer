@@ -42,9 +42,21 @@ int Serial_print_float(double value, uint8_t max_precision, uint8_t max_decimals
     return Serial.print(value, count_decimals(value, max_precision, max_decimals));
 }
 
+void Serial_write(const char *ptr, int len)
+{
+    while(len > 0) {
+        int wlen = len;
+        if (Serial.availableForWrite() < wlen) {
+            wlen = Serial.availableForWrite();
+        }
+        int written = Serial.write(ptr, wlen);
+        ptr += written;
+        len -= written;
+    }
+}
 
 int Serial_printf(const char *format, ...) {
-    char buf[64];
+    char buf[128];
     char *temp = buf;
     va_list arg;
     va_start(arg, format);
@@ -56,9 +68,7 @@ int Serial_printf(const char *format, ...) {
         }
         len = vsnprintf(temp, len, format, arg);
     }
-    if (len > 0) {
-        Serial.write(reinterpret_cast<const char *>(temp), len);
-    }
+    Serial_write(temp, len);
     if (temp != buf) {
         free(temp);
     }
@@ -67,7 +77,7 @@ int Serial_printf(const char *format, ...) {
 }
 
 int Serial_printf_P(PGM_P format, ...) {
-    char buf[64];
+    char buf[128];
     char *temp = buf;
     va_list arg;
     va_start(arg, format);
@@ -79,9 +89,7 @@ int Serial_printf_P(PGM_P format, ...) {
         }
         len = vsnprintf_P(temp, len, format, arg);
     }
-    if (len > 0) {
-        Serial.write(reinterpret_cast<const char *>(temp), len);
-    }
+    Serial_write(temp, len);
     if (temp != buf) {
         free(temp);
     }
