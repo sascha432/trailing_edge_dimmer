@@ -104,6 +104,10 @@ typedef struct {
 uint8_t *get_signature(uint8_t *sig);
 void get_mcu_type(MCUInfo_t &info);
 
+// println + flush
+void Serial_println(const char *str);
+void Serial_println(const __FlashStringHelper *str);
+
 int Serial_printf(const char *format, ...);
 int Serial_printf_P(PGM_P format, ...);
 bool Serial_readLine(String &input, bool allowEmpty);

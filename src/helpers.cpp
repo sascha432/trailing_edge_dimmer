@@ -38,24 +38,55 @@ int count_decimals(double value, uint8_t max_precision, uint8_t max_decimals) {
     return precision;
 }
 
-int Serial_print_float(double value, uint8_t max_precision, uint8_t max_decimals) {
+int Serial_print_float(double value, uint8_t max_precision, uint8_t max_decimals)
+{
     return Serial.print(value, count_decimals(value, max_precision, max_decimals));
 }
 
 void Serial_write(const char *ptr, int len)
 {
-    while(len > 0) {
-        int wlen = len;
-        if (Serial.availableForWrite() < wlen) {
-            wlen = Serial.availableForWrite();
-        }
-        int written = Serial.write(ptr, wlen);
-        ptr += written;
-        len -= written;
+    while(len--) {
+        Serial.write(*ptr++);
     }
+    // // make sure we have enough space
+    // if (len > Serial.availableForWrite()) {
+    //     Serial.flush();
+    // }
+    // if (len > Serial.availableForWrite()) {
+    //     Serial.println(F("Serial_printf size exceeds serial buffer"));
+    //     Serial.println(len);
+    //     Serial.println(Serial.availableForWrite());
+    //     for(;;) {}
+    // }
+    // if (Serial.write(ptr, len)) {
+    //     Serial.flush();
+    // }
+
+    // while(len > 0) {
+    //     int wlen = len;
+    //     if (Serial.availableForWrite() < wlen) {
+    //         wlen = Serial.availableForWrite();
+    //     }
+    //     int written = Serial.write(ptr, wlen);
+    //     ptr += written;
+    //     len -= written;
+    // }
 }
 
-int Serial_printf(const char *format, ...) {
+void Serial_println(const char *str)
+{
+    Serial.println(str);
+    Serial.flush();
+}
+
+void Serial_println(const __FlashStringHelper *str)
+{
+    Serial.println(str);
+    Serial.flush();
+}
+
+int Serial_printf(const char *format, ...)
+{
     char buf[128];
     char *temp = buf;
     va_list arg;
@@ -68,11 +99,11 @@ int Serial_printf(const char *format, ...) {
         }
         len = vsnprintf(temp, len, format, arg);
     }
+    va_end(arg);
     Serial_write(temp, len);
     if (temp != buf) {
         free(temp);
     }
-    va_end(arg);
     return len;
 }
 
@@ -89,11 +120,11 @@ int Serial_printf_P(PGM_P format, ...) {
         }
         len = vsnprintf_P(temp, len, format, arg);
     }
+    va_end(arg);
     Serial_write(temp, len);
     if (temp != buf) {
         free(temp);
     }
-    va_end(arg);
     return len;
 }
 

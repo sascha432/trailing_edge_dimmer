@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <util/atomic.h>
+#include "ArduinoEEPROMConfig.h"
 #if DIMMER_USE_INLINE_ASM
 #include "dimmer_sfr.h"
 #endif
@@ -39,10 +40,6 @@
 #ifndef DEBUG_PIN
 // extra pin for debug output
 #define DEBUG_PIN                                               0
-#endif
-
-#ifndef DIMMER_CUBIC_INT_TABLE_SIZE
-#define DIMMER_CUBIC_INT_TABLE_SIZE                             8
 #endif
 
 #ifndef DIMMER_SIMULATE_ZC
@@ -200,7 +197,7 @@ typedef struct __attribute__packed__ {
 #define INVALID_LEVEL                                           -1
 
 #if DIMMER_I2C_SLAVE
-#define dimmer_level(ch)        register_mem.data.level[ch]
+#define dimmer_level(ch)        register_mem.data.channels.level[ch]
 #define dimmer_config           register_mem.data.cfg
 #else
 #define dimmer_level(ch)        dimmer.level[ch]
@@ -215,7 +212,7 @@ public:
 #if !DIMMER_I2C_SLAVE
     dimmer_level_t level[DIMMER_CHANNELS];                              // current level
     struct {
-        uint8_t zero_crossing_delay_ticks;
+        int16_t zc_offset_ticks;
         uint16_t minimum_on_time_ticks;
         uint16_t adjust_halfwave_time_ticks;
     } cfg;
@@ -287,12 +284,16 @@ public:
     void setLevel(dimmer_channel_id_t channel, dimmer_level_t level);
     dimmer_level_t getLevel(dimmer_channel_id_t channel) const;
 
+    // copy levels for all channels
+    void copyLevels(WearLevelData_t &settings);
+
     void setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time = false);
     inline void setFadeTo(dimmer_channel_id_t channel, dimmer_channel_id_t to_level, float time_in_seconds, bool absolute_time = false) {
         setFade(channel, DIMMER_FADE_FROM_CURRENT_LEVEL, to_level, time_in_seconds, absolute_time);
     }
 
 private:
+    void _setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time = false);
     void _applyFading();
     void _calculateChannels();
 

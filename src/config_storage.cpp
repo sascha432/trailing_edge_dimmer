@@ -3,128 +3,141 @@
  */
 
 #include "main.h"
-#include "crc16.h"
-#include <EEPROM.h>
+#include "dimmer.h"
+#include <ArduinoEEPROM.h>
+#if DIMMER_CUBIC_INTERPOLATION
+#include "cubic_interpolation.h"
+#endif
 
 ConfigStorage config;
 
+void ConfigStorage::Configuration::restoreFactoryDefaults()
+{
+    register_mem.data.cfg = {};
+    register_mem.data.cfg.max_temperature = DIMMER_MAX_TEMP;
+    register_mem.data.cfg.bits.factory_settings = true;
+    register_mem.data.cfg.bits.restore_level = true;
+    register_mem.data.cfg.bits.report_metrics = true;
+#if DIMMER_CUBIC_INTERPOLATION
+    register_mem.data.cfg.bits.cubic_interpolation = true;
+    cubicInterpolation.clearTable();
+#endif
+    register_mem.data.cfg.fade_time = 7.5;
+    register_mem.data.cfg.temp_check_interval = 2;
+    register_mem.data.cfg.metrics_report_interval = 10;
+    register_mem.data.cfg.zc_offset_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_ZC_DELAY_US);
+    register_mem.data.cfg.min_on_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_MIN_ON_TIME_US);
+    register_mem.data.cfg.min_off_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_MAX_ON_TIME_US);
+    register_mem.data.cfg.vref11 = INTERNAL_VREF_1_1V;
+#ifdef INTERNAL_TEMP_OFS
+    register_mem.data.cfg.temperature_offset = INTERNAL_TEMP_OFS;
+#endif
+}
+
+void ConfigStorage::Settings::copyFrom()
+{
+    if (register_mem.data.cfg.bits.restore_level) {
+        FOR_CHANNELS(i) {
+            dimmer.setFade(i, DIMMER_FADE_FROM_CURRENT_LEVEL, _cfg.level[i], register_mem.data.cfg.fade_time);
+        }
+    }
+    register_mem.data.errors = _cfg.errors;
+}
+
+void ConfigStorage::Settings::copyTo()
+{
+    dimmer.copyLevels(_cfg);
+    _cfg.errors = register_mem.data.errors;
+}
+
+WearLevelData_t &ConfigStorage::Settings::getConfig()
+{
+    return _cfg;
+}
+
+
 ConfigStorage::ConfigStorage() : cfg(register_mem.data.cfg)
 {
-    clear();
 }
 
-void ConfigStorage::clear()
+void ConfigStorage::_eraseEEPROM()
 {
-    eeprom_cycle = 0;
-    crc16 = 0;
-    bzero(level, sizeof(level));
+    Serial.println(F("+REM=Intitializing EEPROM"));
+    _eeprom.eraseAndInitialize(ArduinoEEPROM::DataTypeEnum::ALL);
 }
 
-void ConfigStorage::read(size_t position)
+void ConfigStorage::restoreFactorySettings()
 {
-    EEPROM.get(position, eeprom_cycle);
-    position += sizeof(eeprom_cycle);
-    EEPROM.get(position, crc16);
-    position += sizeof(crc16);
-    EEPROM.get(position, level);
-    position += sizeof(level);
+    ConfigStorage::Settings settings;
+    _read(settings, true);
+}
+
+void ConfigStorage::read(ConfigStorage::Settings &settings)
+{
+    _read(settings);
+}
+
+void ConfigStorage::_read(ConfigStorage::Settings &settings, bool restoreFactory)
+{
 #if DIMMER_CUBIC_INTERPOLATION
-    {
-        register_mem_cubic_int_t tmp_cubic_int[DIMMER_CHANNELS];
-        EEPROM.get(position, tmp_cubic_int);
-        memcpy(register_mem.data.cubic_int, tmp_cubic_int, sizeof(tmp_cubic_int));
-        position += sizeof(tmp_cubic_int);
-    }
+    StaticData_t staticData;
+#else
+    StaticData_t &staticData = *reinterpret_cast<StaticData_t *>(&register_mem.data.cfg);
 #endif
-    EEPROM.get(position, register_mem.data.cfg);
-}
 
-size_t ConfigStorage::write(size_t position)
-{
-    EEPROM.put(position, eeprom_cycle);
-    position += sizeof(eeprom_cycle);
-    EEPROM.put(position, crc16);
-    position += sizeof(crc16);
-    EEPROM.put(position, level);
-    position += sizeof(level);
+    // read configuration
+    if (restoreFactory == false && _eeprom.readStaticData(staticData)) {
+
 #if DIMMER_CUBIC_INTERPOLATION
-    {
-        register_mem_cubic_int_t tmp_cubic_int[DIMMER_CHANNELS];
-        memcpy(tmp_cubic_int, register_mem.data.cubic_int, sizeof(tmp_cubic_int));
-        EEPROM.put(position, tmp_cubic_int);
-        position += sizeof(tmp_cubic_int);
-    }
+        memcpy(&register_mem.data.cfg, &staticData.cfg, sizeof(register_mem.data.cfg));
+        FOR_CHANNELS(i) {
+            cubicInterpolation.copyFromConfig(staticData.cubic_int[i], i);
+        }
 #endif
-    EEPROM.put(position, register_mem.data.cfg);
-    position += sizeof(register_mem.data.cfg);
-    return position;
-}
 
-bool ConfigStorage::compare(size_t position)
-{
-    {
-        uint32_t tmp_eeprom_cycle;
-        EEPROM.get(position, tmp_eeprom_cycle);
-        if (tmp_eeprom_cycle != eeprom_cycle) {
-            return false;
+        // read settings
+        if (!_eeprom.readWearLevelData(settings.getConfig())) {
+            // invalid settings, clear wear leveling area
+            settings = Settings();
+            _eeprom.eraseAndInitialize(ArduinoEEPROM::DataTypeEnum::WEAR_LEVEL_DATA);
+            _eeprom.writeWearLevelData(settings.getConfig());
         }
-        position += sizeof(tmp_eeprom_cycle);
     }
-    {
-        uint16_t tmp_crc16;
-        EEPROM.get(position, tmp_crc16);
-        if (tmp_crc16 != crc16) {
-            return false;
-        }
-        position += sizeof(tmp_crc16);
-    }
-    {
-        int16_t tmp_level[DIMMER_CHANNELS];
-        EEPROM.get(position, tmp_level);
-        if (memcmp(tmp_level, level, sizeof(tmp_level))) {
-            return false;
-        }
-        position += sizeof(tmp_level);
-    }
+    else {
+        // invalid configuration, initialize entire EEPROM
+        _eraseEEPROM();
+        Configuration::restoreFactoryDefaults();
 #if DIMMER_CUBIC_INTERPOLATION
-    {
-        register_mem_cubic_int_t tmp_cubic_int[DIMMER_CHANNELS];
-        EEPROM.get(position, tmp_cubic_int);
-        if (memcmp(tmp_cubic_int,&register_mem.data.cubic_int, sizeof(tmp_cubic_int))) {
-            return false;
-        }
-        position += sizeof(tmp_cubic_int);
-    }
+        memcpy(&staticData.cfg, &register_mem.data.cfg, sizeof(register_mem.data.cfg));
+        memset(staticData.cubic_int, 0xff, sizeof(staticData.cubic_int));
 #endif
-    {
-        auto ptr = reinterpret_cast<const uint8_t *>(&register_mem.data.cfg);
-        for(size_t i = 0; i < sizeof(register_mem.data.cfg); i++)  {
-            auto data = EEPROM.read(position);
-            if (*ptr++ != data) {
-                return false;
-            }
-            position++;
-        }
+
+        settings = Settings();
+        _eeprom.writeStaticData(staticData);
+        _eeprom.writeWearLevelData(settings.getConfig());
+
     }
-    return true;
 }
 
-void ConfigStorage::copyLevels()
+void ConfigStorage::writeSettings()
 {
-    memcpy(level, register_mem.data.level, sizeof(level));
+    ConfigStorage::Settings settings;
+    settings.copyTo();
+    _eeprom.writeWearLevelData(settings.getConfig());
 }
 
-uint16_t ConfigStorage::crc() const
+void ConfigStorage::writeConfiguration()
 {
-    uint16_t crc = crc16_update(~0, reinterpret_cast<const uint8_t *>(&register_mem.data.cfg), sizeof(register_mem.data.cfg));
-    crc = crc16_update(crc, reinterpret_cast<const uint8_t *>(level), sizeof(level));
 #if DIMMER_CUBIC_INTERPOLATION
-    crc = crc16_update(crc, reinterpret_cast<const uint8_t *>(register_mem.data.cubic_int), cubicIntSize());
+    StaticData_t staticData;
+    memcpy(&staticData.cfg, &register_mem.data.cfg, sizeof(register_mem.data.cfg));
+    FOR_CHANNELS(i) {
+        cubicInterpolation.copyToConfig(staticData.cubic_int[i], i);
+    }
+#else
+    StaticData_t &staticData = *reinterpret_cast<StaticData_t *>(&register_mem.data.cfg);
 #endif
-    return crc;
-}
 
-void ConfigStorage::updateCrc()
-{
-    crc16 = crc();
+    register_mem.data.cfg.bits.factory_settings = false;
+    _eeprom.writeStaticData(staticData);
 }

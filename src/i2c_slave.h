@@ -8,17 +8,6 @@
 #include "main.h"
 #include "dimmer_protocol.h"
 #include "helpers.h"
-
-#if SERIAL_I2C_BRDIGE
-
-#include "SerialTwoWire.h"
-
-#else
-
-#include <Wire.h>
-
-#endif
-
 #include "config_storage.h"
 
 void dimmer_i2c_slave_setup();

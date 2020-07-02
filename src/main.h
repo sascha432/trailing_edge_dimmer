@@ -7,6 +7,11 @@
 #include <util/atomic.h>
 #include "dimmer.h"
 #include "i2c_slave.h"
+#if SERIAL_I2C_BRDIGE
+#include "SerialTwoWire.h"
+#else
+#include <Wire.h>
+#endif
 
 #if DIMMER_I2C_SLAVE && DIMMER_CHANNELS > 8
 #error I2C is limited to 8 channels
@@ -71,28 +76,29 @@
 #ifndef PRINT_METRICS_REPEAT
 #define PRINT_METRICS_REPEAT                    5000
 #endif
-
 // write EEPROM after a delay in milliseconds
 #define EEPROM_WRITE_DELAY                      500
 // if writing is requested multiple times within this period, increase delay to the same time
-#define EEPROM_REPEATED_WRITE_DELAY             5000
+#define EEPROM_REPEATED_WRITE_DELAY             1000
+
+// size with old eeprom lib 28258
 
 void rem(); // print "+REM="
-
-void read_config();
 void write_config();
-void init_eeprom();
-void _write_config(bool force = false);
-void reset_config();
-void bzero(void *ptr, size_t size);
 
-typedef struct {
-    uint8_t readVCC: 1;
-    uint8_t readIntTemp: 1;
-    uint8_t readNTCTemp: 1;
-    uint8_t writeEEPROM: 1;
-    uint8_t printMetrics: 1;
-} dimmer_scheduled_calls_t;
+
+class dimmer_scheduled_calls_t {
+public:
+    dimmer_scheduled_calls_t() = default;
+    struct {
+        uint8_t readVCC: 1;
+        uint8_t readIntTemp: 1;
+        uint8_t readNTCTemp: 1;
+        uint8_t writeEEPROM: 1;
+        uint8_t printMetrics: 1;
+        uint8_t fadingCompleted: 1;
+    };
+};
 
 //  // bitset
 //  typedef enum : dimmer_scheduled_calls_t {
@@ -111,6 +117,16 @@ extern unsigned long print_metrics_timeout;
 #endif
 
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
+
+template<class T>
+uint8_t Wire_read(T &data) {
+    return Wire.readBytes(reinterpret_cast<uint8_t *>(&data), sizeof(data));
+}
+
+template<class T>
+uint8_t Wire_write(T &data) {
+    return Wire.write(reinterpret_cast<const uint8_t *>(&data), sizeof(data));
+}
 
 #if HAVE_READ_INT_TEMP
 float get_internal_temperature();

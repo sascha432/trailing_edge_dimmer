@@ -52,11 +52,8 @@ Dimmer::Dimmer() : dimmer_t(), _halfwaveTicks(0), _cycleCounter(0), _state(State
     for(int j = 0; j < 8; j++) {
         for(int i = 0; i < 16; i++) {
             Serial_printf_P(PSTR("#if xBI_CHANNEL%u==%u\n"), j, i);
-            Serial.flush();
             Serial_printf_P(PSTR("    #define xBI_ARGS_CHANNEL%u \"0x%02x,%d\"\n"), j, portOutputRegister(digitalPinToPort(i)) - __SFR_OFFSET, _BV2B(digitalPinToBitMask(i)));
-            Serial.flush();
-            Serial.println(F("#endif"));
-            Serial.flush();
+            Serial_println(F("#endif"));
         }
     }
 #endif
@@ -68,7 +65,6 @@ Dimmer::Dimmer() : dimmer_t(), _halfwaveTicks(0), _cycleCounter(0), _state(State
         _D(5,
             {
                 Serial_printf_P(PSTR("Channel %u, pin %u, address %02x, mask %02x\n"), i, dimmer_pins[i], _pinsAddr[i], _pinsMask[i]);
-                Serial.flush();
             }
         );
     }
@@ -102,10 +98,11 @@ void Dimmer::enableTimer1() const
 
 float Dimmer::getFrequency() const
 {
-    if (_halfwaveTicks) {
-        return (F_CPU / DIMMER_TIMER1_PRESCALER / 2) / (float)_halfwaveTicks;
-    }
-    return NAN;
+    // if (_halfwaveTicks) {
+    //     return (F_CPU / DIMMER_TIMER1_PRESCALER / 2) / (float)_halfwaveTicks;
+    // }
+    // return NAN;
+    return register_mem.data.metrics.frequency;
 }
 
 bool Dimmer::measure(uint16_t timeout)
@@ -118,6 +115,7 @@ bool Dimmer::measure(uint16_t timeout)
         _halfwaveTicks = 0;
         _cycleCounter = 0;
     }
+    register_mem.data.metrics.frequency = NAN;
 
     uint32_t end = millis() + timeout;
     while(_halfwaveTicks == 0) {
@@ -141,6 +139,8 @@ void Dimmer::addEvent(uint16_t counter)
             uint32_t ticks = getTicks(counter);
             _halfwaveTicks = ticks / _cycleCounter;
             _halfwaveTicksIntegral = _halfwaveTicks;
+
+            register_mem.data.metrics.frequency = (F_CPU / DIMMER_TIMER1_PRESCALER / 2) / (float)_halfwaveTicks;
 
             _D(5,
                 Serial_printf_P(PSTR("measure %lu hw %u zcmt %lu\n"), (long)ticks, _halfwaveTicks, (long)clockCyclesToMicroseconds(_halfwaveTicks * (94UL * DIMMER_TIMER1_PRESCALER)) / 100)
@@ -291,7 +291,7 @@ uint16_t Dimmer::getChannel(dimmer_level_t level) const
     if (ticks < dimmer_config.min_on_ticks) {
         return dimmer_config.min_on_ticks;
     }
-    uint16_t max = _halfwaveTicks - dimmer_config.max_on_ticks;
+    uint16_t max = _halfwaveTicks - dimmer_config.min_off_ticks;
     if (ticks >= max) {
         return 0xffff;
     }
@@ -354,7 +354,7 @@ void Dimmer::_zcHandler(uint16_t counter)
     else {
 
         uint16_t endTicks = _halfwaveTicks + counter;
-        endTicks += dimmer_config.zero_crossing_delay_ticks; // add zero crossing delay
+        endTicks += dimmer_config.zc_offset_ticks; // add zero crossing delay
         endTicks -= DIMMER_COMPARE_B_EXTRA_TICKS;
 
         // wait until compare B is unlocked
@@ -568,7 +568,6 @@ void Dimmer::_dimmingCycle(uint16_t startOCR1A)
             //     uint16_t ticks = tmp;
             //     if (round(ticks / 2000.0) != round(ordered_channels[i].ticks / 2000.0)) { // compare if ticks and OCR1A roughly match
             //         Serial_printf("\nnum=%u,ch=%d,ticks=%d,OCR1A=%u\n", i, channel, ordered_channels[i].ticks, ticks);
-            //         Serial.flush();
             //         Serial_printf("c32=%lu,t32=%lu\n", __counter,__trigger);
             //         Serial_printf("c=%u,t=%u,d=%u\n", (uint16_t)__counter,(uint16_t)__trigger,__diff);
             //         _fault("invalid ticks");

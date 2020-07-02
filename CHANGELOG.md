@@ -12,6 +12,9 @@
 - Removed linear correction
 - Changes in I2C protcol and register memory (not compatible with 2.x)
 - Inline assembler code generation to improve switching times
+- Improved EEPROM wear leveling, data integry checks and redundancy ([ArduinoEEPROM](TODO))
+- Fixed storing channel levels while fading
+- GUI configuration tool
 
 ## 2.1.4
 

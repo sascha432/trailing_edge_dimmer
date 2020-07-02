@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 #
 # Author: sascha_lammers@gmx.de
 #

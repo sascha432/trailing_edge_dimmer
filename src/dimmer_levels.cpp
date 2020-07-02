@@ -5,13 +5,6 @@
 #include "main.h"
 #include "cubic_interpolation.h"
 
-template <typename T>
-inline void swap(T &a, T &b) {
-    T c = a;
-    a = b;
-    b = c;
-};
-
 static inline void dimmer_bubble_sort(dimmer_channel_t channels[], dimmer_channel_id_t count)
 {
    dimmer_channel_id_t i, j;
@@ -73,11 +66,16 @@ void Dimmer::_calculateChannels()
 #endif
 
     dimmer_channel_t ordered_channels_tmp[DIMMER_CHANNELS + 1];
+#if DIMMER_USE_INLINE_ASM
+    dimmer_enable_mask_t enable_channel_mask_tmp;
+    DIMMER_CHANNELS_CLEAR_ENABLE_MASK(enable_channel_mask_tmp);
+#endif
+
     // using a counter and pointer is a lot faster than accessing the array with the counter or calculating the count from the pointer address
     dimmer_channel_id_t count = 0;
     auto channel_ptr = ordered_channels_tmp;
 
-    bzero(ordered_channels_tmp, sizeof(ordered_channels_tmp));
+    memset(ordered_channels_tmp, 0, sizeof(ordered_channels_tmp));
 
     FOR_CHANNELS(i) {
         if (_isAbortCalc()) {
@@ -98,6 +96,9 @@ void Dimmer::_calculateChannels()
             channel_ptr->channel = i;
             channel_ptr->ticks = ticks;
             channel_ptr++;
+#if DIMMER_USE_INLINE_ASM
+            DIMMER_CHANNELS_ENABLE_MASK_SET_CHANNEL(enable_channel_mask_tmp, i);
+#endif
             count++;
         }
     }
@@ -125,6 +126,11 @@ void Dimmer::_calculateChannels()
     ATOMIC_BLOCK(ATOMIC_FORCEON) {
         // copy double buffer with interrupts disabled
         memcpy(ordered_channels_buffer, ordered_channels_tmp, sizeof(ordered_channels_buffer));
+
+#if DIMMER_USE_INLINE_ASM
+        DIMMER_CHANNELS_ENABLE_MASK_COPY(enable_channel_mask_buffer, enable_channel_mask_tmp);
+#endif
+
 #if 0
         if (dimmer_is_fading()) {
             auto dur = micros() - start;
@@ -142,10 +148,18 @@ void Dimmer::_calculateChannels()
 
 void Dimmer::setLevel(dimmer_channel_id_t channel, dimmer_level_t level)
 {
-    dimmer_level(channel) = dimmer_normalize_level(level);
-
-    fade[channel].count = 0; // disable fading for this channel
-    fadingCompleted[channel] = INVALID_LEVEL;
+    if (channel == -1) {
+        FOR_CHANNELS(channel) {
+            dimmer_level(channel) = dimmer_normalize_level(level);
+            fade[channel].count = 0; // disable fading for this channel
+            fadingCompleted[channel] = INVALID_LEVEL;
+        }
+    }
+    else {
+        dimmer_level(channel) = dimmer_normalize_level(level);
+        fade[channel].count = 0; // disable fading for this channel
+        fadingCompleted[channel] = INVALID_LEVEL;
+    }
 
     _calculateChannels();
 
@@ -164,7 +178,30 @@ dimmer_level_t Dimmer::getLevel(dimmer_channel_id_t channel) const
     return dimmer_level(channel);
 }
 
+void Dimmer::copyLevels(WearLevelData_t &settings)
+{
+    FOR_CHANNELS(i) {
+        if (fade[i].count) {
+            settings.level[i] = fade[i].targetLevel;
+        } else {
+            settings.level[i] = dimmer_level(i);
+        }
+    }
+}
+
 void Dimmer::setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time)
+{
+    if (channel == -1) {
+        FOR_CHANNELS(channel) {
+            _setFade(channel, from, to, time, absolute_time);
+        }
+    }
+    else {
+        _setFade(channel, from, to, time, absolute_time);
+    }
+}
+
+void Dimmer::_setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_level_t to, float time, bool absolute_time)
 {
     float diff;
     auto &fade = this->fade[channel];
@@ -209,6 +246,7 @@ void Dimmer::_applyFading()
                     dimmer_level(i) = dimmer_normalize_level(fade.targetLevel);
 #if HAVE_FADE_COMPLETION_EVENT
                     fadingCompleted[i] = dimmer_level(i);
+                    dimmer_scheduled_calls.fadingCompleted = true;
 #endif
                 } else {
                     dimmer_level(i) = dimmer_normalize_level(fade.level);
@@ -216,7 +254,7 @@ void Dimmer::_applyFading()
             }
 #if DEBUG
             if (fade.count % 60 == 0) {
-                _D(5, debug_printf_P(PSTR("Fading channel %u: %u ticks %.2f\n"), i, dimmer_level(i), DIMMER_GET_TICKS(DIMMER_LINEAR_LEVEL(dimmer_level(i), i))));
+                _D(5, debug_printf_P(PSTR("Fading channel %u: %u ticks %.2f\n"), i, dimmer_level(i), dimmer.getChannel(DIMMER_LINEAR_LEVEL(dimmer_level(i), i))));
             }
 #endif
         }
