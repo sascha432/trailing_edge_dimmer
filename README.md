@@ -52,6 +52,12 @@ Version 2 or without inline assembler
 
 ![Version 2](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/turn_on_default.png)
 
+## GUI tool for configuration
+
+I created a GUI tool to calibrate, configure and monitor the dimmer via serial port, TCP or web sockets.
+
+![GUI tool edit cubic interpolation curve](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/gui_cubic_curve.jpg)
+
 ## New and improved in-wall dimmer STL files
 
 I have improved and updated the housing for the in-wall dimmer and added print instructions.
