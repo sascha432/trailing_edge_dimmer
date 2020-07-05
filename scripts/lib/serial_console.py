@@ -3,6 +3,7 @@
 #
 
 import tkinter
+import math
 
 class SerialConsole(object):
 
@@ -17,7 +18,10 @@ class SerialConsole(object):
 
     def write(self, message):
         if self.text:
-            self.text.insert(tkinter.INSERT, message)
-            self.text.see(tkinter.END)
+            self.text.insert(tkinter.END, message)
+            if self.auto_scroll:
+                self.text.see(tkinter.END)
 
-
+    def write_hb(self, message, width=78):
+        hb = (width - len(message)) / 2.0
+        self.write('%s %s %s\n' % ('=' * math.floor(hb), message, '=' * math.ceil(hb)))

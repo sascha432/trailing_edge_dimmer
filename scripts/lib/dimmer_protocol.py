@@ -1,3 +1,4 @@
+# AUTO GENERATED FILE - DO NOT MODIFY
 #
 # Author: sascha_lammers@gmx.de
 #
@@ -5,10 +6,11 @@
 class DimmerProtocol(object):
     def __init__(self):
         self.register_mem_info_t = {
-            '__SIZE': 5,
+            '__SIZE': 6,
             'version': 'H',
             'num_levels': 'h',
             'num_channels': 'b',
+            'options': 'B',
         }
         self.register_mem_command_t = {
             '__SIZE': 2,
@@ -16,7 +18,7 @@ class DimmerProtocol(object):
             'read_length': 'b',
         }
         self.register_mem_t = {
-            '__SIZE': 85,
+            '__SIZE': 87,
             'points': { 
                 'x': 'B',
                 'y': 'B',
@@ -59,9 +61,11 @@ class DimmerProtocol(object):
             'level': [ 'h', 'h', 'h', 'h', 'h', 'h', 'h', 'h',  ],
             'zc_misfire': 'B',
             'temperature': 'B',
+            'i2c_errors': 'B',
             'version': 'H',
             'num_levels': 'h',
             'num_channels': 'b',
+            'options': 'B',
             'address': 'B',
         }
         self.register_mem_metrics_t = {
@@ -104,16 +108,23 @@ class DimmerProtocol(object):
             "REGISTER_CFG_TEMPERATURE2_OFFSET": 60,
             "REGISTER_ERRORS_ZC_MISFIRE": 77,
             "REGISTER_ERRORS_TEMPERATURE": 78,
-            "REGISTER_INFO_VERSION": 79,
-            "REGISTER_INFO_NUM_LEVELS": 81,
-            "REGISTER_INFO_NUM_CHANNELS": 83,
-            "REGISTER_ADDRESS": 84,
-            "REGISTER_MEM_SIZE": 85,
+            "REGISTER_ERRORS_I2C_ERRORS": 79,
+            "REGISTER_INFO_VERSION": 80,
+            "REGISTER_INFO_NUM_LEVELS": 82,
+            "REGISTER_INFO_NUM_CHANNELS": 84,
+            "REGISTER_INFO_OPTIONS": 85,
+            "REGISTER_ADDRESS": 86,
+            "REGISTER_MEM_SIZE": 87,
             "REGISTER_COMMAND": "DIMMER_REGISTER_CMD_COMMAND",
             "OPTIONS_FACTORY_SETTINGS": 1,
             "OPTIONS_CUBIC_INTERPOLATION": 2,
             "OPTIONS_REPORT_METRICS": 4,
             "OPTIONS_RESTORE_LEVEL": 8,
+            "OPTIONS_INFO_HAS_CUBIC_INTERPOLATION": 1,
+            "OPTIONS_INFO_HAS_TEMPERATURE": 2,
+            "OPTIONS_INFO_HAS_TEMPERATURE2": 4,
+            "OPTIONS_INFO_HAS_VCC": 8,
+            "OPTIONS_INFO_HAS_FADING_COMPLETED_EVENT": 16,
             "COMMAND_SET_LEVEL": 16,
             "COMMAND_FADE": 17,
             "COMMAND_READ_CHANNELS": 18,
@@ -121,6 +132,7 @@ class DimmerProtocol(object):
             "COMMAND_READ_TEMPERATURE2": 33,
             "COMMAND_READ_VCC": 34,
             "COMMAND_READ_FREQUENCY": 35,
+            "COMMAND_READ_METRICS": 36,
             "COMMAND_WRITE_SETTINGS": 80,
             "COMMAND_RESTORE_FACTORY": 81,
             "COMMAND_PRINT_INFO": 83,
@@ -130,9 +142,9 @@ class DimmerProtocol(object):
             "COMMAND_GET_CUBIC_INT": 97,
             "COMMAND_READ_CUBIC_INT": 98,
             "COMMAND_WRITE_CUBIC_INT": 99,
+            "COMMAND_CUBIC_INT_TEST_PERF": 100,
             "COMMAND_SET_ZC_OFS": 146,
             "COMMAND_WRITE_EEPROM": 147,
-            "COMMAND_SIMULATE_ZC": 224,
             "MASTER_COMMAND_METRICS_REPORT": 240,
             "MASTER_COMMAND_TEMPERATURE_ALERT": 241,
             "MASTER_COMMAND_FADING_COMPLETE": 242,
@@ -165,15 +177,22 @@ class DimmerProtocol(object):
         self.REGISTER_CFG_TEMPERATURE2_OFFSET = 60
         self.REGISTER_ERRORS_ZC_MISFIRE = 77
         self.REGISTER_ERRORS_TEMPERATURE = 78
-        self.REGISTER_INFO_VERSION = 79
-        self.REGISTER_INFO_NUM_LEVELS = 81
-        self.REGISTER_INFO_NUM_CHANNELS = 83
-        self.REGISTER_ADDRESS = 84
-        self.REGISTER_MEM_SIZE = 85
+        self.REGISTER_ERRORS_I2C_ERRORS = 79
+        self.REGISTER_INFO_VERSION = 80
+        self.REGISTER_INFO_NUM_LEVELS = 82
+        self.REGISTER_INFO_NUM_CHANNELS = 84
+        self.REGISTER_INFO_OPTIONS = 85
+        self.REGISTER_ADDRESS = 86
+        self.REGISTER_MEM_SIZE = 87
         self.OPTIONS_FACTORY_SETTINGS = 1
         self.OPTIONS_CUBIC_INTERPOLATION = 2
         self.OPTIONS_REPORT_METRICS = 4
         self.OPTIONS_RESTORE_LEVEL = 8
+        self.OPTIONS_INFO_HAS_CUBIC_INTERPOLATION = 1
+        self.OPTIONS_INFO_HAS_TEMPERATURE = 2
+        self.OPTIONS_INFO_HAS_TEMPERATURE2 = 4
+        self.OPTIONS_INFO_HAS_VCC = 8
+        self.OPTIONS_INFO_HAS_FADING_COMPLETED_EVENT = 16
         self.COMMAND_SET_LEVEL = 16
         self.COMMAND_FADE = 17
         self.COMMAND_READ_CHANNELS = 18
@@ -181,6 +200,7 @@ class DimmerProtocol(object):
         self.COMMAND_READ_TEMPERATURE2 = 33
         self.COMMAND_READ_VCC = 34
         self.COMMAND_READ_FREQUENCY = 35
+        self.COMMAND_READ_METRICS = 36
         self.COMMAND_WRITE_SETTINGS = 80
         self.COMMAND_RESTORE_FACTORY = 81
         self.COMMAND_PRINT_INFO = 83
@@ -190,9 +210,9 @@ class DimmerProtocol(object):
         self.COMMAND_GET_CUBIC_INT = 97
         self.COMMAND_READ_CUBIC_INT = 98
         self.COMMAND_WRITE_CUBIC_INT = 99
+        self.COMMAND_CUBIC_INT_TEST_PERF = 100
         self.COMMAND_SET_ZC_OFS = 146
         self.COMMAND_WRITE_EEPROM = 147
-        self.COMMAND_SIMULATE_ZC = 224
         self.MASTER_COMMAND_METRICS_REPORT = 240
         self.MASTER_COMMAND_TEMPERATURE_ALERT = 241
         self.MASTER_COMMAND_FADING_COMPLETE = 242
