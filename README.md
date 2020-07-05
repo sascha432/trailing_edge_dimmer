@@ -32,6 +32,12 @@ The current master is work in progress and should not be used for any production
 
 [Change Log v3.0.0](CHANGELOG.md)
 
+## GUI tool for configuration
+
+I created a GUI tool to calibrate, configure and monitor the dimmer via serial port, TCP or web sockets.
+
+![GUI tool edit cubic interpolation curve](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/gui_cubic_curve.jpg)
+
 ### Multiple channels
 
 When having multple channels, using a single port reduces any delay when turning channels on. Multiple ports add a slight delay to each channel associated with the port (62.5ns), while version 2 had a delay of 2µs per channel, which added up to 16µs  when having 8 active channels.
@@ -51,12 +57,6 @@ Version 2 or without inline assembler
 * blue = channel#7
 
 ![Version 2](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/turn_on_default.png)
-
-## GUI tool for configuration
-
-I created a GUI tool to calibrate, configure and monitor the dimmer via serial port, TCP or web sockets.
-
-![GUI tool edit cubic interpolation curve](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/gui_cubic_curve.jpg)
 
 ## New and improved in-wall dimmer STL files
 
