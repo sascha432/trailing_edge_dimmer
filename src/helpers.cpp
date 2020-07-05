@@ -3,175 +3,112 @@
  */
 
 #include <avr/boot.h>
+#include <stddef.h>
 #include "helpers.h"
+#include "main.h"
 
-// returns number of digits without trailing zeros after determining max. precision
-int count_decimals(double value, uint8_t max_precision, uint8_t max_decimals) {
-    auto precision = max_precision;
-    auto number = abs(value);
-    if (number < 1) {
-        while ((number = (number * 10)) < 1 && precision < max_decimals) { // increase precision for decimals
-            precision++;
-        }
-    }
-    else {
-        while ((number = (number / 10)) > 1 && precision > 1) { // reduce precision for decimals
-            precision--;
-        }
-    }
-    char format[8];
-    snprintf_P(format, sizeof(format), PSTR("%%.%uf"), precision);
-    char buf[32];
-    auto len = snprintf(buf, sizeof(buf), format, value);
-    char *ptr;
-    if (len < (int)sizeof(buf) && (ptr = strchr(buf, '.'))) {
-        ptr++;
-        char *endPtr = ptr + strlen(ptr);
-        while(--endPtr > ptr && *endPtr == '0') { // remove trailing zeros
-            *endPtr = 0;
-            precision--;
-        }
-    }
-    else {
-        precision = max_decimals; // buffer to small
-    }
-    return precision;
+extern unsigned int __heap_start;
+extern void *__brkval;
+
+unsigned int stackAvailable()
+{
+    unsigned int v;
+    return (unsigned int)&v - (__brkval == 0 ? (unsigned int)&__heap_start : (unsigned int)__brkval);
 }
 
-int Serial_print_float(double value, uint8_t max_precision, uint8_t max_decimals)
+struct __freelist
 {
-    return Serial.print(value, count_decimals(value, max_precision, max_decimals));
+  size_t sz;
+  struct __freelist *nx;
+};
+
+/* The head of the free list structure */
+extern struct __freelist *__flp;
+
+/* Calculates the size of the free list */
+int freeListSize()
+{
+  struct __freelist* current;
+  int total = 0;
+  for (current = __flp; current; current = current->nx)
+  {
+    total += 2; /* Add two bytes for the memory block's header  */
+    total += (int) current->sz;
+  }
+
+  return total;
 }
 
-void Serial_write(const char *ptr, int len)
+int freeMemory()
 {
-    while(len--) {
-        Serial.write(*ptr++);
-    }
-    // // make sure we have enough space
-    // if (len > Serial.availableForWrite()) {
-    //     Serial.flush();
-    // }
-    // if (len > Serial.availableForWrite()) {
-    //     Serial.println(F("Serial_printf size exceeds serial buffer"));
-    //     Serial.println(len);
-    //     Serial.println(Serial.availableForWrite());
-    //     for(;;) {}
-    // }
-    // if (Serial.write(ptr, len)) {
-    //     Serial.flush();
-    // }
-
-    // while(len > 0) {
-    //     int wlen = len;
-    //     if (Serial.availableForWrite() < wlen) {
-    //         wlen = Serial.availableForWrite();
-    //     }
-    //     int written = Serial.write(ptr, wlen);
-    //     ptr += written;
-    //     len -= written;
-    // }
+  int free_memory;
+  if ((int)__brkval == 0)
+  {
+    free_memory = ((int)&free_memory) - ((int)&__heap_start);
+  }
+  else
+  {
+    free_memory = ((int)&free_memory) - ((int)__brkval);
+    free_memory += freeListSize();
+  }
+  return free_memory;
 }
 
-void Serial_println(const char *str)
+size_t Print::__printf(vsnprint_t func, const char *format, va_list arg)
 {
-    Serial.println(str);
-    Serial.flush();
-}
-
-void Serial_println(const __FlashStringHelper *str)
-{
-    Serial.println(str);
-    Serial.flush();
-}
-
-int Serial_printf(const char *format, ...)
-{
-    char buf[128];
+    char buf[64];
     char *temp = buf;
-    va_list arg;
-    va_start(arg, format);
-    int len = vsnprintf(buf, sizeof(buf), format, arg);
+    int len = func(buf, sizeof(buf), format, arg);
     if (len >= (int)sizeof(buf) - 1) {
         temp = (char *)malloc(len + 2);
+        DEBUG_VALIDATE_ALLOC(temp, len + 2);
         if (!temp) {
             return 0;
         }
-        len = vsnprintf(temp, len, format, arg);
+        len = func(temp, len, format, arg);
     }
-    va_end(arg);
-    Serial_write(temp, len);
+    write(reinterpret_cast<const uint8_t *>(temp), len);
     if (temp != buf) {
         free(temp);
     }
     return len;
 }
 
-int Serial_printf_P(PGM_P format, ...) {
-    char buf[128];
-    char *temp = buf;
+size_t Print::printf(const char *format, ...)
+{
     va_list arg;
     va_start(arg, format);
-    int len = vsnprintf_P(buf, sizeof(buf), format, arg);
-    if (len >= (int)sizeof(buf) - 1) {
-        temp = (char *)malloc(len + 2);
-        if (!temp) {
-            return 0;
-        }
-        len = vsnprintf_P(temp, len, format, arg);
-    }
+    size_t result = __printf( vsnprintf, format, arg);
     va_end(arg);
-    Serial_write(temp, len);
-    if (temp != buf) {
-        free(temp);
-    }
-    return len;
+    return result;
 }
 
-bool Serial_readLine(String &input, bool allowEmpty) {
-    int ch;
-    while (Serial.available()) {
-        ch = Serial.read();
-        if (ch == '\b') {
-            input.remove(-1, 1);
-            Serial.print(F("\b \b"));
-        }
-        else if (ch == '+') {
-            input = "+";
-            return true;
-         } else if (ch == '-') {
-            input = "-";
-            return true;
-        } else if (ch == 27) {
-            Serial.write('\r');
-            size_t count = input.length() + 1;
-            while(count--) {
-                Serial.write(' ');
-            }
-            Serial.write('\r');
-            input = String();
-        }
-        else if (ch == '\r' || ch == -1) {
-        }
-        else if (ch == '\n') {
-            if (input.length() != 0 || allowEmpty) { // ignore empty lines
-                if (Serial.available() && Serial.peek() == '\r') { // CRLF, CR should already be gone...
-                    Serial.read();
-                }
-                input += '\n';
-                Serial.println();
-                return true;
-            } else {
-                if (allowEmpty ) {
-                    return true;
-                }
-            }
-        } else {
-            input += (char)ch;
-        }
-    }
-    return false;
+size_t Print::printf_P(PGM_P format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+    size_t result = __printf(vsnprintf_P, format, arg);
+    va_end(arg);
+    return result;
 }
+
+#if DEBUG_REPORT_ERRORS
+
+const char PSTR_debug_error_alloc[] PROGMEM = "alloc failed, size %u";
+const char PSTR_debug_i2c_invalid_address[] PROGMEM = "i2c invalid addr. 0x%02x";
+
+void debug_report_error(PGM_P format, ...)
+{
+    char buf[64];
+    va_list arg;
+    va_start(arg, format);
+    vsnprintf_P(buf, sizeof(buf), format, arg);
+    va_end(arg);
+    Serial.print(F("+REM=ERROR:"));
+    Serial.println(buf);
+}
+
+#endif
 
 uint8_t bitValue2Bit(uint8_t mask)
 {
@@ -277,7 +214,8 @@ ATmega8U2       1e9389
 ATmega8         1e9307
 */
 
-uint8_t *get_signature(uint8_t *sig) {
+uint8_t *get_signature(uint8_t *sig)
+{
     auto ptr = sig;
     *ptr++ = boot_signature_byte_get(0);
     *ptr++ = boot_signature_byte_get(2);
@@ -285,7 +223,10 @@ uint8_t *get_signature(uint8_t *sig) {
     return sig;
 }
 
-void get_mcu_type(MCUInfo_t &info) {
+extern bool is_Atmega328PB;
+
+void get_mcu_type(MCUInfo_t &info)
+{
     get_signature(info.sig);
 
     auto ptr = info.fuses;
@@ -293,76 +234,54 @@ void get_mcu_type(MCUInfo_t &info) {
     *ptr++ = boot_lock_fuse_bits_get(GET_HIGH_FUSE_BITS);
     *ptr++ = boot_lock_fuse_bits_get(GET_EXTENDED_FUSE_BITS);
 
-    auto mcu = info.name;
-    *mcu = 0;
+#if __AVR_ATmega328PB__
 
-    // MCU name limited to 16 characters
+    info.name = FPSTR("ATmega328PB");
+    setAtmega328PB(true);
+
+#elif __AVR_ATmega328P__
+
+    if (info.sig[2] == 0x16) {
+        info.name = FPSTR("ATmega328PB");
+        setAtmega328PB(true);
+    }
+    else {
+        info.name = FPSTR("ATmega328P");
+    }
+
+#elif __AVR_ATmega2560__
+
+    info.name = FPSTR("ATmega2560");
+
+#else
+
+    info.name = nullptr;
     if (info.sig[0] == 0x1e) {
-        // removed due to insufficient flash memory
-        // if (info.sig[1] == 0x93) {
-        //     switch(info.sig[2]) {
-        //         case 0x0a:
-        //             strcpy_P(mcu, PSTR("ATmega88"));
-        //             break;
-        //         case 0x0f:
-        //             strcpy_P(mcu, PSTR("ATmega88P"));
-        //             break;
-        //     }
-        // }
-        // else
-        if (info.sig[1] == 0x95) {
+        if (info.sig[1] == 0x98) {
             switch(info.sig[2]) {
-                // case 0x02:
-                //     strcpy_P(mcu, PSTR("ATmega32"));
-                //     break;
-                case 0x0f:
-                    strcpy_P(mcu, PSTR("ATmega328P"));
+                case 0x01:
+                    info.name = FPSTR("ATmega2560");
                     break;
-                // case 0x14:
-                //     strcpy_P(mcu, PSTR("ATmega328-PU"));
-                //     break;
+            }
+        }
+        else if (info.sig[1] == 0x95) {
+            switch(info.sig[2]) {
+                case 0x02:
+                     info.name = FPSTR("ATmega32");
+                     break;
+                case 0x0f:
+                    info.name = FPSTR("ATmega328P");
+                    break;
+                case 0x14:
+                    info.name = FPSTR("ATmega328-PU");
+                    break;
                 case 0x16:
-                    strcpy_P(mcu, PSTR("ATmega328PB"));
+                    info.name = FPSTR("ATmega328PB");
+                    setAtmega328PB(true);
                     break;
             }
         }
     }
-}
-
-#if DEBUG
-uint8_t _debug_level = DEBUG_LEVEL;
-
-void debug_print_millis() {
-    Serial_printf_P(PSTR("+DBG%05lu: "), millis());
-}
-
-// PrintExEx SerialEx = Serial;
-
-// void PrintExEx::printf_P(PGM_P format, ...) {
-// }
-
-// void PrintExEx::vprintf(const char *format, ...) {
-//     char buf[64];
-//     size_t len;
-//     va_list arg;
-//     va_start(arg, format);
-//     if ((len = vsnprintf(buf, sizeof(buf), format, arg)) == sizeof(buf)) {
-//         char *ptr = (char *)malloc(len + 2);
-//         if (ptr) {
-//             vsnprintf(ptr, len, format, arg);
-//             print(ptr);
-//             free(ptr);
-//         }
-//     } else {
-//         print(buf);
-//     }
-//     va_end(arg);
-// }
-
-// PrintExEx::PrintExEx(Stream &stream) : PrintEx(stream), _stream(stream) {
-// }
-
-// PrintExEx::~PrintExEx() {
-// }
-
 #endif
+
+}

@@ -6,8 +6,6 @@
 
 #include <Arduino.h>
 #include <stdio.h>
-#include <float.h>
-#include <HardwareSerial.h>
 #include "helpers.h"
 
 #if DEBUG
@@ -24,14 +22,54 @@ void debug_print_millis();
 #define _D_INFO       5
 #define _D_DEBUG      10
 #define _D(level, ...)          { if (_debug_level >= level) { __VA_ARGS__; }; }
-#define debug_printf_P(...)     { debug_print_millis(); Serial_printf_P(__VA_ARGS__); }
-#define debug_printf(...)       { debug_print_millis(); Serial_printf(__VA_ARGS__); }
+#define debug_printf_P(...)     { debug_print_millis(); Serial.printf_P(__VA_ARGS__); }
+#define debug_printf(...)       { debug_print_millis(); Serial.printf(__VA_ARGS__); }
 #else
 #define DEBUG_LEVEL   0
 #define _D(...) ;
 #define debug_printf_P(...)
 #define debug_printf(...)
 #endif
+
+#ifndef DEBUG_REPORT_ERRORS
+#define DEBUG_REPORT_ERRORS                                 0
+#endif
+
+#if DEBUG_REPORT_ERRORS
+
+extern const char PSTR_debug_error_alloc[] PROGMEM;
+extern const char PSTR_debug_i2c_invalid_address[] PROGMEM;
+
+void debug_report_error(PGM_P format, ...);
+
+#define DEBUG_VALIDATE_ALLOC(ptr, size)                     if (!ptr) { debug_report_error(PSTR_debug_error_alloc, size); }
+#define DEBUG_INVALID_I2C_ADDRESS(addr)                     debug_report_error(PSTR_debug_i2c_invalid_address, addr)
+#else
+#define DEBUG_VALIDATE_ALLOC(...)                           ;
+#define DEBUG_INVALID_I2C_ADDRESS(...)                      ;
+#define
+#endif
+
+namespace std {
+
+    template <class T>
+    struct remove_pointer {
+        using type = T;
+
+    };
+
+    template <class T>
+    struct remove_pointer<T *> {
+        using type = T;
+    };
+
+    template <class T>
+    struct remove_pointer<T * const> {
+        using type = T;
+    };
+
+};
+
 
 template <class T>
 class unique_ptr {
@@ -95,24 +133,34 @@ private:
 
 uint8_t bitValue2Bit(uint8_t mask);
 
+#ifndef FPSTR
+#define FPSTR(str)                              reinterpret_cast<const __FlashStringHelper *>(PSTR(str))
+#endif
+
 typedef struct {
     uint8_t sig[3];
     uint8_t fuses[3];
-    char name[17];
+    const __FlashStringHelper *name;
 } MCUInfo_t;
 
 uint8_t *get_signature(uint8_t *sig);
 void get_mcu_type(MCUInfo_t &info);
 
-// println + flush
-void Serial_println(const char *str);
-void Serial_println(const __FlashStringHelper *str);
+unsigned int stackAvailable();
+int freeMemory();
 
-int Serial_printf(const char *format, ...);
-int Serial_printf_P(PGM_P format, ...);
-bool Serial_readLine(String &input, bool allowEmpty);
-int Serial_print_float(double value, uint8_t max_precision = FLT_DIG, uint8_t max_decimals = 8);
-int count_decimals(double value, uint8_t max_precision = FLT_DIG, uint8_t max_decimals = 8);
+
+// framework-arduino-avr\cores\arduino\Print.h
+// add
+// class Print {
+//...
+// private:
+//     typedef int (* vsnprint_t)(char *, size_t, const char *, va_list ap);
+//     size_t __printf(vsnprint_t func, const char *format, va_list arg);
+// public:
+//     size_t printf(const char *format, ...);
+//     size_t printf_P(PGM_P format, ...);
+// };
 
 template <typename T>
 inline void swap(T &a, T &b) {

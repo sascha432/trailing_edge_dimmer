@@ -6,7 +6,7 @@
 
 #include <Arduino.h>
 #include <util/atomic.h>
-#include "ArduinoEEPROMConfig.h"
+#include "arduino_eeprom_config.h"
 #if DIMMER_USE_INLINE_ASM
 #include "dimmer_sfr.h"
 #endif
@@ -42,15 +42,27 @@
 #define DEBUG_PIN                                               0
 #endif
 
-#ifndef DIMMER_SIMULATE_ZC
-#define DIMMER_SIMULATE_ZC                                      0
-#endif
-
 #ifndef DIMMER_MAX_TEMP
 #define DIMMER_MAX_TEMP                                         80
 #endif
 
-#define DIMMER_TEMP_OFFSET_DIVIDER                              4.0f
+// reference voltage is 1.1
+#ifndef DIMMER_ATMEGA_VREF11
+#define DIMMER_ATMEGA_VREF11                                    1.1
+#endif
+
+// temperature offset in °C for the NTC
+// -15.5 to +15.5°C, precison 0.125
+#ifndef DIMMER_TEMPERATURE_OFFSET
+#define DIMMER_TEMPERATURE_OFFSET                               0.0
+#endif
+
+// temperature offset in °C for the internal ATmega sensor
+#ifndef DIMMER_TEMPERATURE2_OFFSET
+#define DIMMER_TEMPERATURE2_OFFSET                              0.0
+#endif
+
+#define DIMMER_TEMP_OFFSET_DIVIDER                              8.0
 
 #ifndef ZC_SIGNAL_PIN
 #define ZC_SIGNAL_PIN                                           3
@@ -81,13 +93,13 @@
 #define DIMMER_MIN_ON_TIME_US                                   100
 #endif
 
-// the maximum on time is the halfwave in microseconds minus DIMMER_MAX_ON_TIME_US
+// the maximum on time is the halfwave in microseconds minus DIMMER_MIN_OFF_TIME_US
 // if the value is exceeded, mosfets are not turned off anymore.
-#ifndef DIMMER_MAX_ON_TIME_US
-#define DIMMER_MAX_ON_TIME_US                                   300
+#ifndef DIMMER_MIN_OFF_TIME_US
+#define DIMMER_MIN_OFF_TIME_US                                  300
 #endif
-#if DIMMER_MAX_ON_TIME_US < 200
-#error DIMMER_MAX_ON_TIME_US must be greater than 200
+#if DIMMER_MIN_OFF_TIME_US < 200
+#error DIMMER_MIN_OFF_TIME_US must be greater than 200
 #endif
 
 #ifndef DIMMER_MEASURE_CYCLES
@@ -102,7 +114,7 @@
     #define DIMMER_MOSFET_PINS                                  { 6, 8, 9, 10 }
 #endif
 
-static constexpr uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
+static constexpr uint8_t kDimmerPins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 
 // 0 to (DIMMER_MAX_LEVELS-1)
 // default 0 - 8191
@@ -151,15 +163,20 @@ static constexpr uint8_t dimmer_pins[DIMMER_CHANNELS] = DIMMER_MOSFET_PINS;
 #define HAVE_FADE_COMPLETION_EVENT                              1
 #endif
 
+// check temperature and update metrics every n milliseconds
+#ifndef DIMMER_UPDATE_METRICS_INTERVAL
+#define DIMMER_UPDATE_METRICS_INTERVAL                          2500UL
+#endif
+
+#ifndef DIMMER_EEPROM_WRITE_DELAY
+// write EEPROM after a delay in milliseconds
+#define DIMMER_EEPROM_WRITE_DELAY                               500
+#endif
+
+
 #define DIMMER_VERSION_WORD                                     ((3 << 10) | (0 << 5) | 0)
 #define DIMMER_VERSION                                          "3.0.0"
 #define DIMMER_INFO                                             "Author sascha_lammers@gmx.de"
-
-#ifndef DIMMER_I2C_SLAVE
-#define DIMMER_I2C_SLAVE                                        1
-#endif
-
-#define DIMMER_REGISTER_MEM_END_PTR                             &register_mem.raw[sizeof(register_mem_t)]
 
 #define _STRINGIFY(...)                                         ___STRINGIFY(__VA_ARGS__)
 #define ___STRINGIFY(...)                                       #__VA_ARGS__
@@ -169,8 +186,11 @@ typedef int16_t dimmer_level_t;
 
 #define FOR_CHANNELS(var)                                       for(dimmer_channel_id_t var = 0; var < DIMMER_CHANNELS; var++)
 
+#define INVALID_LEVEL                                           -1
+#define DIMMER_FADE_FROM_CURRENT_LEVEL                          -1
+
 #ifndef __attribute__packed__
-#define __attribute__packed__           __attribute__((packed))
+#define __attribute__packed__                                   __attribute__((packed))
 #endif
 
 typedef struct {
@@ -180,8 +200,7 @@ typedef struct {
     dimmer_level_t targetLevel;
 } dimmer_fade_t;
 
-
-typedef struct __attribute__packed__ {
+typedef struct {
     uint8_t channel;
     uint16_t ticks;
 #if DEBUG_FAULTS
@@ -189,34 +208,14 @@ typedef struct __attribute__packed__ {
 #endif
 } dimmer_channel_t;
 
-typedef struct __attribute__packed__ {
-    dimmer_channel_id_t channel;
-    dimmer_level_t level;
-} FadingCompletionEvent_t;
-
-#define INVALID_LEVEL                                           -1
-
-#if DIMMER_I2C_SLAVE
 #define dimmer_level(ch)        register_mem.data.channels.level[ch]
 #define dimmer_config           register_mem.data.cfg
-#else
-#define dimmer_level(ch)        dimmer.level[ch]
-#define dimmer_config           dimmer.cfg
-#endif
 
 class dimmer_t
 {
 public:
     dimmer_t() = default;
 
-#if !DIMMER_I2C_SLAVE
-    dimmer_level_t level[DIMMER_CHANNELS];                              // current level
-    struct {
-        int16_t zc_offset_ticks;
-        uint16_t minimum_on_time_ticks;
-        uint16_t adjust_halfwave_time_ticks;
-    } cfg;
-#endif
     dimmer_fade_t fade[DIMMER_CHANNELS];                                // calculated fading data
     dimmer_channel_t *channel_ptr;
     dimmer_channel_t ordered_channels[DIMMER_CHANNELS + 1];             // current dimming levels in ticks
@@ -225,13 +224,7 @@ public:
     dimmer_enable_mask_t enable_channel_mask;
     dimmer_enable_mask_t enable_channel_mask_buffer;
 #endif
-
-#if HAVE_FADE_COMPLETION_EVENT
-    dimmer_level_t fadingCompleted[DIMMER_CHANNELS];
-#endif
 };
-
-#define DIMMER_FADE_FROM_CURRENT_LEVEL                          -1
 
 class Dimmer : public dimmer_t
 {
@@ -249,6 +242,14 @@ public:
     static constexpr uint8_t _IFZCI  = 2;           // ZC interrupt lock
     static constexpr uint8_t _IFCHL  = 3;           // calculate channel lock
     static constexpr uint8_t _IFCHA  = 4;           // calculate channel abort request
+
+    static constexpr dimmer_channel_id_t kMaxChannels = DIMMER_CHANNELS;
+    static constexpr dimmer_level_t kMaxLevels = DIMMER_MAX_LEVELS;
+    static constexpr uint8_t kCubicIntMaxDataPoints = DIMMER_CUBIC_INT_DATA_POINTS;
+
+    static constexpr bool isChannelValid(dimmer_channel_id_t channel) {
+        return (uint8_t)channel < (uint8_t)kMaxChannels;
+    }
 
 public:
     Dimmer();
@@ -396,6 +397,41 @@ private:
 #if !DIMMER_USE_INLINE_ASM
     volatile uint8_t *_pinsAddr[DIMMER_CHANNELS];
     uint8_t _pinsMask[DIMMER_CHANNELS];
+#endif
+
+#if HAVE_FADE_COMPLETION_EVENT
+
+public:
+    inline void sendFadingCompletedEvents() {
+        _fadingCompletedEvents.sendEvents();
+    }
+
+private:
+    class FadingCompletedEvents {
+    public:
+        static constexpr uint8_t kMaxFadingCompletedEvents = kMaxChannels * 8;
+
+    public:
+        FadingCompletedEvents();
+
+        void addEvent(dimmer_channel_id_t channel, dimmer_level_t level);
+        void sendEvents();
+
+        uint8_t size() const;
+        bool notEmpty() const;
+
+    private:
+        volatile uint8_t _readIndex;
+        volatile uint8_t _writeIndex;
+        dimmer_fading_completed_event_t _fadingCompletedBuffer[kMaxFadingCompletedEvents];
+    };
+
+    FadingCompletedEvents _fadingCompletedEvents;
+
+#else
+
+    inline void sendFadingCompletedEvents() {}
+
 #endif
 };
 

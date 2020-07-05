@@ -135,8 +135,8 @@ void Dimmer::_calculateChannels()
         if (dimmer_is_fading()) {
             auto dur = micros() - start;
             FOR_CHANNELS(i) {
-                // Serial_printf_P(PSTR("%u=%u(%u) "), ordered_channels_buffer[i].channel, ordered_channels_buffer[i].ticks, dimmer_level(i));
-                Serial_printf_P(PSTR("%u=%u "), ordered_channels_buffer[i].channel, ordered_channels_buffer[i].ticks);
+                // Serial.printf_P(PSTR("%u=%u(%u) "), ordered_channels_buffer[i].channel, ordered_channels_buffer[i].ticks, dimmer_level(i));
+                Serial.printf_P(PSTR("%u=%u "), ordered_channels_buffer[i].channel, ordered_channels_buffer[i].ticks);
             }
             Serial.println(dur);
         }
@@ -152,19 +152,17 @@ void Dimmer::setLevel(dimmer_channel_id_t channel, dimmer_level_t level)
         FOR_CHANNELS(channel) {
             dimmer_level(channel) = dimmer_normalize_level(level);
             fade[channel].count = 0; // disable fading for this channel
-            fadingCompleted[channel] = INVALID_LEVEL;
         }
     }
     else {
         dimmer_level(channel) = dimmer_normalize_level(level);
         fade[channel].count = 0; // disable fading for this channel
-        fadingCompleted[channel] = INVALID_LEVEL;
     }
 
     _calculateChannels();
 
     _D(5,
-        Serial_printf_P(PSTR("Dimmer channel %u set %u value %u ticks %u\n"),
+        Serial.printf_P(PSTR("Dimmer channel %u set %u value %u ticks %u\n"),
             (unsigned)channel,
             (unsigned)dimmer_level(channel),
             (unsigned)getChannel(dimmer_level(channel)),
@@ -205,9 +203,6 @@ void Dimmer::_setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_l
 {
     float diff;
     auto &fade = this->fade[channel];
-#if HAVE_FADE_COMPLETION_EVENT
-    fadingCompleted[channel] = INVALID_LEVEL;
-#endif
 
     from = dimmer_normalize_level((from == DIMMER_FADE_FROM_CURRENT_LEVEL) ? dimmer_level(channel) : from);
     diff = dimmer_normalize_level(to) - from;
@@ -215,7 +210,7 @@ void Dimmer::_setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_l
     if (!absolute_time) { // calculate relative fading time depending on the level change "diff"
         time = diff / DIMMER_MAX_LEVELS * time;
         time = abs(time);
-        _D(5, Serial_printf_P(PSTR("Relative fading time %.3f\n"), time));
+        _D(5, Serial.printf_P(PSTR("Relative fading time %.3f\n"), time));
     }
 
     fade.count = 2 * getFrequency() * time;
@@ -227,8 +222,8 @@ void Dimmer::_setFade(dimmer_channel_id_t channel, dimmer_level_t from, dimmer_l
         fade.count = 1;
     }
 
-    _D(5, Serial_printf_P(PSTR("Set fading for channel %u: %.2f to %.2f"), channel, from, to));
-    _D(5, Serial_printf_P(PSTR(", step %.3f, count %u\n"), fade.step, fade.count));
+    _D(5, Serial.printf_P(PSTR("Set fading for channel %u: %.2f to %.2f"), channel, from, to));
+    _D(5, Serial.printf_P(PSTR(", step %.3f, count %u\n"), fade.step, fade.count));
 }
 
 // this function is called from an interrupt twice the rate of the AC frequency
@@ -245,8 +240,10 @@ void Dimmer::_applyFading()
                 if (--fade.count == 0) {
                     dimmer_level(i) = dimmer_normalize_level(fade.targetLevel);
 #if HAVE_FADE_COMPLETION_EVENT
-                    fadingCompleted[i] = dimmer_level(i);
-                    dimmer_scheduled_calls.fadingCompleted = true;
+                    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+                        _fadingCompletedEvents.addEvent(i, dimmer_level(i));
+                    }
+
 #endif
                 } else {
                     dimmer_level(i) = dimmer_normalize_level(fade.level);
@@ -262,3 +259,60 @@ void Dimmer::_applyFading()
 
     _calculateChannels();
 }
+
+
+#if HAVE_FADE_COMPLETION_EVENT
+
+Dimmer::FadingCompletedEvents::FadingCompletedEvents() : _readIndex(0), _writeIndex(0)
+{
+}
+
+void Dimmer::FadingCompletedEvents::addEvent(dimmer_channel_id_t channel, dimmer_level_t level)
+{
+    uint8_t nextWriteIndex = (_writeIndex + 1) % kMaxFadingCompletedEvents;
+    if (nextWriteIndex == _readIndex) {
+        Serial.println(F("FadingCompletedEvents::addEvent buffer full"));
+        return;
+    }
+    _fadingCompletedBuffer[_writeIndex] = { channel, level };
+    _writeIndex = nextWriteIndex;
+}
+
+uint8_t Dimmer::FadingCompletedEvents::size() const
+{
+    if (_writeIndex < _readIndex) {
+        return kMaxFadingCompletedEvents - (_readIndex - _writeIndex);
+    }
+    else {
+        return _writeIndex - _readIndex;
+    }
+}
+
+bool Dimmer::FadingCompletedEvents::notEmpty() const
+{
+    return _readIndex != _writeIndex;
+}
+
+void Dimmer::FadingCompletedEvents::sendEvents()
+{
+    cli();
+    if (notEmpty()) {
+        sei();
+
+        Wire.beginTransmission(DIMMER_I2C_MASTER_ADDRESS);
+        Wire.write(DIMMER_MASTER_COMMAND_FADING_COMPLETE);
+        do {
+            sei();
+            Wire_write(_fadingCompletedBuffer[_readIndex]);
+            cli();
+            _readIndex = (_readIndex + 1) % kMaxFadingCompletedEvents;
+        } while(notEmpty());
+        sei();
+
+        Wire.endTransmission();
+
+    }
+    sei();
+}
+
+#endif

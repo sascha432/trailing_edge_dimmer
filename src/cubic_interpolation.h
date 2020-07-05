@@ -11,6 +11,10 @@
 
 class CubicInterpolation {
 public:
+    using xyValueType = INTERPOLATION_LIB_XYVALUES_TYPE;
+    using xyValueTypePtr = xyValueType *;
+
+public:
     class Channel {
     public:
         Channel() = default;
@@ -18,26 +22,27 @@ public:
             free();
         }
 
+        Channel(const Channel &) = delete;
+        Channel(Channel &&) = delete;
         Channel &operator=(const Channel &) = delete;
         Channel &operator=(Channel &&) = delete;
 
-        void allocate(uint8_t dataPoints);
+        bool allocate(uint8_t dataPoints);
         void free();
 
         void setDataPoint(uint8_t pos, uint8_t x, uint8_t y);
         uint8_t getDataPoints() const;
-        // double getStepSize() const;
 
-        double *getXValues() const {
+        xyValueTypePtr getXValues() const {
             return _xValues;
         }
-        double *getYValues() const {
+        xyValueTypePtr getYValues() const {
             return _yValues;
         }
 
     public:
-        double *_xValues;
-        double *_yValues;
+        xyValueTypePtr _xValues;
+        xyValueTypePtr _yValues;
         uint8_t _dataPoints;
     };
 
@@ -45,22 +50,25 @@ public:
     CubicInterpolation();
 
     void printState() const;
-    void printTable(int8_t channel, uint8_t levelStepSize = 1) const;
+#if HAVE_CUBIC_INT_PRINT_TABLE
+    void printTable(dimmer_channel_id_t channel, uint8_t levelStepSize = 1) const;
+#endif
+#if HAVE_CUBIC_INT_TEST_PERFORMANCE
+    void testPerformance(dimmer_channel_id_t channel) const;
+#endif
 
-    int16_t getLevel(int16_t level, int8_t channel) const;
-    void getInterpolatedLevels(int16_t *dst, uint8_t size, int16_t startLevel, uint8_t step, uint8_t dataPointCount, double *xValues, double *yValues) const;
+    int16_t getLevel(dimmer_level_t level, dimmer_channel_id_t channel) const;
+    uint8_t getInterpolatedLevels(dimmer_level_t *dst, dimmer_level_t *endPtr, dimmer_level_t startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const;
 
-    // uint8_t getValueCount(int8_t channel) const;
-
-    Channel &getChannel(int8_t channel);
-
-    void copyFromConfig(register_mem_cubic_int_t &cubic_int, int8_t channel);
-    void copyToConfig(register_mem_cubic_int_t &cubic_int, int8_t channel);
+    void copyFromConfig(register_mem_cubic_int_t &cubic_int, dimmer_channel_id_t channel);
+    void copyToConfig(register_mem_cubic_int_t &cubic_int, dimmer_channel_id_t channel);
     void clearTable();
 
 private:
-    static constexpr double stepSize = 254 / (double)DIMMER_MAX_LEVELS;
-    Channel _channels[DIMMER_CHANNELS];
+    dimmer_level_t _toLevel(double y) const;
+    double _toY(dimmer_level_t level) const;
+
+    Channel _channels[Dimmer::kMaxChannels];
 };
 
 extern CubicInterpolation cubicInterpolation;

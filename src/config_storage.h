@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include <ArduinoEEPROM.h>
 #include "dimmer_protocol.h"
+#include "dimmer.h"
 
 class ConfigStorage {
 public:
@@ -38,9 +39,11 @@ public:
     void restoreFactorySettings();
     // reads Configuration and Settings
     void read(ConfigStorage::Settings &settings);
-    // writes Settings
+    // writes settings
     void writeSettings();
-    // writes Configuration
+    // write settings after kEEPROMWriteDelay milliseconds. a second call will not extend the delay
+    void scheduleWriteSettings();
+    // writes configuration
     void writeConfiguration();
 
     // if restore levels is enabled, set levels from _settings and call fade()
@@ -58,10 +61,16 @@ public:
    }
 
 private:
+    friend void loop();
+    static constexpr unsigned long kEEPROMTimerDisabled = ~0;
+    static constexpr uint16_t kEEPROMWriteDelay = DIMMER_EEPROM_WRITE_DELAY;
+    volatile unsigned long _eepromWriteTimer;
+
+private:
     void _eraseEEPROM();
     void _read(ConfigStorage::Settings &settings, bool restoreFactory = false);
 
-   ArduinoEEPROM _eeprom;
+    ArduinoEEPROM _eeprom;
 };
 
 extern ConfigStorage config;

@@ -67,11 +67,11 @@ void DebugStatistics::print(Print &output)
     }
     dimmer_stats_bubble_sort(_statsTmp);
     //                    012345012345670123456012345601234560123456012345601234560123456
-    Serial_printf_P(PSTR("cycle time    start  end    next   ch0    ch1    ch2    ch3    \n"));
+    Serial.printf_P(PSTR("cycle time    start  end    next   ch0    ch1    ch2    ch3    \n"));
     for(uint8_t i = 0; i < DEBUG_STATISTICS_COUNT; i++) {
         auto &frame = _statsTmp[i];
         if (frame.cycleCounter) {
-            Serial_printf_P(PSTR("%-5u %-7lu %-6u %-6u %-6u %-6u %-6u %-6u %-6u\n"),
+            Serial.printf_P(PSTR("%-5u %-7lu %-6u %-6u %-6u %-6u %-6u %-6u %-6u\n"),
                 (uint16_t)frame.cycleCounter, frame.timeMs, frame.startTicks, frame.endTicks, frame.nextTicks,
                 frame.channelTicks[0], frame.channelTicks[1], frame.channelTicks[2], frame.channelTicks[3]
             );

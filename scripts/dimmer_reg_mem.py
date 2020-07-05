@@ -242,6 +242,7 @@ slave_commands = {
     'READ_TEMPERATURE2': 0x21,
     'READ_VCC': 0x22,
     'READ_FREQUENCY': 0x23,
+    'READ_METRICS': 0x24,
     'WRITE_SETTINGS': 0x50,
     'RESTORE_FACTORY': 0x51,
     'PRINT_INFO': 0x53,
@@ -251,9 +252,9 @@ slave_commands = {
     'GET_CUBIC_INT': 0x61,
     'READ_CUBIC_INT': 0x62,
     'WRITE_CUBIC_INT': 0x63,
+    'CUBIC_INT_TEST_PERF': 0x64,
     'SET_ZC_OFS': 0x92,
     'WRITE_EEPROM': 0x93,
-    'SIMULATE_ZC': 0xe0,
 }
 
 master_commands = {
@@ -262,6 +263,7 @@ master_commands = {
     'FADING_COMPLETE': 0xf2,
 }
 
+output('// AUTO GENERATED FILE - DO NOT MODIFY')
 output('/**')
 output(' * Author: sascha_lammers@gmx.de')
 output(' */')
@@ -286,6 +288,12 @@ output('#if _MSC_VER')
 output('#pragma pack(push, 1)')
 output('#endif')
 output()
+
+dimmer_fading_completed_event_t = CStruct('dimmer_fading_completed_event_t', {
+    'channel': ('b', 0),
+    'level': ('h', 0),
+});
+dimmer_fading_completed_event_t.dump();
 
 dimmer_get_cubic_int_header_t = CStruct('dimmer_get_cubic_int_header_t', {
     'start_level': ('h', 0),
@@ -368,13 +376,29 @@ register_mem_channel_t.dump()
 register_mem_errors_t = CStruct('register_mem_errors_t', {
     'zc_misfire': ('B', 0),
     'temperature': ('B', 0),
+    'i2c_errors': ('B', 0),
 }, define_prefix='errors')
 register_mem_errors_t.dump()
+
+register_mem_info_options_bits_t = CStruct('register_mem_info_options_bits_t', {
+    'has_cubic_interpolation': ('B:1', 0),
+    'has_temperature': ('B:1', 0),
+    'has_temperature2': ('B:1', 0),
+    'has_vcc': ('B:1', 0),
+    'has_fading_completed_event': ('B:1', 0),
+}, define_prefix='info')
+register_mem_info_options_bits_t.dump()
+
+register_mem_info_options_union_t = CStruct(None, {
+    'options': ('B', 0),
+    'bits': (register_mem_info_options_bits_t, 0),
+}, 'union', define_prefix='info')
 
 register_mem_info_t = CStruct('register_mem_info_t', {
     'version': ('H', 0),
     'num_levels': ('h', 0),
     'num_channels': ('b', 0),
+    'options': (register_mem_info_options_union_t, 0),
 }, define_prefix='info')
 register_mem_info_t.dump()
 
@@ -410,6 +434,8 @@ output(define(define_name('REGISTER', 'COMMAND'), 'DIMMER_REGISTER_CMD_COMMAND')
 output()
 create_defines(register_mem_options_bits_t, 'OPTIONS')
 output()
+create_defines(register_mem_info_options_bits_t, 'OPTIONS')
+output()
 
 for name, value in slave_commands.items():
     output(define(define_name('COMMAND', name), value))
@@ -432,6 +458,7 @@ file.close()
 file = args.python
 verbose('Creating %s' % file.name)
 
+output('# AUTO GENERATED FILE - DO NOT MODIFY')
 output('#')
 output('# Author: sascha_lammers@gmx.de')
 output('#')

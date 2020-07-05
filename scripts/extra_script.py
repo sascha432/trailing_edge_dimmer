@@ -20,6 +20,26 @@ def verbose(msg):
         print(msg)
 
 #
+# create protocol
+#
+
+def build_protocol(source, target, env):
+
+    script = path.realpath(path.join(path.dirname(inspect.getfile(inspect.currentframe())), 'dimmer_reg_mem.py'))
+
+    args = [
+        env.subst("$PYTHONEXE"),
+        script,
+        '--create'
+    ]
+    if verbose_flag:
+        args.append('--verbose')
+
+    return_code = subprocess.run(args, shell=True).returncode
+    if return_code!=0:
+        error("%s failed to run, exit code %u\ncommand: '%s'" % (path.basename(script), return_code, ' '.join(args)))
+
+#
 # run SFR tool
 #
 
@@ -117,7 +137,9 @@ def disassemble(source, target, env):
 
 run_sfr_tool(None, None, env)
 
-env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
-
 env.AlwaysBuild(env.Alias("sfr_tool", None, run_sfr_tool))
 env.AlwaysBuild(env.Alias("disassemble", None, disassemble))
+env.AlwaysBuild(env.Alias("build_protocol", None, build_protocol))
+
+env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
+

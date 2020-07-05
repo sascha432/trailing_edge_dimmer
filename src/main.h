@@ -13,8 +13,8 @@
 #include <Wire.h>
 #endif
 
-#if DIMMER_I2C_SLAVE && DIMMER_CHANNELS > 8
-#error I2C is limited to 8 channels
+#if DIMMER_CHANNELS > 8
+#error A maximum of 8 channels is supported
 #endif
 
 #ifndef SERIAL_I2C_BRDIGE
@@ -31,12 +31,6 @@
 
 #ifndef HAVE_READ_VCC
 #define HAVE_READ_VCC                           1
-#endif
-
-#ifndef INTERNAL_VREF_1_1V
-// after calibration VCC readings are pretty accurate, +-2-3mV
-// default for cfg.internal_1_1v_ref
-#define INTERNAL_VREF_1_1V                      1.1
 #endif
 
 #ifndef HAVE_READ_INT_TEMP
@@ -65,58 +59,52 @@
 #define NTC_NOMINAL_TEMP                        25
 #endif
 
-#define SERIAL_INPUT_BUFFER_MAX_LENGTH          64
-#define SERIAL_MAX_ARGUMENTS                    10
-
 #ifndef HAVE_PRINT_METRICS
 #define HAVE_PRINT_METRICS                      1
 #endif
 
-// delay in milliseconds before metrics are printed again
-#ifndef PRINT_METRICS_REPEAT
-#define PRINT_METRICS_REPEAT                    5000
+#ifndef HAVE_CUBIC_INT_PRINT_TABLE
+#define HAVE_CUBIC_INT_PRINT_TABLE              0
 #endif
-// write EEPROM after a delay in milliseconds
-#define EEPROM_WRITE_DELAY                      500
-// if writing is requested multiple times within this period, increase delay to the same time
-#define EEPROM_REPEATED_WRITE_DELAY             1000
 
-// size with old eeprom lib 28258
+#ifndef HAVE_CUBIC_INT_GET_TABLE
+#define HAVE_CUBIC_INT_GET_TABLE                0
+#endif
 
-void rem(); // print "+REM="
-void write_config();
+#ifndef HAVE_CUBIC_INT_TEST_PERFORMANCE
+#define HAVE_CUBIC_INT_TEST_PERFORMANCE         0
+#endif
 
+constexpr uint8_t kRegisterMemInfoOptionsBitValue = 0
+#if DIMMER_CUBIC_INTERPOLATION
+    |DIMMER_OPTIONS_INFO_HAS_CUBIC_INTERPOLATION
+#endif
+#if HAVE_NTC
+    |DIMMER_OPTIONS_INFO_HAS_TEMPERATURE
+#endif
+#if HAVE_READ_INT_TEMP
+    |DIMMER_OPTIONS_INFO_HAS_TEMPERATURE2
+#endif
+#if HAVE_READ_VCC
+    |DIMMER_OPTIONS_INFO_HAS_VCC
+#endif
+#if HAVE_FADE_COMPLETION_EVENT
+    |DIMMER_OPTIONS_INFO_HAS_FADING_COMPLETED_EVENT
+#endif
+;
 
-class dimmer_scheduled_calls_t {
-public:
-    dimmer_scheduled_calls_t() = default;
-    struct {
-        uint8_t readVCC: 1;
-        uint8_t readIntTemp: 1;
-        uint8_t readNTCTemp: 1;
-        uint8_t writeEEPROM: 1;
-        uint8_t printMetrics: 1;
-        uint8_t fadingCompleted: 1;
-    };
-};
+#if HAVE_READ_INT_TEMP
+extern bool is_Atmega328PB;
+#define setAtmega328PB(value) is_Atmega328PB = value;
+#else
+#define setAtmega328PB(value) ;
+#endif
 
-//  // bitset
-//  typedef enum : dimmer_scheduled_calls_t {
-//     TYPE_NONE =             0,
-//     READ_VCC =              0x01,
-//     READ_INT_TEMP =         0x02,
-//     READ_NTC_TEMP =         0x04,
-//     EEPROM_WRITE =          0x08,
-//     PRINT_METRICS =         0x10,
-// } dimmer_scheduled_calls_enum_t;
-
-extern unsigned long next_temp_check;
+extern unsigned long update_metrics_timer;
 
 #if HAVE_PRINT_METRICS
-extern unsigned long print_metrics_timeout;
+extern bool print_metrics_enabled;
 #endif
-
-extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
 template<class T>
 uint8_t Wire_read(T &data) {
@@ -128,16 +116,5 @@ uint8_t Wire_write(T &data) {
     return Wire.write(reinterpret_cast<const uint8_t *>(&data), sizeof(data));
 }
 
-#if HAVE_READ_INT_TEMP
-float get_internal_temperature();
-#endif
-
+void rem();
 void display_dimmer_info();
-
-#if HAVE_READ_VCC
-uint16_t read_vcc();
-#endif
-
-#if HAVE_NTC
-float get_ntc_temperature();
-#endif

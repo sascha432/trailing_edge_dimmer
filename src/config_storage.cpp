@@ -23,15 +23,13 @@ void ConfigStorage::Configuration::restoreFactoryDefaults()
     cubicInterpolation.clearTable();
 #endif
     register_mem.data.cfg.fade_time = 7.5;
-    register_mem.data.cfg.temp_check_interval = 2;
     register_mem.data.cfg.metrics_report_interval = 10;
     register_mem.data.cfg.zc_offset_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_ZC_DELAY_US);
     register_mem.data.cfg.min_on_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_MIN_ON_TIME_US);
-    register_mem.data.cfg.min_off_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_MAX_ON_TIME_US);
-    register_mem.data.cfg.vref11 = INTERNAL_VREF_1_1V;
-#ifdef INTERNAL_TEMP_OFS
-    register_mem.data.cfg.temperature_offset = INTERNAL_TEMP_OFS;
-#endif
+    register_mem.data.cfg.min_off_ticks = DIMMER_T1_US_TO_TICKS(DIMMER_MIN_OFF_TIME_US);
+    register_mem.data.cfg.vref11 = DIMMER_ATMEGA_VREF11;
+    register_mem.data.cfg.temperature_offset = DIMMER_TEMPERATURE_OFFSET * DIMMER_TEMP_OFFSET_DIVIDER;
+    register_mem.data.cfg.temperature2_offset = DIMMER_TEMPERATURE2_OFFSET * DIMMER_TEMP_OFFSET_DIVIDER;
 }
 
 void ConfigStorage::Settings::copyFrom()
@@ -56,7 +54,7 @@ WearLevelData_t &ConfigStorage::Settings::getConfig()
 }
 
 
-ConfigStorage::ConfigStorage() : cfg(register_mem.data.cfg)
+ConfigStorage::ConfigStorage() : cfg(register_mem.data.cfg), _eepromWriteTimer(kEEPROMTimerDisabled)
 {
 }
 
@@ -109,7 +107,7 @@ void ConfigStorage::_read(ConfigStorage::Settings &settings, bool restoreFactory
         Configuration::restoreFactoryDefaults();
 #if DIMMER_CUBIC_INTERPOLATION
         memcpy(&staticData.cfg, &register_mem.data.cfg, sizeof(register_mem.data.cfg));
-        memset(staticData.cubic_int, 0xff, sizeof(staticData.cubic_int));
+        memset(staticData.cubic_int, 0, sizeof(staticData.cubic_int));
 #endif
 
         settings = Settings();
@@ -124,6 +122,15 @@ void ConfigStorage::writeSettings()
     ConfigStorage::Settings settings;
     settings.copyTo();
     _eeprom.writeWearLevelData(settings.getConfig());
+}
+
+void ConfigStorage::scheduleWriteSettings()
+{
+    if (_eepromWriteTimer == kEEPROMTimerDisabled) {
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+            _eepromWriteTimer = millis() + kEEPROMWriteDelay;
+        }
+    }
 }
 
 void ConfigStorage::writeConfiguration()
