@@ -364,13 +364,6 @@ void loop() {
                 Wire.write(0);
                 endTransmission();
                 break;
-            case 'O':
-                Serial.println(F("Sending reset..."));
-                Wire.beginTransmission(DIMMER_I2C_ADDRESS);
-                Wire.write(DIMMER_REGISTER_COMMAND);
-                Wire.write(DIMMER_COMMAND_RESET);
-                endTransmission();
-                break;
             case 'P': {
                     OCR1A--;
                     OCR1B = OCR1A + 3;

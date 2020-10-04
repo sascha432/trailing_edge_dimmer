@@ -10,6 +10,8 @@ volatile uint8_t *dimmer_pins_addr[DIMMER_CHANNELS];
 uint8_t dimmer_pins_mask[DIMMER_CHANNELS];
 dimmer_t dimmer;
 
+extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
+
 #if FREQUENCY_TEST_DURATION
 
 volatile uint8_t zero_crossing_int_counter = 0;
@@ -24,7 +26,7 @@ float dimmer_get_frequency() {
     auto last = millis() - zero_crossing_frequency_time;
     if (last > 1000 / DIMMER_LOW_FREQUENCY) { // signal lost
         zero_crossing_frequency_period = 0;
-        dimmer_schedule_call(FREQUENCY_LOW);
+        dimmer_scheduled_calls.report_error = true;
         register_mem.data.errors.frequency_low++;
         return NAN;
     }
@@ -100,11 +102,11 @@ void dimmer_zc_interrupt_handler() {
         zero_crossing_int_counter = 0;
         zero_crossing_frequency_time = _millis;
         if (zero_crossing_frequency_period > 500 / DIMMER_LOW_FREQUENCY) {
-            dimmer_schedule_call(FREQUENCY_LOW);
+            dimmer_scheduled_calls.report_error = true;
             register_mem.data.errors.frequency_low++;
         }
         else if (zero_crossing_frequency_period < 500 / DIMMER_HIGH_FREQUENCY) {
-            dimmer_schedule_call(FREQUENCY_HIGH);
+            dimmer_scheduled_calls.report_error = true;
             register_mem.data.errors.frequency_high++;
         }
     }
@@ -128,7 +130,7 @@ void dimmer_zc_setup() {
 #endif
 
     pinMode(ZC_SIGNAL_PIN, INPUT);
-    attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), dimmer_zc_interrupt_handler, RISING);
+    attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), dimmer_zc_interrupt_handler, DIMMER_ZC_INTERRUPT_MODE);
 }
 
 #if DIMMER_USE_LINEAR_CORRECTION

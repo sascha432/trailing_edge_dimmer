@@ -2,11 +2,11 @@
  * Author: sascha_lammers@gmx.de
  */
 
-#include <avr/wdt.h>
 #include "i2c_slave.h"
 #include "helpers.h"
 
 register_mem_union_t register_mem;
+extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
 #if DIMMER_USE_FADING
 
@@ -153,21 +153,21 @@ void _dimmer_i2c_on_receive(int length) {
                 case DIMMER_COMMAND_READ_NTC:
                     register_mem.data.temp = NAN;
 #if HAVE_NTC
-                    dimmer_schedule_call(READ_NTC_TEMP);
+                    dimmer_scheduled_calls.read_ntc_temp = true;
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
                 case DIMMER_COMMAND_READ_INT_TEMP:
                     register_mem.data.temp = NAN;
 #if HAVE_READ_INT_TEMP
-                    dimmer_schedule_call(READ_INT_TEMP);
+                    dimmer_scheduled_calls.read_int_temp = true;
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
                 case DIMMER_COMMAND_READ_VCC:
                     register_mem.data.vcc = 0;
 #if HAVE_READ_VCC
-                    dimmer_schedule_call(READ_VCC);
+                    dimmer_scheduled_calls.read_vcc = true;
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.vcc));
                     break;
@@ -189,7 +189,6 @@ void _dimmer_i2c_on_receive(int length) {
                     reset_config();
 #if USE_EEPROM
                     init_eeprom();
-                    _write_config();
 #endif
                     break;
                 case DIMMER_COMMAND_READ_TIMINGS:
@@ -231,19 +230,9 @@ void _dimmer_i2c_on_receive(int length) {
 #if HAVE_PRINT_METRICS
                 case DIMMER_COMMAND_PRINT_METRICS:
                     print_metrics_timeout = 0;
-                    if (length-- > 0 && Wire.read() == 0) {
-
-                        dimmer_remove_scheduled_call(PRINT_METRICS);
-                    }
-                    else {
-                        dimmer_schedule_call(PRINT_METRICS);
-                    }
+                    dimmer_scheduled_calls.print_metrics = !(length-- > 0 && Wire.read() == 0);
                     break;
 #endif
-
-                case DIMMER_COMMAND_RESET:
-                    wdt_reset();
-                    break;
 
 #if ZC_MAX_TIMINGS
                 case DIMMER_COMMAND_ZC_TIMINGS_OUTPUT:

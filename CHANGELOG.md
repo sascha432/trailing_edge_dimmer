@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.5
+
+- SerialTwoWire updated
+- Fixed issues with millis overflow
+- Replaced frequency and misfire error with single type of error
+
+## 2.1.4
+
+- Added DIMMER_ZC_INTERRUPT to specify rising or falling interrupt triggering
+- Removed DIMMER_COMMAND_RESET since it was not working with several versions of the bootloader
+
 ## 2.1.3
 
 - Fixed bug in EEPROM wear leveling and invalid CRC after cycling
