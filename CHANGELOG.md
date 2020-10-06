@@ -2,9 +2,13 @@
 
 ## 2.1.5
 
-- SerialTwoWire updated
 - Fixed issues with millis overflow
 - Replaced frequency and misfire error with single type of error
+- SerialTwoWire updated
+- Replaced crc16.cpp with a library
+- Changed default max. temperature to 75°C and metrics update interval to 5 seconds
+- Added environments for flashing the bootloader to ATMega328P and ATMega328PB @ 8MHz and BOD disabled
+- Improved reading VCC and internal temperature
 
 ## 2.1.4
 
