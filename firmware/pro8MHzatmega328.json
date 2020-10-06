@@ -1,0 +1,33 @@
+{
+  "build": {
+    "core": "arduino",
+    "extra_flags": "-DARDUINO_AVR_PRO",
+    "f_cpu": "8000000L",
+    "mcu": "atmega328p",
+    "variant": "eightanaloginputs"
+  },
+  "bootloader": {
+    "efuse": "0xFD",
+    "file": "atmega/ATmegaBOOT_168_atmega328_pro_8MHz.hex",
+    "hfuse": "0xDA",
+    "lock_bits": "0x0F",
+    "lfuse": "0xFF",
+    "unlock_bits": "0x3F"
+  },
+  "debug": {
+    "simavr_target": "atmega328p"
+  },
+  "frameworks": [
+    "arduino"
+  ],
+  "name": "Arduino Pro or Pro Mini ATmega328 (3.3V, 8 MHz, BDO 2.7V)",
+  "upload": {
+    "maximum_ram_size": 2048,
+    "maximum_size": 30720,
+    "protocol": "arduino",
+    "require_upload_port": true,
+    "speed": 57600
+  },
+  "url": "http://arduino.cc/en/Main/ArduinoBoardProMini",
+  "vendor": "Arduino"
+}
