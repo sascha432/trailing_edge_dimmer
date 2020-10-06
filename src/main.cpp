@@ -9,8 +9,12 @@
 #include "helpers.h"
 #if USE_EEPROM
 #include <EEPROM.h>
-#include "crc16.h"
+#include <crc16.h>
 #endif
+
+// size reduction
+//23704 - 2.1.3
+//23492 - helpers.cpp / get_signature
 
 config_t config;
 uint16_t eeprom_position = 0;
@@ -22,7 +26,7 @@ void reset_config() {
     config = {};
     register_mem.data.cfg = {};
     register_mem.data.version = DIMMER_VERSION_WORD;
-    register_mem.data.cfg.max_temp = 90;
+    register_mem.data.cfg.max_temp = 75;
     register_mem.data.cfg.bits.restore_level = true;
     register_mem.data.cfg.bits.report_metrics = true;
     register_mem.data.cfg.fade_in_time = 7.5;
@@ -31,7 +35,7 @@ void reset_config() {
     register_mem.data.cfg.minimum_on_time_ticks = DIMMER_US_TO_TICKS(DIMMER_MIN_ON_TIME_US, DIMMER_TMR1_TICKS_PER_US);
     register_mem.data.cfg.adjust_halfwave_time_ticks = DIMMER_US_TO_TICKS(DIMMER_ADJUST_HALFWAVE_US, DIMMER_TMR1_TICKS_PER_US);
     register_mem.data.cfg.internal_1_1v_ref = INTERNAL_VREF_1_1V;
-    register_mem.data.cfg.report_metrics_max_interval = 30;
+    register_mem.data.cfg.report_metrics_max_interval = 5;
 #ifdef INTERNAL_TEMP_OFS
     register_mem.data.cfg.int_temp_offset = INTERNAL_TEMP_OFS;
 #endif
@@ -42,12 +46,14 @@ void reset_config() {
     memcpy(&config.cfg, &register_mem.data.cfg, sizeof(config.cfg));
 }
 
-unsigned long get_eeprom_num_writes(unsigned long cycle, uint16_t position) {
+unsigned long get_eeprom_num_writes(unsigned long cycle, uint16_t position)
+{
     return ((EEPROM.length() / sizeof(config_t)) * (cycle - 1)) + (position / sizeof(config_t));
 }
 
 // initialize EEPROM and wear leveling
-void init_eeprom() {
+void init_eeprom()
+{
     EEPROM.begin();
     config.eeprom_cycle = 1;
     eeprom_position = 0;
@@ -56,7 +62,7 @@ void init_eeprom() {
     for(uint16_t i = 0; i < EEPROM.length(); i++) {
         EEPROM.write(i, 0);
     }
-    config.crc16 = crc16_calc(reinterpret_cast<const uint8_t *>(&config.cfg), sizeof(config.cfg));
+    config.crc16 = crc16_update(&config.cfg, sizeof(config.cfg));
     EEPROM.put(eeprom_position, config);
     EEPROM.end();
 }
@@ -100,7 +106,7 @@ void read_config() {
     EEPROM.get(eeprom_position, config);
     EEPROM.end();
 
-    auto crc = crc16_calc(reinterpret_cast<const uint8_t *>(&config.cfg), sizeof(config.cfg));
+    auto crc = crc16_update(&config.cfg, sizeof(config.cfg));
 
     Serial_printf_P(PSTR("+REM=EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x=%04x\n"), (unsigned long)max_cycle, eeprom_position, get_eeprom_num_writes(max_cycle, eeprom_position), config.crc16, crc);
 
@@ -144,7 +150,7 @@ void _write_config(bool force) {
 
     memcpy(&config.cfg, &register_mem.data.cfg, sizeof(config.cfg));
     memcpy(&config.level, &register_mem.data.level, sizeof(config.level));
-    config.crc16 = crc16_calc(reinterpret_cast<const uint8_t *>(&config.cfg), sizeof(config.cfg));
+    config.crc16 = crc16_update(&config.cfg, sizeof(config.cfg));
 
     EEPROM.begin();
     EEPROM.get(eeprom_position, temp_config);
@@ -154,7 +160,7 @@ void _write_config(bool force) {
         if (eeprom_position + sizeof(config) >= EEPROM.length()) { // end reached, start from beginning and increase cycle counter
             eeprom_position = 0;
             config.eeprom_cycle++;
-            config.crc16 = crc16_calc(reinterpret_cast<const uint8_t *>(&config.cfg), sizeof(config.cfg)); // recalculate CRC
+            config.crc16 = crc16_update(&config.cfg, sizeof(config.cfg)); // recalculate CRC
         }
         _D(5, debug_printf_P(PSTR("new cycle %lu, position %u\n"), (unsigned long)config.eeprom_cycle, eeprom_position));
         EEPROM.put(eeprom_position, config);
@@ -199,26 +205,74 @@ bool is_Atmega328PB;
 float get_internal_temperature() {
     ADMUX = (_BV(REFS1) | _BV(REFS0) | _BV(MUX3));
     ADCSRA |= _BV(ADEN);
-    delay(40); // 20 was not enough. It takes quite a while when switching from reading VCC to temp.
-    ADCSRA |= _BV(ADSC);
-    while (bit_is_set(ADCSRA, ADSC)) ;
-    return ((ADCW - (is_Atmega328PB ? 247.0f : 324.31f)) / 1.22f) + (float)(register_mem.data.cfg.int_temp_offset / 4.0f);
+    uint16_t sum = 0;
+    for (uint8_t i = 0; i < 25; i++) {
+        delay(1);
+        if (i == 15) { // start after 15ms
+            sum = 0;
+        }
+        ADCSRA |= _BV(ADSC);
+        while (bit_is_set(ADCSRA, ADSC)) ;
+        sum += ADCW;
+    }
+    return (((sum / 10.0) - (is_Atmega328PB ? 247.0f : 324.31f)) / 1.22f) + (float)(register_mem.data.cfg.int_temp_offset / 4.0f);
 }
 
 #endif
 
 #if HAVE_READ_VCC
 
+#if HAVE_EXT_VCC
+
+uint16_t read_vcc()
+{
+    analogReference(INTERNAL);
+    analogRead(VCC_PIN);
+    uint32_t sum = 0;
+    for(uint8_t i = 0; i < 25; i++) {
+        delay(1);
+        if (i == 15) { // start after 15ms
+            sum = 0;
+        }
+        sum += analogRead(VCC_PIN);
+    }
+
+    // Vout = (Vs * R2) / (R1 + R2)
+    // ((ADCValue / 1024) * (Vref * 1000)) / N = (Vs * R2) / (R1 + R2)
+    // Vs=((125*ADCValue*R2+125*ADCValue*R1)*Vref)/(128*N*R2)
+
+    // R1=12K
+    // R2=3K
+    // N=10
+    // ((ADCValue / 1024) * (Vref * 1000)) / N = (Vs * 3000) / (12000 + 3000)
+    // Vs=(625*ADCValue*Vref)/(128*N)
+
+    return (625UL * sum * register_mem.data.cfg.internal_1_1v_ref) / 1280U;
+}
+
+#else
+#define read_vcc()      read_vcc_int()
+
+#endif
+
 // read VCC in mV
-uint16_t read_vcc() {
-    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1);
-    delay(40);
-    ADCSRA |= _BV(ADSC);
-    while (bit_is_set(ADCSRA, ADSC)) ;
-    return (1000.0f * 1024.0f) * register_mem.data.cfg.internal_1_1v_ref / (float)ADCW;
+uint16_t read_vcc_int() {
+    ADMUX = _BV(REFS0) | _BV(MUX3) | _BV(MUX2) | _BV(MUX1); // analogReference(DEFAULT) = AVCC with external capacitor at AREF pin
+    uint16_t sum = 0;
+    for (uint8_t i = 0; i < 20; i++) {
+        delay(1);
+        if (i == 10) { // start after 10ms
+            sum = 0;
+        }
+        ADCSRA |= _BV(ADSC);
+        while (bit_is_set(ADCSRA, ADSC));
+        sum += ADCW;
+    }
+    return (10UL * 1000UL * 1024UL) * register_mem.data.cfg.internal_1_1v_ref / (float)sum;
 }
 
 #endif
+
 
 #if HAVE_NTC
 
@@ -281,12 +335,12 @@ void display_dimmer_info() {
     Serial.flush();
 
     rem();
-    char *mcu;
-    uint8_t *sig, *fuses;
-    auto buffer = get_mcu_type(mcu, sig, fuses);
-    Serial_printf_P(PSTR("sig=%02x-%02x-%02x,fuses=l:%02x,h:%02x,e:%02x"), *sig, *(sig + 1), *(sig + 2), *fuses, *(fuses + 1), *(fuses + 2));
-    if (*mcu) {
-        Serial_printf_P(PSTR(",mcu=%s"), mcu);
+    MCUInfo_t mcu;
+    get_mcu_type(mcu);
+
+    Serial_printf_P(PSTR("sig=%02x-%02x-%02x,fuses=l:%02x,h:%02x,e:%02x"), mcu.sig[0], mcu.sig[1], mcu.sig[2], mcu.fuses[0], mcu.fuses[1], mcu.fuses[2]);
+    if (mcu.name) {
+        Serial_printf_P(PSTR(",MCU=%S"), mcu.name);
     }
     Serial_printf_P(PSTR("@%uMhz\n"), (unsigned)(F_CPU / 1000000UL));
     Serial.flush();
@@ -533,7 +587,9 @@ void loop() {
         #if HAVE_READ_INT_TEMP
             Serial_printf_P(PSTR("int.temp=%.3f,"), get_internal_temperature());
         #endif
-        #if HAVE_READ_VCC
+        #if HAVE_EXT_VCC
+            Serial_printf_P(PSTR("VCC=%u,VCCi=%u,"), read_vcc(), read_vcc_int());
+        #elif HAVE_READ_VCC
             Serial_printf_P(PSTR("VCC=%u,"), read_vcc());
         #endif
         #if FREQUENCY_TEST_DURATION

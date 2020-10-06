@@ -62,7 +62,7 @@ typedef struct __attribute__packed__ {
     uint8_t address;
 } register_mem_t;
 
-typedef union __attribute__packed__ {
+typedef union __attribute__packed__ register_mem_union_t {
     register_mem_t data;
     uint8_t raw[sizeof(register_mem_t)];
 } register_mem_union_t;

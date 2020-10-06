@@ -4,6 +4,7 @@
 
 #include <avr/boot.h>
 #include "helpers.h"
+#include "main.h"
 
 // returns number of digits without trailing zeros after determining max. precision
 int count_decimals(double value, uint8_t max_precision, uint8_t max_decimals) {
@@ -228,7 +229,8 @@ ATmega8U2       1e9389
 ATmega8         1e9307
 */
 
-uint8_t *get_signature(uint8_t *sig) {
+uint8_t *get_signature(uint8_t *sig)
+{
     auto ptr = sig;
     *ptr++ = boot_signature_byte_get(0);
     *ptr++ = boot_signature_byte_get(2);
@@ -236,89 +238,65 @@ uint8_t *get_signature(uint8_t *sig) {
     return sig;
 }
 
-unique_ptr<uint8_t> get_mcu_type(char *&mcu, uint8_t *&sig, uint8_t *&fuses) {
-    const size_t mcu_size = 17;
-    auto buffer = new uint8_t[3 + 3 + mcu_size + 1];
-    auto ptr = buffer;
+extern bool is_Atmega328PB;
 
-    sig = ptr;
-    ptr = get_signature(ptr) + 3;
+void get_mcu_type(MCUInfo_t &info)
+{
+    get_signature(info.sig);
 
-    fuses = ptr;
+    auto ptr = info.fuses;
     *ptr++ = boot_lock_fuse_bits_get(GET_LOW_FUSE_BITS);
     *ptr++ = boot_lock_fuse_bits_get(GET_HIGH_FUSE_BITS);
     *ptr++ = boot_lock_fuse_bits_get(GET_EXTENDED_FUSE_BITS);
 
-    mcu = reinterpret_cast<char *>(ptr);
-    *mcu = 0;
-    *(mcu + mcu_size) = 0;
+#if __AVR_ATmega328PB__
 
-    if (sig[0] == 0x1e) {
-        if (sig[1] == 0x93) {
-            switch(sig[2]) {
-                case 0x0a:
-                    strncpy_P(mcu, PSTR("ATmega88"), mcu_size);
-                    break;
-                case 0x0f:
-                    strncpy_P(mcu, PSTR("ATmega88P"), mcu_size);
+    info.name = FPSTR("ATmega328PB");
+    setAtmega328PB(true);
+
+#elif __AVR_ATmega328P__
+
+    if (info.sig[2] == 0x16) {
+        info.name = FPSTR("ATmega328PB");
+        setAtmega328PB(true);
+    }
+    else {
+        info.name = FPSTR("ATmega328P");
+    }
+
+#elif __AVR_ATmega2560__
+
+    info.name = FPSTR("ATmega2560");
+
+#else
+
+    info.name = nullptr;
+    if (info.sig[0] == 0x1e) {
+        if (info.sig[1] == 0x98) {
+            switch(info.sig[2]) {
+                case 0x01:
+                    info.name = FPSTR("ATmega2560");
                     break;
             }
         }
-        else if (sig[1] == 0x95) {
-            switch(sig[2]) {
+        else if (info.sig[1] == 0x95) {
+            switch(info.sig[2]) {
                 case 0x02:
-                    strncpy_P(mcu, PSTR("ATmega32"), mcu_size);
-                    break;
+                     info.name = FPSTR("ATmega32");
+                     break;
                 case 0x0f:
-                    strncpy_P(mcu, PSTR("ATmega328P"), mcu_size);
+                    info.name = FPSTR("ATmega328P");
                     break;
                 case 0x14:
-                    strncpy_P(mcu, PSTR("ATmega328-PU"), mcu_size);
+                    info.name = FPSTR("ATmega328-PU");
                     break;
                 case 0x16:
-                    strncpy_P(mcu, PSTR("ATmega328PB"), mcu_size);
+                    info.name = FPSTR("ATmega328PB");
+                    setAtmega328PB(true);
                     break;
             }
         }
     }
-
-    return unique_ptr<uint8_t>(buffer);
-}
-
-#if DEBUG
-uint8_t _debug_level = DEBUG_LEVEL;
-
-void debug_print_millis() {
-    Serial_printf_P(PSTR("+DBG%05lu: "), millis());
-}
-
-// PrintExEx SerialEx = Serial;
-
-// void PrintExEx::printf_P(PGM_P format, ...) {
-// }
-
-// void PrintExEx::vprintf(const char *format, ...) {
-//     char buf[64];
-//     size_t len;
-//     va_list arg;
-//     va_start(arg, format);
-//     if ((len = vsnprintf(buf, sizeof(buf), format, arg)) == sizeof(buf)) {
-//         char *ptr = (char *)malloc(len + 2);
-//         if (ptr) {
-//             vsnprintf(ptr, len, format, arg);
-//             print(ptr);
-//             free(ptr);
-//         }
-//     } else {
-//         print(buf);
-//     }
-//     va_end(arg);
-// }
-
-// PrintExEx::PrintExEx(Stream &stream) : PrintEx(stream), _stream(stream) {
-// }
-
-// PrintExEx::~PrintExEx() {
-// }
-
 #endif
+
+}

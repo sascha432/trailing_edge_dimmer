@@ -90,8 +90,18 @@ private:
     T_ptr_t _ptr;
 };
 
+#ifndef FPSTR
+#define FPSTR(str)                              reinterpret_cast<const __FlashStringHelper *>(PSTR(str))
+#endif
+
+typedef struct {
+    uint8_t sig[3];
+    uint8_t fuses[3];
+    const __FlashStringHelper *name;
+} MCUInfo_t;
+
 uint8_t *get_signature(uint8_t *sig);
-unique_ptr<uint8_t> get_mcu_type(char *&mcu, uint8_t *&sig, uint8_t *&fuses);
+void get_mcu_type(MCUInfo_t &info);
 
 int Serial_printf(const char *format, ...);
 int Serial_printf_P(PGM_P format, ...);

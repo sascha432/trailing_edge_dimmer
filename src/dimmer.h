@@ -207,6 +207,14 @@ float dimmer_get_frequency();
 #define DIMMER_I2C_SLAVE                                        1
 #endif
 
+#ifndef HAVE_EXT_VCC
+#define HAVE_EXT_VCC                                            0
+#endif
+
+#ifndef VCC_PIN
+#define VCC_PIN                                                 A0
+#endif
+
 typedef int8_t dimmer_channel_id_t;
 typedef int16_t dimmer_level_t;
 

@@ -118,7 +118,7 @@ void dimmer_zc_setup() {
 
     _D(5, debug_printf_P(PSTR("Setting up zero crossing detection on PIN %u\n"), ZC_SIGNAL_PIN));
 
-    memset(&dimmer, 0, sizeof(dimmer));
+    dimmer = {};
 #if HAVE_FADE_COMPLETION_EVENT
     for(dimmer_channel_id_t i = 0; i < DIMMER_CHANNELS; i++) {
         dimmer.fadingCompleted[i] = INVALID_LEVEL;

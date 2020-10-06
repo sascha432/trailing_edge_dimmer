@@ -115,8 +115,13 @@ extern unsigned long metrics_next_event;
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
 #if HAVE_READ_INT_TEMP
+extern bool is_Atmega328PB;
+#define setAtmega328PB(value) is_Atmega328PB = value;
 float get_internal_temperature();
+#else
+#define setAtmega328PB(value) ;
 #endif
+
 
 #if HIDE_DIMMER_INFO == 0
 void display_dimmer_info();

@@ -410,7 +410,7 @@ void dimmer_i2c_slave_setup() {
 
     _D(5, debug_printf_P(PSTR("I2C slave address: %#02x\n"), DIMMER_I2C_ADDRESS));
 
-    memset(&register_mem, 0, sizeof(register_mem));
+    register_mem = {};
     register_mem.data.from_level = -1;
 
     Wire.begin(DIMMER_I2C_ADDRESS);
