@@ -121,7 +121,7 @@ void setup() {
 
     Serial.begin(DEFAULT_BAUD_RATE);
     Serial.print(F("Dimmer control example @ "));
-    Serial_printf_P(PSTR("0x%02x\n"), DIMMER_I2C_ADDRESS);
+    Serial.printf_P(PSTR("0x%02x\n"), DIMMER_I2C_ADDRESS);
 
 #if SERIAL_I2C_BRDIGE
     Serial2.begin(DEFAULT_BAUD_RATE);
@@ -136,21 +136,21 @@ void setup() {
     // receive incoming data as slave
     Wire.begin(DIMMER_I2C_ADDRESS + 1);
     Wire.onReceive([](int length) {
-        // Serial_printf_P(PSTR("Wire.onReceive(): length %u, type %#02x\n"), length, Wire.peek());
+        // Serial.printf_P(PSTR("Wire.onReceive(): length %u, type %#02x\n"), length, Wire.peek());
         switch((uint8_t)Wire.read()) {
             case DIMMER_METRICS_REPORT:
                 if (length >= (int)sizeof(dimmer_metrics_t)) {
                     dimmer_metrics_t metrics;
                     Wire.readBytes(reinterpret_cast<uint8_t *>(&metrics), sizeof(metrics));
-                    Serial_printf_P(PSTR("Temperature %.2f°C NTC %.2f°C "), metrics.internal_temp, metrics.ntc_temp);
-                    Serial_printf_P(PSTR("VCC %.3fV AC frequency %.2f Hz\n"), metrics.vcc / 1000.0, metrics.frequency);
+                    Serial.printf_P(PSTR("Temperature %.2f°C NTC %.2f°C "), metrics.internal_temp, metrics.ntc_temp);
+                    Serial.printf_P(PSTR("VCC %.3fV AC frequency %.2f Hz\n"), metrics.vcc / 1000.0, metrics.frequency);
                 }
                 break;
             case DIMMER_TEMPERATURE_ALERT:
                 if (length == 3) {
                     uint8_t temperature = Wire.read();
                     uint8_t tempThreshold = Wire.read();
-                    Serial_printf_P(PSTR("Temperature alarm: %u > %u\n"), temperature, tempThreshold);
+                    Serial.printf_P(PSTR("Temperature alarm: %u > %u\n"), temperature, tempThreshold);
                 }
                 break;
             case DIMMER_FADING_COMPLETE: {
@@ -161,7 +161,7 @@ void setup() {
                     while(length >= len) {
                         channel = (int8_t)Wire.read();
                         Wire.readBytes(reinterpret_cast<uint8_t *>(&level), sizeof(level));
-                        Serial_printf_P(PSTR("[%d]: %d "), channel, level);
+                        Serial.printf_P(PSTR("[%d]: %d "), channel, level);
                         length -= len;
                         poll_channels[channel] = 0;
                     }
@@ -172,7 +172,7 @@ void setup() {
                     if (length >= sizeof(dimmer_eeprom_written_t)) {
                         dimmer_eeprom_written_t eeprom;
                         Wire.readBytes(reinterpret_cast<uint8_t *>(&eeprom), sizeof(eeprom));
-                        Serial_printf_P(PSTR("EEPROM written: cycle %lu, position %u, bytes written %u\n"), (unsigned long)eeprom.write_cycle, eeprom.write_position, eeprom.bytes_written);
+                        Serial.printf_P(PSTR("EEPROM written: cycle %lu, position %u, bytes written %u\n"), (unsigned long)eeprom.write_cycle, eeprom.write_position, eeprom.bytes_written);
                     }
                 }
                 break;
@@ -190,14 +190,14 @@ int selected_channel = 0;
 int endTransmission(uint8_t stop = true) {
     auto result = Wire.endTransmission(stop);
     if (result) {
-        Serial_printf_P(PSTR("endTransmission() returned %d\n"), result);
+        Serial.printf_P(PSTR("endTransmission() returned %d\n"), result);
     }
     return result;
 }
 
 void set_channel(int channel) {
     selected_channel = channel;
-    Serial_printf_P(PSTR("Channel %u selected\n"), channel);
+    Serial.printf_P(PSTR("Channel %u selected\n"), channel);
 }
 
 void print_channels() {
@@ -212,7 +212,7 @@ void print_channels() {
         Wire.readBytes(reinterpret_cast<uint8_t *>(&levels), sizeof(levels));
 
         for(int8_t i = 0; i < DIMMER_CHANNELS; i++) {
-            Serial_printf_P(PSTR("Channel %u: %d\n"), i, levels[i]);
+            Serial.printf_P(PSTR("Channel %u: %d\n"), i, levels[i]);
         }
     }
 
@@ -232,7 +232,7 @@ int get_level(int channel) {
         if (result == 2) {
             return (uint8_t)Wire.read() | ((uint8_t)Wire.read() << 8);
         } else {
-            Serial_printf_P(PSTR("requestFrom() returned %d\n"), result);
+            Serial.printf_P(PSTR("requestFrom() returned %d\n"), result);
         }
     }
     return -1;
@@ -255,7 +255,7 @@ void set_level(int channel, int newLevel) {
         Wire.write(DIMMER_REGISTER_COMMAND);
         Wire.write(DIMMER_COMMAND_SET_LEVEL);
         if (endTransmission() == 0) {
-            Serial_printf_P(PSTR("Set level %d for channel %d\n"), get_level(channel), channel);
+            Serial.printf_P(PSTR("Set level %d for channel %d\n"), get_level(channel), channel);
         }
     }
 
@@ -277,7 +277,7 @@ void check_poll_channels() {
                 if (millis() > poll_channels[i]) {
                     poll_channels[i] = 0;
                 } else {
-                    Serial_printf_P(PSTR("[%d]: %d\n"), i, get_level(i));
+                    Serial.printf_P(PSTR("[%d]: %d\n"), i, get_level(i));
                 }
             }
         }
@@ -287,7 +287,7 @@ void check_poll_channels() {
 
 void fade(int channel, uint16_t toLevel, float time) {
 
-    Serial_printf_P(PSTR("Fading channel %u to %u in %.2f seconds\n"), channel, toLevel, time);
+    Serial.printf_P(PSTR("Fading channel %u to %u in %.2f seconds\n"), channel, toLevel, time);
 
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
     Wire.write(DIMMER_REGISTER_CHANNEL);
@@ -317,7 +317,7 @@ void read_timing(uint8_t timing, const String &name) {
         float value = -1;
         Wire.readBytes(reinterpret_cast<uint8_t *>(&value), sizeof(value));
         Serial.print(name);
-        Serial_printf_P(PSTR("% 5.4f\n"), value);
+        Serial.printf_P(PSTR("% 5.4f\n"), value);
     }
 }
 
@@ -329,7 +329,7 @@ void read_errors() {
     Wire.write(DIMMER_REGISTER_ERR_FREQ_LOW);
     if (endTransmission() == 0 && Wire.requestFrom(DIMMER_I2C_ADDRESS, sizeof(errors)) == sizeof(errors)) {
         Wire.readBytes(reinterpret_cast<uint8_t *>(&errors), sizeof(errors));
-        Serial_printf_P(PSTR("frequency low %u, frequency high %u, zc misfire %u\n"), errors.frequency_low, errors.frequency_high, errors.zc_misfire);
+        Serial.printf_P(PSTR("frequency low %u, frequency high %u, zc misfire %u\n"), errors.frequency_low, errors.frequency_high, errors.zc_misfire);
     }
 }
 
@@ -367,7 +367,7 @@ void loop() {
             case 'P': {
                     OCR1A--;
                     OCR1B = OCR1A + 3;
-                    Serial_printf_P(PSTR("AC Frequency %.2f Hz (%u)\n"), F_CPU / 256.0 / (float)OCR1A / 2, OCR1A);
+                    Serial.printf_P(PSTR("AC Frequency %.2f Hz (%u)\n"), F_CPU / 256.0 / (float)OCR1A / 2, OCR1A);
                 }
                 break;
             case 'E':
@@ -400,7 +400,7 @@ void loop() {
                             Wire.readBytes(reinterpret_cast<uint8_t *>(&ntc_temp), sizeof(ntc_temp));
                         }
                     }
-                    Serial_printf_P(PSTR("VCC: %.3f Internal temperature: %.2f°C NTC: %.2f°C\n"), vcc / 1000.0, int_temp, ntc_temp);
+                    Serial.printf_P(PSTR("VCC: %.3f Internal temperature: %.2f°C NTC: %.2f°C\n"), vcc / 1000.0, int_temp, ntc_temp);
                 } break;
 
             case 'f':
@@ -427,7 +427,7 @@ void loop() {
                             Wire.write(DIMMER_REGISTER_INT_1_1V_REF);
                             Wire.write(reinterpret_cast<const uint8_t *>(&value), sizeof(value));
                             if (endTransmission() == 0) {
-                                Serial_printf_P(PSTR("Written %.6f\n"), value);
+                                Serial.printf_P(PSTR("Written %.6f\n"), value);
                             }
                         }
                     }
@@ -435,7 +435,7 @@ void loop() {
                 break;
 
             case 'm': {
-                    Serial.print(F("1 - DIMMER_TIMINGS_ZC_DELAY_IN_US\n2 - DIMMER_TIMINGS_MIN_ON_TIME_IN_US\n3 - DIMMER_TIMINGS_ADJ_HW_TIME_IN_US\n\nSelect [empty=abort]: "));
+                    Serial.print(F("1 - DIMMER_TIMINGS_ZC_DELAY_IN_US\n2 - DIMMER_TIMINGS_MIN_ON_TIME_IN_US\n3 - DIMMER_TIMINGS_MIN_OFF_TIME_IN_US\n\nSelect [empty=abort]: "));
                     String input = String();
                     while(!Serial_readLine(input, true)) {
                     }
@@ -453,7 +453,7 @@ void loop() {
                             Wire.write(addr);
                             Wire.write(ticks);
                             if (endTransmission() == 0) {
-                                Serial_printf_P(PSTR("Written %u ticks to %#02x\n"), ticks, addr);
+                                Serial.printf_P(PSTR("Written %u ticks to %#02x\n"), ticks, addr);
                             }
                         }
                     }
@@ -464,7 +464,7 @@ void loop() {
                 read_timing(DIMMER_TIMINGS_TMR2_TICKS_PER_US,   F("Timer 2 ticks per us:        "));
                 read_timing(DIMMER_TIMINGS_ZC_DELAY_IN_US,      F("Zero crossing delay in us:   "));
                 read_timing(DIMMER_TIMINGS_MIN_ON_TIME_IN_US,   F("Min. on time in us:          "));
-                read_timing(DIMMER_TIMINGS_ADJ_HW_TIME_IN_US,   F("Adjust halfwave time in us:  "));
+                read_timing(DIMMER_TIMINGS_MIN_OFF_TIME_IN_US,   F("Adjust halfwave time in us:  "));
                 break;
 
             case 'q':
@@ -527,13 +527,13 @@ void loop() {
             case '*':
                 level = get_level(selected_channel);
                 if (level != -1) {
-                    set_level(selected_channel, level + max(1, DIMMER_MAX_LEVEL / 100));
+                    set_level(selected_channel, level + max(1, dimmer_get_max_level() / 100));
                 }
                 break;
             case '/':
                 level = get_level(selected_channel);
                 if (level != -1) {
-                    set_level(selected_channel, level - max(1, DIMMER_MAX_LEVEL / 100));
+                    set_level(selected_channel, level - max(1, dimmer_get_max_level() / 100));
                 }
                 break;
 
@@ -542,7 +542,7 @@ void loop() {
                 set_level(selected_channel, 0);
                 break;
             case ',':
-                set_level(selected_channel, DIMMER_MAX_LEVEL);
+                set_level(selected_channel, dimmer_get_max_level());
                 break;
 
             // 0-100% fadein/out "fade_time" seconds
@@ -555,7 +555,7 @@ void loop() {
             case '7':
             case '8':
             case '9':
-                fade(selected_channel, (input - '1') * 0.125 * DIMMER_MAX_LEVEL, 5.0);
+                fade(selected_channel, (input - '1') * 0.125 * dimmer_get_max_level(), 5.0);
                 break;
         }
     }

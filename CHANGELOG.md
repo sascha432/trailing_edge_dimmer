@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.2.0
+
+- Min/max Level range can be configured
+- DIMMER_MIN_LEVEL has been replaced by a configurable level that is applied for a specific amount of time when the dimmer is turned on
+- Trailing edge/leading edge switch
+- Changing code to C++
+
 ## 2.1.5
 
 - Fixed issues with millis overflow

@@ -6,91 +6,93 @@
 #include "helpers.h"
 #include "main.h"
 
-// returns number of digits without trailing zeros after determining max. precision
-int count_decimals(double value, uint8_t max_precision, uint8_t max_decimals) {
-    auto precision = max_precision;
-    auto number = abs(value);
-    if (number < 1) {
-        while ((number = (number * 10)) < 1 && precision < max_decimals) { // increase precision for decimals
-            precision++;
-        }
-    }
-    else {
-        while ((number = (number / 10)) > 1 && precision > 1) { // reduce precision for decimals
-            precision--;
-        }
-    }
-    char format[8];
-    snprintf_P(format, sizeof(format), PSTR("%%.%uf"), precision);
-    char buf[32];
-    auto len = snprintf(buf, sizeof(buf), format, value);
-    char *ptr;
-    if (len < (int)sizeof(buf) && (ptr = strchr(buf, '.'))) {
-        ptr++;
-        char *endPtr = ptr + strlen(ptr);
-        while(--endPtr > ptr && *endPtr == '0') { // remove trailing zeros
-            *endPtr = 0;
-            precision--;
-        }
-    }
-    else {
-        precision = max_decimals; // buffer to small
-    }
-    return precision;
-}
-
-int Serial_print_float(double value, uint8_t max_precision, uint8_t max_decimals) {
-    return Serial.print(value, count_decimals(value, max_precision, max_decimals));
-}
-
-
-int Serial_printf(const char *format, ...) {
+size_t Print::__printf(vsnprint_t func, const char *format, va_list arg)
+{
     char buf[64];
     char *temp = buf;
-    va_list arg;
-    va_start(arg, format);
-    int len = vsnprintf(buf, sizeof(buf), format, arg);
+    int len = func(buf, sizeof(buf), format, arg);
     if (len >= (int)sizeof(buf) - 1) {
         temp = (char *)malloc(len + 2);
         if (!temp) {
             return 0;
         }
-        len = vsnprintf(temp, len, format, arg);
+        len = func(temp, len, format, arg);
     }
-    if (len > 0) {
-        Serial.write(reinterpret_cast<const char *>(temp), len);
-    }
+    write(temp, len);
     if (temp != buf) {
         free(temp);
     }
-    va_end(arg);
     return len;
 }
 
-int Serial_printf_P(PGM_P format, ...) {
-    char buf[64];
-    char *temp = buf;
+size_t Print::printf(const char *format, ...)
+{
     va_list arg;
     va_start(arg, format);
-    int len = vsnprintf_P(buf, sizeof(buf), format, arg);
-    if (len >= (int)sizeof(buf) - 1) {
-        temp = (char *)malloc(len + 2);
-        if (!temp) {
-            return 0;
-        }
-        len = vsnprintf_P(temp, len, format, arg);
-    }
-    if (len > 0) {
-        Serial.write(reinterpret_cast<const char *>(temp), len);
-    }
-    if (temp != buf) {
-        free(temp);
-    }
+    size_t result = __printf( vsnprintf, format, arg);
     va_end(arg);
-    return len;
+    return result;
 }
 
-bool Serial_readLine(String &input, bool allowEmpty) {
+size_t Print::printf_P(PGM_P format, ...)
+{
+    va_list arg;
+    va_start(arg, format);
+    size_t result = __printf(vsnprintf_P, format, arg);
+    va_end(arg);
+    return result;
+}
+
+#if DEBUG
+
+uint8_t _debug_level = 0;
+
+void debug_print_millis()
+{
+    Serial.printf_P(PSTR("%05.5lu "), millis());
+    Serial.flush();
+}
+
+void __debug_printf(const char *format, ...)
+{
+    debug_print_millis();
+    va_list arg;
+    va_start(arg, format);
+    Serial.__printf(vsnprintf_P, format, arg);
+    Serial.flush();
+    va_end(arg);
+}
+// #define debug_printf(fmt, ...)              { debug_print_millis(); Serial.printf_P(PSTR(fmt), ##__VA_ARGS__); Serial.flush(); }
+
+
+void __debug_print_memory(void *ptr, size_t size)
+{
+    debug_print_millis();
+    auto data = (uint8_t *)ptr;
+    uint8_t n = 0;
+    Serial.printf_P(PSTR("[%p:%04x]"), ptr, size);
+    while(size--) {
+        Serial.printf_P(PSTR("%02x"), *data++);
+        if ((++n % 2 == 0) && size > 1) {
+            Serial.print(' ');
+            Serial.flush();
+        }
+    }
+    Serial.println();
+    Serial.flush();
+}
+
+int assert_failed()
+{
+    Serial.print(F("\nASSERT FAILED\n"));
+    Serial.flush();
+    abort();
+}
+
+#endif
+
+bool Serial_readLine(String &input, bool allowEmpty)
+{
     int ch;
     while (Serial.available()) {
         ch = Serial.read();
@@ -124,7 +126,7 @@ bool Serial_readLine(String &input, bool allowEmpty) {
                 Serial.println();
                 return true;
             } else {
-                if (allowEmpty ) {
+                if (allowEmpty) {
                     return true;
                 }
             }

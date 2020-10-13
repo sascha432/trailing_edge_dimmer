@@ -10,7 +10,6 @@ The examples are using the UART protocol and can send to the dimmer using any te
 
 Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
 
-
     // +i2ct=17,89,22
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
     Wire.write(DIMMER_REGISTER_COMMAND);
@@ -156,9 +155,21 @@ Channel 2 and 3
 
 ## DIMMER_COMMAND_WRITE_EEPROM
 
-Store configuration and current levels in EEPROM
+Store current dimming levels in EEPROM. Might be delayed due to wear leveling.
 
     +i2ct=17,89,50
+
+## DIMMER_COMMAND_WRITE_CFG_NOW
+
+Store configuration and dimming levels in EEPROM
+
+    +i2ct=17,89,92
+
+## DIMMER_COMMAND_WRITE_EEPROM_NOW
+
+Store current dimming levels in EEPROM
+
+    +i2ct=17,89,93
 
 ## DIMMER_COMMAND_RESTORE_FS
 
@@ -174,7 +185,7 @@ Read timings for fine tuning. The return type is float and all values are in mic
 - DIMMER_TIMINGS_TMR2_TICKS_PER_US
 - DIMMER_TIMINGS_ZC_DELAY_IN_US
 - DIMMER_TIMINGS_MIN_ON_TIME_IN_US
-- DIMMER_TIMINGS_ADJ_HW_TIME_IN_US
+- DIMMER_TIMINGS_MIN_OFF_TIME_IN_US
 
 Read zero crossing delay
 
@@ -182,6 +193,15 @@ Read zero crossing delay
     +i2cr=17,04
 
 **NOTE:** Values are stored in ticks in the EEPROM. DIMMER_TIMINGS_TMR1_TICKS_PER_US and DIMMER_TIMINGS_TMR2_TICKS_PER_US can be used to translate time to ticks.
+
+## Reading firmware version
+
+Reading the firmware version is using the same transmission for all versions. The address 0xB9 is virtual and might be shared with other data.
+
+    +I2CT=17,8a,02,b9
+    +I2CR=17,02
+
+    +I2CT=172608
 
 ## Reading and writing the dimmer settings
 
@@ -192,7 +212,7 @@ Read zero crossing delay
 - DIMMER_REGISTER_LC_FACTOR (float)
 - DIMMER_REGISTER_ZC_DELAY_TICKS (uint8)
 - DIMMER_REGISTER_MIN_ON_TIME_TICKS (uint16)
-- DIMMER_REGISTER_ADJ_HALFWAVE_TICKS (uint16)
+- DIMMER_REGISTER_MIN_OFF_TIME_TICKS (uint16)
 
 ### Options
 
@@ -200,7 +220,7 @@ Read zero crossing delay
 - Bit 1: Report temperature and over-temperature alarm (UART only)
 - Bit 2: Temperature alarm indication. Needs to be cleared manually
 
-To make any changes permanent, **DIMMER_COMMAND_WRITE_EEPROM** needs to be executed.
+To make any changes permanent, **DIMMER_COMMAND_WRITE_CFG_NOW** needs to be executed.
 
 Read all settings
 
@@ -308,7 +328,6 @@ Force temperature check and report metrics if enabled
 ## DIMMER_COMMAND_DUMP_xxx
 
 - DIMMER_COMMAND_DUMP_MEM
-- DIMMER_COMMAND_DUMP_MACROS
 
 This is only available with enabled debugging.
 
@@ -360,23 +379,55 @@ No zero crossing signal does not fire this event, but the frequency measurement 
 
 The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*, which need to be reset manually.
 
-## Zero Crossing calibration
+## First time setup, and general configuration
 
-Following commands are available for calibration. For more commands see "FOR CALIBRATION" in i2c_slave.cpp
+Following commands are available for calibration
 
+### Zero crossing
 
-Increase zero crossing delay
+#### Increase zero crossing delay
 
     +i2ct=17,89,82
 
-Decrease zero crossing delay
+#### Decrease zero crossing delay
 
     +i2ct=17,89,83
 
-Set zero crossing delay to 7F and print setting
+#### Set zero crossing delay to 7F and print setting
 
     +i2ct=17,89,92,7F
 
-The settings need to be stored in the EEPROM. The following command forces to write the EEPROM
+### Displaying and storing settings
 
-    +i2ct=17,89,93
+#### Write current settings to EEPROM
+
+    +i2ct=17,89,92
+
+#### Restore factory defaults
+
+    +i2ct=17,89,51
+
+#### Print Information
+
+    +i2ct=17,89,53
+
+#### Print metrics every 5 seconds
+
+    +i2ct=17,89,55,01
+
+#### Turn print metrics off
+
+    +i2ct=17,89,55,00
+
+#### Print version and configuration
+
+    +i2ct=17,89,91
+
+#### Print register memory
+
+    +i2ct=17,89,ee
+
+#### Read firmware version
+
+    +i2ct=17,8a,02,b9
+    +i2cr=17,02

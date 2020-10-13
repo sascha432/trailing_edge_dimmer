@@ -3,5 +3,9 @@
         {
             "path": "."
         }
-    ]
+    ],
+    "settings": {
+        "C_Cpp.default.cppStandard": "c++11",
+        "C_Cpp.default.intelliSenseMode": "gcc-arm"
+    }
 }

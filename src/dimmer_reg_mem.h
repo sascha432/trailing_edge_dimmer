@@ -20,7 +20,8 @@ typedef struct {
     uint8_t temperature_alert: 1;
     uint8_t frequency_low: 1;
     uint8_t frequency_high: 1;
-    uint8_t ___reserved: 3;
+    uint8_t leading_edge: 1;
+    uint8_t ___reserved: 2;
 } config_options_t;
 
 typedef struct __attribute__packed__ {
@@ -31,14 +32,19 @@ typedef struct __attribute__packed__ {
     uint8_t max_temp;
     float fade_in_time;
     uint8_t temp_check_interval;
-    float linear_correction_factor;
+    float __empty;
     uint8_t zero_crossing_delay_ticks;
     uint16_t minimum_on_time_ticks;
-    uint16_t adjust_halfwave_time_ticks;
+    uint16_t minimum_off_time_ticks;
     float internal_1_1v_ref;
     int8_t int_temp_offset;
     int8_t ntc_temp_offset;
     uint8_t report_metrics_max_interval;
+    // uint16_t version;
+    int16_t range_begin;
+    int16_t range_end;
+    uint16_t switch_on_minimum_ticks;       // if switch_on_minimum_ticks > minimum_on_time_ticks
+    uint8_t switch_on_count;                // increase it for switch_on_count half cycles after switching on
 } register_mem_cfg_t;
 
 typedef struct __attribute__packed__ {
@@ -57,12 +63,11 @@ typedef struct __attribute__packed__ {
     float temp;
     uint16_t vcc;
     register_mem_cfg_t cfg;
-    uint16_t version;
     register_mem_errors_t errors;
     uint8_t address;
 } register_mem_t;
 
-typedef union __attribute__packed__ register_mem_union_t {
+typedef union __attribute__packed__ {
     register_mem_t data;
     uint8_t raw[sizeof(register_mem_t)];
 } register_mem_union_t;
@@ -81,3 +86,14 @@ typedef struct __attribute__packed__ {
     uint8_t bytes_written;      // might be 0 if the data has not been changed
 } dimmer_eeprom_written_t;
 
+typedef struct __attribute__packed__ {
+    uint8_t channel;
+    uint16_t level;
+} dimmer_fading_complete_event_t;
+
+
+static constexpr uint16_t dimmer_version_to_uint16(uint8_t major, uint8_t minor, uint8_t revision) {
+    return (major << 10) | (minor << 5) | revision;
+}
+
+extern register_mem_union_t register_mem;
