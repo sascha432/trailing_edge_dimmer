@@ -4,7 +4,7 @@
 
 #include <avr/boot.h>
 #include "helpers.h"
-#include "main.h"
+#include "sensor.h"
 
 size_t Print::__printf(vsnprint_t func, const char *format, va_list arg)
 {
@@ -63,7 +63,6 @@ void __debug_printf(const char *format, ...)
     va_end(arg);
 }
 // #define debug_printf(fmt, ...)              { debug_print_millis(); Serial.printf_P(PSTR(fmt), ##__VA_ARGS__); Serial.flush(); }
-
 
 void __debug_print_memory(void *ptr, size_t size)
 {

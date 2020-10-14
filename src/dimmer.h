@@ -15,6 +15,8 @@ extern register_mem_union_t register_mem;
 using dimmer_channel_id_t = int8_t;
 using dimmer_level_t = int16_t;
 
+//#if __ARM
+
 struct dimmer_fade_t {
     float level;
     float step;
@@ -24,6 +26,7 @@ struct dimmer_fade_t {
 
 struct dimmer_channel_t {
     uint8_t channel;
+    uint8_t state;
     uint16_t ticks;
 };
 
@@ -40,12 +43,15 @@ namespace Dimmer {
     using TickType = uint16_t;
     using TickMultiplierType = uint32_t;
 
+    enum class ModeType {
+        TRAILING_EDGE,
+        LEADING_EDGE
+    };
+
     static constexpr long LevelTypeMin = static_cast<LevelType>(1UL << ((sizeof(LevelType) << 3) - 1));
     static constexpr long LevelTypeMax = (1UL << ((sizeof(LevelType) << 3) - 1));
-
     static constexpr TickType TickTypeMin = 0;
     static constexpr TickType TickTypeMax = ~0;
-
     static constexpr float kVRef = INTERNAL_VREF_1_1V;
 
     template<int _Timer>
@@ -158,18 +164,24 @@ namespace Dimmer {
         static constexpr type off = 0;
         static constexpr type min = 0;
         static constexpr type max = size;
-        static constexpr type min_on = off + 1;
-        static constexpr type max_on = size;
         static constexpr type invalid = -1;
         static constexpr type current = -1;
     };
 
-    static constexpr uint8_t kFrequency = DIMMER_AC_FREQUENCY;
+    static constexpr uint8_t kFrequency = 50;
+    static constexpr TickType kTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kFrequency * 2));
+
+    static_assert(Level::size >= 255, "at least 255 levels required");
+
     static constexpr uint8_t kMinFrequency = 48;
     static constexpr uint8_t kMaxFrequency = 62;
 
-    static constexpr TickType kTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kFrequency * 2));
-    static constexpr TickMultiplierType kMaxTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kMinFrequency * 2));
+    static constexpr TickType kMinTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kMaxFrequency * 2));
+    static constexpr TickType kMaxTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kMinFrequency * 2));
+
+    static_assert((F_CPU / Timer<1>::prescaler / (kMinFrequency * 2)) < TickTypeMax, "adjust timer 1 prescaler");
+
+    static constexpr uint8_t kOnSwitchCounterMax = 0xfe;
 
     static constexpr float timer1TicksPerMicroSeconds =  Timer<1>::ticksPerMicrosecond;
     static constexpr float timer2TicksPerMicroSeconds =  Timer<2>::ticksPerMicrosecond;
@@ -193,13 +205,13 @@ namespace Dimmer {
         dimmer_channel_t ordered_channels_buffer[Channel::size + 1];            // next dimming levels
         uint8_t on_counter[Channel::size];                                      // counts halfwaves from 0 to 254 after switching on
         uint32_t halfwave_ticks;
-        uint16_t channel_state;                                                  // bitset of the channel state and if the state has been reported (+ Channel::size bits)
+        uint8_t frequency;
+        uint8_t channel_state;                                                  // bitset of the channel state
+        bool toggle_state: 1;
 
 #if HAVE_FADE_COMPLETION_EVENT
         Level::type fading_completed[Channel::size];
 #endif
-        bool on_state: 1;                                                       // value to set when turning the mosfets on
-        bool off_state: 1;                                                      // value to set when turning the mosfets off
     };
 
     class DimmerBase : public dimmer_t {
@@ -215,6 +227,10 @@ namespace Dimmer {
         void end();
         void zc_interrupt_handler();
 
+        inline void set_mode(ModeType mode) {
+            _config.bits.leading_edge = (mode == ModeType::LEADING_EDGE);
+        }
+
         // Set channel to level
         //
         // channel          Channel::min - Channel::max
@@ -225,16 +241,7 @@ namespace Dimmer {
         //
         // channel          Channel::any, Channel::min - Channel::max
         // level            Level::min - Level::max
-        void set_level(Channel::type channel, Level::type level)
-        {
-            if (channel == Channel::any) {
-                for(Channel::type i = 0; i < Channel::size; i++) {
-                    set_channel_level(i, level);
-                }
-            } else {
-                set_channel_level(channel, level);
-            }
-        }
+        void set_level(Channel::type channel, Level::type level);
 
         // Change level from "from_level" to "to_level" within "time"
         //
@@ -263,31 +270,43 @@ namespace Dimmer {
         //                  if absolute_time is set to true, the time is from_level to to_level
         void fade_from_to(Channel::type channel, Level::type from_level, Level::type to_level, float time, bool absolute_time = false);
 
+        //
+        // send fading complention events for all channels
+        //
+        void send_fading_completion_events();
+
     //private:
         void _apply_fading();
 
-        uint16_t _get_ticks(Channel::type channel, Level::type level);
+        inline TickType _get_ticks_per_halfwave() const {
+            return kTicksPerHalfWave;
+        }
 
-        inline uint16_t _get_min_on_ticks(Channel::type channel)
-        {
-            if (_config.switch_on_count && _config.switch_on_minimum_ticks && on_counter[channel] < _config.switch_on_count) {
+        uint16_t __get_ticks(Channel::type channel, Level::type level) const;
+
+        inline uint16_t _get_ticks(Channel::type channel, Level::type level) {
+            return _config.bits.leading_edge ?
+                (_get_ticks_per_halfwave() - __get_ticks(channel, level)) :
+                __get_ticks(channel, level);
+
+        }
+
+        inline uint16_t _get_min_on_ticks(Channel::type channel) const {
+            if (on_counter[channel] < kOnSwitchCounterMax && _config.switch_on_count && _config.switch_on_minimum_ticks && on_counter[channel] < _config.switch_on_count) {
                 return _config.switch_on_minimum_ticks;
             }
             return _config.minimum_on_time_ticks;
         }
 
-        inline uint16_t _get_level(Channel::type channel) const
-        {
-            return level(channel);
+        inline uint16_t _get_level(Channel::type channel) const {
+            return _register_mem.level[channel];
         }
 
-        inline void _set_level(Channel::type channel, Level::type level)
-        {
+        inline void _set_level(Channel::type channel, Level::type level) {
             _register_mem.level[channel] = level;
         }
 
-        inline Level::type _normalize_level(Level::type level)
-        {
+        inline Level::type _normalize_level(Level::type level) const {
             if (level < Level::off) {
                 return Level::off;
             }
@@ -306,20 +325,6 @@ namespace Dimmer {
         float _get_frequency();
         void _set_mosfet_gate(Channel::type channel, bool state);
         void _calculate_channels();
-        void send_fading_completion_events();
-
-    public:
-        inline register_mem_cfg_t &config() {
-            return _config;
-        }
-
-        inline uint16_t &level(Channel::type channel) {
-            return _register_mem.level[channel];
-        }
-
-        inline uint16_t level(Channel::type channel) const {
-            return _register_mem.level[channel];
-        }
 
     private:
         register_mem_cfg_t &_config;

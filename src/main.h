@@ -19,13 +19,14 @@ void _write_config(bool force = false, bool update_regmem_cfg = true);
 
  // bitset
 struct dimmer_scheduled_calls_t {
-    uint8_t read_vcc: 1;
-    uint8_t read_int_temp: 1;
-    uint8_t read_ntc_temp: 1;
-    uint8_t write_eeprom: 1;
-    uint8_t print_info: 1;
-    uint8_t print_metrics: 1;
-    uint8_t report_error: 1;
+    uint8_t read_vcc: 1;                // 0
+    uint8_t read_int_temp: 1;           // 1
+    uint8_t read_ntc_temp: 1;           // 2
+    uint8_t write_eeprom: 1;            // 3
+    uint8_t print_info: 1;              // 4
+    uint8_t report_error: 1;            // 5
+    uint8_t send_channel_state: 1;      // 6
+    uint8_t send_fading_events: 1;      // 7
 };
 
 #if USE_TEMPERATURE_CHECK
@@ -34,29 +35,14 @@ extern unsigned long next_temp_check;
 
 #if HAVE_PRINT_METRICS
 extern unsigned long print_metrics_timeout;
+extern uint16_t print_metrics_interval;
 #endif
 
 extern unsigned long metrics_next_event;
 
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
-#if HAVE_READ_INT_TEMP
-extern bool is_Atmega328PB;
-#define setAtmega328PB(value) is_Atmega328PB = value;
-float get_internal_temperature();
-#else
-#define setAtmega328PB(value) ;
-#endif
-
-
 #if HIDE_DIMMER_INFO == 0
 void display_dimmer_info();
 #endif
 
-#if HAVE_READ_VCC
-uint16_t read_vcc();
-#endif
-
-#if HAVE_NTC
-float get_ntc_temperature();
-#endif

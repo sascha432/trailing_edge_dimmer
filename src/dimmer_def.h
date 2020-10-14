@@ -4,41 +4,25 @@
 
 #pragma once
 
+// pin for the zero crossing signal
 #ifndef ZC_SIGNAL_PIN
 #define ZC_SIGNAL_PIN                                           3
 #endif
 
-// **********************************
-//  NOTE:
-//  for timing see docs/timings.svg
-// **********************************
-
-// the exact delay depends on the zero crossing detection, the prescaler and the CPU speed, the propagation delay and all
-// capacitiy of the circuit. I strongly recommend to check with an oscilloscope to get the exact timings. It can be tuned very
-// well by software to be accurate in the 200-300 nano second range.
-
-// 60 Hz example, time in milliseconds
-
-//  0.000 zero crossing
-//  6.658 zero crossing interrupt
-//  1.675 zero crossing delay (DIMMER_ZC_DELAY_US=1675)
-//        NOTE: there is an additional delay of 22.8us (atmega328p, 16mhz) between the interrupt and the MOSFETs being turned on
-//        depending on the circuit, there will be a propagation delay of 100-500ns, or even more. The delay needs to be adjusted accordingly
-//  8.333 next zero crossing, turn on mosfets - dimmer level 0%
-//  8.533 keep mosfets on (DIMMER_MIN_ON_TIME_US=200) until level 2.49%
-// 14.991 zero crossing interrupt
-// 16.366 dimming level reached 100%, turn mosfets off if still on
-//        depending on the level set, the MOSFETs can be turned off between 2.49% and 100% (between 0.200-8.033ms of the 8333ms half wave)
-// 16.666 next zero crossing
-
-// delay after receiving the zero crossing signal and the mosfet being turned on
+// delay after receiving the zero crossing signal and the mosfets being turned on
+// if RISING is used, there is still a difference of about 20µs (1 channel @16MHz) until the mosfets turn on. this
+// value varies depending on the number of channels and CPU frequency
+//
+// this should be calibrated at a temperature close to the working temperature. the zc crossing detection being used
+// in revision 1.3 with power monitoring changes about 250ns/°C while some older ones vary up to 5µs/°C
+// if more precision is required, a temperature correction based on the NTC temperature can be added
 #ifndef DIMMER_ZC_DELAY_US
 #define DIMMER_ZC_DELAY_US                                      1104  // in µs
 #endif
 
 // zero crossing interrupt trigger mode
-// if CHANGE is used, the zero crossing signal is the average time between rising and falling
-// measured over 2 or more halfwaves
+// if CHANGE is used, the zero crossing signal is the average time between rising and
+// falling measured over 2 or more halfwaves. this mode can be used for asymmetrical and symmetrical signals
 #ifndef DIMMER_ZC_INTERRUPT_MODE
 #define DIMMER_ZC_INTERRUPT_MODE                                RISING
 //#define DIMMER_ZC_INTERRUPT_MODE                                FALLING
@@ -52,47 +36,60 @@
 // in combination with DIMMER_ZC_DELAY_US it can be used to turn the MOSFETs on after the half wave
 // starts and off, before it ends
 
+//
 // minimum on time after the zero crossing interrupt
-// this is level Level::min_on
+// this is level Level::off + 1
+//
+// NOTE:
+// leading edge mode: min. on time ends at zc delay + halfwave - min. on time
+// trailing edge mode: min. on time ends at zc delay + min. on time.
+//
+// https://github.com/sascha432/trailing_edge_dimmer/blob/bedf1d01b5e8d3531ac5dc090c64a4bc6f67bfd3/docs/images/min_on_time.png
+//
 #ifndef DIMMER_MIN_ON_TIME_US
-#define DIMMER_MIN_ON_TIME_US                                   200 // minimum on-time in µs
+#define DIMMER_MIN_ON_TIME_US                                   300 // minimum on-time in µs
 #endif
 
 // default for DIMMER_REGISTER_MIN_OFF_TIME_TICKS
 // minimum time to turn MOSFETs off before the halfwave ends
 // this is level Level::max - 1
 // level Level::max turns the mosfet on permanently
+//
+// NOTE:
+// leading edge mode: min. off time starts at zc delay + halfwave - min. off time
+// trailing edge mode: min. off time starts at zc delay + min. off time.
+//
+// https://github.com/sascha432/trailing_edge_dimmer/blob/bedf1d01b5e8d3531ac5dc090c64a4bc6f67bfd3/docs/images/min_off_time.png
+//
 #ifndef DIMMER_MIN_OFF_TIME_US
 #define DIMMER_MIN_OFF_TIME_US                                  300 // minimum off-time before the halfwave ends
 #endif
 
-// this can be used to configure trailing or leading edge by default. the mode can be configured dynamically
-#ifndef DIMMER_INVERT_MOSFET_SIGNAL
-#define DIMMER_INVERT_MOSFET_SIGNAL                             0
+// default mode
+// 1 trailing edge
+// 0 leading edge
+#ifndef DIMMER_TRAILING_EDGE
+#define DIMMER_TRAILING_EDGE                                    1
 #endif
 
-// state of the PIN that controls the MOSFETs to turn them off
-// this is not affected by DIMMER_INVERT_MOSFET_SIGNAL while the dimmer is turned off
+// 1 inverts the output signal
+#ifndef DIMMER_MOSFET_ACTIVE_LOW
+#define DIMMER_MOSFET_ACTIVE_LOW                                0
+#endif
+
+// pin state to turn MOSFETS on
+#ifndef DIMMER_MOSFET_ON_STATE
+#define DIMMER_MOSFET_ON_STATE                                  (DIMMER_MOSFET_ACTIVE_LOW ? LOW : HIGH)
+#endif
+
+// pin state to turn MOSFETS off
 #ifndef DIMMER_MOSFET_OFF_STATE
-#define DIMMER_MOSFET_OFF_STATE                                 LOW
-#endif
-
-// used to calculate the length of the half wave
-#ifndef DIMMER_AC_FREQUENCY
-    #define DIMMER_AC_FREQUENCY                                 60      // Hz
-#endif
-
-#ifndef DIMMER_LOW_FREQUENCY
-#define DIMMER_LOW_FREQUENCY                                    0.75    // 75%
-#endif
-
-#ifndef DIMMER_HIGH_FREQUENCY
-#define DIMMER_HIGH_FREQUENCY                                   1.2     // 120%
+#define DIMMER_MOSFET_OFF_STATE                                 (DIMMER_MOSFET_ACTIVE_LOW ? HIGH : LOW)
 #endif
 
 // output pins as comma separated list
 #ifndef DIMMER_MOSFET_PINS
-    #define DIMMER_MOSFET_PINS                                  6, 8, 9, 10
+#define DIMMER_MOSFET_PINS                                      6, 8, 9, 10
 #endif
 
 // maximum number of different dimming levels
@@ -103,24 +100,25 @@
 #define DIMMER_MAX_LEVEL                                        8192
 #endif
 
+//
+// the prescaler should be chosen to have maximum precision while having enough range for fine tuning
+
 // timer1, 16 bit, used for turning MOSFETs on and off
 #ifndef DIMMER_TIMER1_PRESCALER
 #define DIMMER_TIMER1_PRESCALER                                 8
 #endif
-
 
 // timer2, 8bit, used to delay the turn on after receiving the ZC signal
 #ifndef DIMMER_TIMER2_PRESCALER
 #define DIMMER_TIMER2_PRESCALER                                 64
 #endif
 
-//
-// the prescaler should be chosen to have maximum precision while having enough range for fine tuning
-
+// sent event when fading has reached the target level
 #ifndef HAVE_FADE_COMPLETION_EVENT
 #define HAVE_FADE_COMPLETION_EVENT                              1
 #endif
 
+// do not display info during boot and disable DIMMER_COMMAND_PRINT_INFO
 #ifndef HIDE_DIMMER_INFO
 #define HIDE_DIMMER_INFO                                        0
 #endif
@@ -131,12 +129,31 @@
 #define FREQUENCY_TEST_DURATION                                 600
 #endif
 
+// voltage divider on analog port
 #ifndef HAVE_EXT_VCC
 #define HAVE_EXT_VCC                                            0
 #endif
 
+// pin to read VCC from. the value is compared against the internal VREF11
+// the voltage divider for measuring 5V is R1=12K, R2=3K, R1=VCC to analog pin, R2=GND to analog pin
+// for getting a stable/average voltage, add C1=10nF-1uF analog pin to GND
 #ifndef VCC_PIN
 #define VCC_PIN                                                 A0
+#endif
+
+// potentiometer for testing purposes
+#ifndef HAVE_POTI
+#define HAVE_POTI                                               0
+#endif
+
+// analog PIN for potentiometer
+#ifndef POTI_PIN
+#define POTI_PIN                                                A1
+#endif
+
+// channel controlled by potentiometer
+#ifndef POTI_CHANNEL
+#define POTI_CHANNEL                                            0
 #endif
 
 #ifndef ZC_MAX_TIMINGS
@@ -218,9 +235,6 @@ extern bool zc_timings_output;
 
 #ifndef HAVE_PRINT_METRICS
 #define HAVE_PRINT_METRICS                                      1
-#endif
-#ifndef PRINT_METRICS_REPEAT
-#define PRINT_METRICS_REPEAT                                    5000
 #endif
 
 #ifndef EEPROM_WRITE_DELAY

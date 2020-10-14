@@ -87,11 +87,11 @@ void _dimmer_i2c_on_receive(int length)
                     }
                     break;
                 case DIMMER_COMMAND_SET_LEVEL:
-                    _D(5, debug_printf("I2C set level=%d, channel=%d\n", register_mem.data.to_level, register_mem.data.channel));
+                    _D(5, debug_printf("I2C set level cmd=%d, channel=%d\n", register_mem.data.to_level, register_mem.data.channel));
                     dimmer.set_level(register_mem.data.channel, register_mem.data.to_level);
                     break;
                 case DIMMER_COMMAND_FADE:
-                    _D(5, debug_printf("I2C fade from=%d, to=%d, channel=%d, fade_time=%f\n", register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
+                    _D(5, debug_printf("I2C fade cmd from=%d, to=%d, channel=%d, fade_time=%f\n", register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
                     dimmer.fade_from_to(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
                     break;
                 case DIMMER_COMMAND_READ_NTC:
@@ -169,9 +169,20 @@ void _dimmer_i2c_on_receive(int length)
 #if HAVE_PRINT_METRICS
                 case DIMMER_COMMAND_PRINT_METRICS:
                     print_metrics_timeout = 0;
-                    dimmer_scheduled_calls.print_metrics = !(length-- > 0 && Wire.read() == 0);
+                    if (length-- > 0) {
+                        print_metrics_interval = Wire.read() * 100;
+                    } else {
+                        print_metrics_interval = 0;
+                    }
+
                     break;
 #endif
+
+                case DIMMER_COMMAND_SET_MODE:
+                    if (length-- > 0) {
+                        dimmer.set_mode((Wire.read() == 1) ? Dimmer::ModeType::LEADING_EDGE : Dimmer::ModeType::TRAILING_EDGE);
+                    }
+                    break;
 
 #if ZC_MAX_TIMINGS
                 case DIMMER_COMMAND_ZC_TIMINGS_OUTPUT:
@@ -308,6 +319,22 @@ void _dimmer_i2c_on_receive(int length)
                     break;
 #endif
 
+#if DIMMER_COMMAND_DUMP_CHANNELS
+                case DIMMER_COMMAND_DUMP_CHANNELS: {
+                        auto &tmp = dimmer.ordered_channels;
+                        if (tmp[0].ticks) {
+                            for(Dimmer::Channel::type i = 0; tmp[i].ticks; i++) {
+                                Serial.printf_P(PSTR("%u=%u(%u) "), tmp[i].channel, tmp[i].ticks, dimmer._get_level(tmp[i].channel));
+                            }
+                            Serial.println();
+                        }
+                        else {
+                            Serial.println(F("No channels active"));
+                        }
+                    }
+                    break;
+#endif
+
 #if DIMMER_COMMAND_DUMP_MEM
                 case DIMMER_COMMAND_DUMP_MEM:
                     auto ptr = register_mem.raw;
@@ -316,6 +343,7 @@ void _dimmer_i2c_on_receive(int length)
                     }
                     break;
 #endif
+
             }
         }
     }

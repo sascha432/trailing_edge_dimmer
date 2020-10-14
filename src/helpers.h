@@ -31,14 +31,28 @@ void debug_print_millis();
 void __debug_print_memory(void *ptr, size_t size);
 void __debug_printf(const char *format, ...);
 
+static inline void __debug_printf_i(uint16_t interval, const char *format, ...) {
+    static uint32_t counter;
+    if ((millis() / interval) && (counter++ % 2 == 0)) {
+        debug_print_millis();
+        va_list arg;
+        va_start(arg, format);
+        Serial.__printf(vsnprintf_P, format, arg);
+        Serial.flush();
+        va_end(arg);
+    }
+}
+
 #define _D(level, ...)                      { if (_debug_level >= level) { __VA_ARGS__; }; }
 #define debug_printf(fmt, ...)              __debug_printf(PSTR(fmt), ##__VA_ARGS__);
 #define debug_print_memory(ptr, size)       __debug_print_memory(ptr, size)
+#define debug_printf_i(interval, fmt, ...)  __debug_printf_i(interval, PSTR(fmt), ##__VA_ARGS__);
 #else
 #define DEBUG_LEVEL   0
 #define _D(...) ;
 #define debug_printf(...)
 #define debug_print_memory(ptr, size)
+#define debug_printf_i(interval, fmt, ...)
 #endif
 
 #ifdef NDEBUG

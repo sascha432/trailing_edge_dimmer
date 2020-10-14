@@ -40,7 +40,6 @@ typedef struct __attribute__packed__ {
     int8_t int_temp_offset;
     int8_t ntc_temp_offset;
     uint8_t report_metrics_max_interval;
-    // uint16_t version;
     int16_t range_begin;
     int16_t range_end;
     uint16_t switch_on_minimum_ticks;       // if switch_on_minimum_ticks > minimum_on_time_ticks
@@ -91,6 +90,9 @@ typedef struct __attribute__packed__ {
     uint16_t level;
 } dimmer_fading_complete_event_t;
 
+typedef struct __attribute__packed__ {
+    uint8_t channel_state;
+} dimmer_channel_state_event_t;
 
 static constexpr uint16_t dimmer_version_to_uint16(uint8_t major, uint8_t minor, uint8_t revision) {
     return (major << 10) | (minor << 5) | revision;

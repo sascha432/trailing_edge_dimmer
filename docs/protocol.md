@@ -209,7 +209,6 @@ Reading the firmware version is using the same transmission for all versions. Th
 - DIMMER_REGISTER_MAX_TEMP (uint8, °C)
 - DIMMER_REGISTER_FADE_IN_TIME (float, seconds)
 - DIMMER_REGISTER_TEMP_CHECK_INT (uint8, seconds)
-- DIMMER_REGISTER_LC_FACTOR (float)
 - DIMMER_REGISTER_ZC_DELAY_TICKS (uint8)
 - DIMMER_REGISTER_MIN_ON_TIME_TICKS (uint16)
 - DIMMER_REGISTER_MIN_OFF_TIME_TICKS (uint16)
@@ -219,6 +218,11 @@ Reading the firmware version is using the same transmission for all versions. Th
 - Bit 0: Restore last levels on power up
 - Bit 1: Report temperature and over-temperature alarm (UART only)
 - Bit 2: Temperature alarm indication. Needs to be cleared manually
+- Bit 3: unused
+- Bit 4: unused
+- Bit 5: Leading edge mode
+- Bit 6: unused
+- Bit 7: unused
 
 To make any changes permanent, **DIMMER_COMMAND_WRITE_CFG_NOW** needs to be executed.
 
@@ -251,6 +255,12 @@ Setting the linear correction factor to 1.0
 Print dimmer info on serial port
 
     +i2ct=17,89,53
+
+## DIMMER_COMMAND_SET_MODE
+
+Set dimmer mode. The following byte indicates the mode. 0 is trailng edge, 1 is leading edge. It is recommended to turn all channels off before switching mode.
+
+    +i2ct=17,89,56,01
 
 ## DIMMER_COMMAND_RESET
 
@@ -315,9 +325,11 @@ The first argument is the return value of micros() hex encoded. Every following 
 
 ## DIMMER_COMMAND_PRINT_METRICS
 
-Print metrics every 5 seconds on serial port in human readable form. The following byte enables (non 0) or disables the output
+Print metrics on serial port in human readable form. The following byte enables or disables the output. The print interval is multiplied by 100ms.
 
-    +i2ct=17,89,55,01
+For example 0x0a * 100ms = 1s
+
+    +i2ct=17,89,55,0a
 
 ## DIMMER_COMMAND_FORCE_TEMP_CHECK
 
@@ -325,19 +337,19 @@ Force temperature check and report metrics if enabled
 
     +i2ct=17,89,54
 
-## DIMMER_COMMAND_DUMP_xxx
+## Commands available in DEBUG mode
 
-- DIMMER_COMMAND_DUMP_MEM
+### DIMMER_COMMAND_DUMP_CHANNELS
 
-This is only available with enabled debugging.
+Dump active channels
+
+    +i2ct=17,89,ed
+
+### DIMMER_COMMAND_DUMP_MEM
 
 Dump the content of the register memory
 
     +i2ct=17,89,ee
-
-Dump macros for the register memory.
-
-    +i2ct=17,89,ef
 
 ## Temperature, VCC status and AC Frequency (DIMMER_METRICS_REPORT)
 
@@ -379,6 +391,10 @@ No zero crossing signal does not fire this event, but the frequency measurement 
 
 The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*, which need to be reset manually.
 
+## Channel on/off state (DIMMER_CHANNEL_ON_OFF)
+
+When a channel is turned on or off, this event is fired. If fading is used, the event is fired immediately before fading reaches the final state. The event data is one byte containing a bitset of the channel states.
+
 ## First time setup, and general configuration
 
 Following commands are available for calibration
@@ -413,7 +429,7 @@ Following commands are available for calibration
 
 #### Print metrics every 5 seconds
 
-    +i2ct=17,89,55,01
+    +i2ct=17,89,55,32
 
 #### Turn print metrics off
 
