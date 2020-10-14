@@ -2,10 +2,13 @@
 
 ## 2.2.0
 
-- Min/max Level range can be configured
+- Removed linear correction
+- Min./max. level range can be configured
 - DIMMER_MIN_LEVEL has been replaced by a configurable level that is applied for a specific amount of time when the dimmer is turned on
-- Trailing edge/leading edge switch
-- Changing code to C++
+- Trailing edge/leading edge mode
+- Frequency auto detection (50/60Hz)
+- Increased ZC delay to 16bit / 500ns resolution
+- Filter invalid ZC signals and continue to run up to several seconds without being synchronized
 
 ## 2.1.5
 

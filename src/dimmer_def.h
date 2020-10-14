@@ -17,7 +17,7 @@
 // in revision 1.3 with power monitoring changes about 250ns/°C while some older ones vary up to 5µs/°C
 // if more precision is required, a temperature correction based on the NTC temperature can be added
 #ifndef DIMMER_ZC_DELAY_US
-#define DIMMER_ZC_DELAY_US                                      1104  // in µs
+#define DIMMER_ZC_DELAY_US                                      144  // in µs
 #endif
 
 // zero crossing interrupt trigger mode
@@ -65,6 +65,20 @@
 #define DIMMER_MIN_OFF_TIME_US                                  300 // minimum off-time before the halfwave ends
 #endif
 
+// adjustment for measuring clock cycles
+// avr-gcc (atmega328p, -O2) adds 37 cpu cycles before reading the counter
+#ifndef DIMMER_MEASURE_ADJ_CYCLE_CNT
+#define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -37
+#endif
+
+// keep dimmer enabled when loosing the ZC signal for up to
+// DIMMER_OUT_OF_SYNC_LIMIT halfwaves. 250 @ 60Hz ~ 2seconds
+// once the signal is lost, it will start to drift and get out of sync. adjust the
+// limit to keep the drift below 200µs
+#ifndef DIMMER_OUT_OF_SYNC_LIMIT
+#define DIMMER_OUT_OF_SYNC_LIMIT                                250
+#endif
+
 // default mode
 // 1 trailing edge
 // 0 leading edge
@@ -84,7 +98,7 @@
 
 // pin state to turn MOSFETS off
 #ifndef DIMMER_MOSFET_OFF_STATE
-#define DIMMER_MOSFET_OFF_STATE                                 (DIMMER_MOSFET_ACTIVE_LOW ? HIGH : LOW)
+#define DIMMER_MOSFET_OFF_STATE                                 (!DIMMER_MOSFET_ON_STATE)
 #endif
 
 // output pins as comma separated list
@@ -121,12 +135,6 @@
 // do not display info during boot and disable DIMMER_COMMAND_PRINT_INFO
 #ifndef HIDE_DIMMER_INFO
 #define HIDE_DIMMER_INFO                                        0
-#endif
-
-// the frequency is updated twice per second
-// 0 disables frequency messuring
-#ifndef FREQUENCY_TEST_DURATION
-#define FREQUENCY_TEST_DURATION                                 600
 #endif
 
 // voltage divider on analog port

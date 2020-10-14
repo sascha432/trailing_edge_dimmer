@@ -32,8 +32,9 @@ typedef struct __attribute__packed__ {
     uint8_t max_temp;
     float fade_in_time;
     uint8_t temp_check_interval;
-    float __empty;
-    uint8_t zero_crossing_delay_ticks;
+    uint8_t __empty[2];
+    int8_t halfwave_adjust_ticks;           // correction for measured ticks
+    uint16_t zero_crossing_delay_ticks;
     uint16_t minimum_on_time_ticks;
     uint16_t minimum_off_time_ticks;
     float internal_1_1v_ref;

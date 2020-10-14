@@ -116,11 +116,7 @@ void _dimmer_i2c_on_receive(int length)
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.vcc));
                     break;
                 case DIMMER_COMMAND_READ_AC_FREQUENCY:
-#if FREQUENCY_TEST_DURATION
                     register_mem.data.temp = dimmer._get_frequency();
-#else
-                    register_mem.data.temp = NAN;
-#endif
                     _D(5, debug_printf("I2C get AC frequency=%.3f\n", register_mem.data.temp));
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
@@ -130,34 +126,23 @@ void _dimmer_i2c_on_receive(int length)
                 case DIMMER_COMMAND_RESTORE_FS:
                     init_eeprom();
                     break;
-                case DIMMER_COMMAND_READ_TIMINGS:
-                    if (length-- > 0) {
-                        uint8_t timing = (uint8_t)Wire.read();
-                        switch(timing) {
-                            case DIMMER_TIMINGS_TMR1_TICKS_PER_US:
-                                register_mem.data.temp = Dimmer::Timer<1>::ticksPerMicrosecond;
-                                break;
-                            case DIMMER_TIMINGS_TMR2_TICKS_PER_US:
-                                register_mem.data.temp = Dimmer::Timer<2>::ticksPerMicrosecond;
-                                break;
-                            case DIMMER_TIMINGS_ZC_DELAY_IN_US:
-                                register_mem.data.temp = Dimmer::Timer<2>::ticksToMicros(register_mem.data.cfg.zero_crossing_delay_ticks);
-                                break;
-                            case DIMMER_TIMINGS_MIN_ON_TIME_IN_US:
-                                register_mem.data.temp = Dimmer::Timer<1>::ticksToMicros(register_mem.data.cfg.minimum_on_time_ticks);
-                                break;
-                            case DIMMER_TIMINGS_MIN_OFF_TIME_IN_US:
-                                register_mem.data.temp = Dimmer::Timer<1>::ticksToMicros(register_mem.data.cfg.minimum_off_time_ticks);
-                                break;
-                            default:
-                                timing = 0;
-                                break;
-                        }
-                        if (timing) {
-                            i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
-                            _D(5, debug_printf("I2C get timing %#02x=%s\n", timing, String(register_mem.data.temp, 5).c_str()));
-                        }
-                    }
+                case DIMMER_COMMAND_GET_TIMER_TICKS:
+                    // if (length-- > 0) {
+                    //     switch(Wire.read()) {
+                    //         case 1:
+                    //             register_mem.data.temp = Dimmer::Timer<1>::ticksPerMicrosecond;
+                    //             break;
+                    //         case 2:
+                    //             register_mem.data.temp = Dimmer::Timer<2>::ticksPerMicrosecond;
+                    //             break;
+                    //         default:
+                    //             register_mem.data.temp = NAN;
+                    //             break;
+                    //     }
+                    //     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
+                    // }
+                    register_mem.data.temp = Dimmer::Timer<1>::ticksPerMicrosecond;
+                    i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
 
 #if HIDE_DIMMER_INFO == 0
@@ -174,7 +159,6 @@ void _dimmer_i2c_on_receive(int length)
                     } else {
                         print_metrics_interval = 0;
                     }
-
                     break;
 #endif
 
@@ -194,43 +178,27 @@ void _dimmer_i2c_on_receive(int length)
 #if 1
                 // FOR CALIBRATION
                 // undocumented, for calibration and testing
-                case 0x80:
-                    register_mem.data.cfg.internal_1_1v_ref += 0.001f;
-                    Serial.printf_P(PSTR("+REM=ref11=%.4f\n"), register_mem.data.cfg.internal_1_1v_ref);
-                    break;
-                case 0x81:
-                    register_mem.data.cfg.internal_1_1v_ref -= 0.001f;
-                    Serial.printf_P(PSTR("+REM=ref11=%.4f\n"), register_mem.data.cfg.internal_1_1v_ref);
-                    break;
                 case 0x82:
                     register_mem.data.cfg.zero_crossing_delay_ticks++;
-                    Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
-                    break;
-                case 0x92:
-                    if (length-- >= 1) {
-                        register_mem.data.cfg.zero_crossing_delay_ticks = Wire.read();
-                    }
                     Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
                 case 0x83:
                     register_mem.data.cfg.zero_crossing_delay_ticks--;
                     Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
+                case 0x92:
+                    if (length-- >= (int)sizeof(register_mem.data.cfg.zero_crossing_delay_ticks)) {
+                        Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.cfg.zero_crossing_delay_ticks), sizeof(register_mem.data.cfg.zero_crossing_delay_ticks));
+                    }
+                    Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
+                    break;
                 case 0x84:
-                    register_mem.data.cfg.int_temp_offset++;
-                    Serial.printf_P(PSTR("+REM=tmpofs=%d\n"), register_mem.data.cfg.int_temp_offset);
+                    dimmer.halfwave_ticks += Wire.read();
+                    Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                     break;
                 case 0x85:
-                    register_mem.data.cfg.int_temp_offset--;
-                    Serial.printf_P(PSTR("+REM=tmpofs=%d\n"), register_mem.data.cfg.int_temp_offset);
-                    break;
-                case 0x86:
-                    register_mem.data.cfg.ntc_temp_offset++;
-                    Serial.printf_P(PSTR("+REM=ntctmpofs=%d\n"), register_mem.data.cfg.ntc_temp_offset);
-                    break;
-                case 0x87:
-                    register_mem.data.cfg.ntc_temp_offset--;
-                    Serial.printf_P(PSTR("+REM=ntctmpofs=%d\n"), register_mem.data.cfg.ntc_temp_offset);
+                    dimmer.halfwave_ticks -= Wire.read();
+                    Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                     break;
 #if 0
                 case 0x90: { // toggle pins on/off

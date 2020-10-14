@@ -177,22 +177,19 @@ Restore factory settings and re-initialize EEPROM wear leveling
 
     +i2ct=17,89,51
 
-## DIMMER_COMMAND_READ_TIMINGS
+## DIMMER_COMMAND_GET_TIMER_TICKS
 
-Read timings for fine tuning. The return type is float and all values are in micro seconds
+Get ticks per microsecond for Timer 1
 
-- DIMMER_TIMINGS_TMR1_TICKS_PER_US
-- DIMMER_TIMINGS_TMR2_TICKS_PER_US
-- DIMMER_TIMINGS_ZC_DELAY_IN_US
-- DIMMER_TIMINGS_MIN_ON_TIME_IN_US
-- DIMMER_TIMINGS_MIN_OFF_TIME_IN_US
-
-Read zero crossing delay
-
-    +i2ct=17,89,23,03
+    +i2ct=17,89,52
     +i2cr=17,04
 
-**NOTE:** Values are stored in ticks in the EEPROM. DIMMER_TIMINGS_TMR1_TICKS_PER_US and DIMMER_TIMINGS_TMR2_TICKS_PER_US can be used to translate time to ticks.
+## DIMMER_COMMAND_READ_AC_FREQUENCY
+
+Read AC frequency
+
+    +i2ct=17,89,23
+    +i2cr=17,04
 
 ## Reading firmware version
 
@@ -209,7 +206,7 @@ Reading the firmware version is using the same transmission for all versions. Th
 - DIMMER_REGISTER_MAX_TEMP (uint8, °C)
 - DIMMER_REGISTER_FADE_IN_TIME (float, seconds)
 - DIMMER_REGISTER_TEMP_CHECK_INT (uint8, seconds)
-- DIMMER_REGISTER_ZC_DELAY_TICKS (uint8)
+- DIMMER_REGISTER_ZC_DELAY_TICKS (uint16)
 - DIMMER_REGISTER_MIN_ON_TIME_TICKS (uint16)
 - DIMMER_REGISTER_MIN_OFF_TIME_TICKS (uint16)
 
@@ -411,7 +408,7 @@ Following commands are available for calibration
 
 #### Set zero crossing delay to 7F and print setting
 
-    +i2ct=17,89,92,7F
+    +i2ct=17,89,92,7F,00
 
 ### Displaying and storing settings
 

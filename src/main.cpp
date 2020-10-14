@@ -23,6 +23,8 @@
 //Flash: [========  ]  76.6% (used 23518 bytes from 30720 bytes)
 //Flash: [=======   ]  73.1% (used 22468 bytes from 30720 bytes)
 // Flash: [=======   ]  73.2% (used 22480 bytes from 30720 bytes
+// frequency detection and continue without zc signal
+// Flash: [========  ]  78.7% (used 24168 bytes from 30720 bytes)
 
 config_t config;
 uint16_t eeprom_position = 0;
@@ -38,11 +40,11 @@ void reset_config()
     dimmer_config.fade_in_time = 4.5;
     dimmer_config.temp_check_interval = 2;
 
-    constexpr int kZCDelayTicks = Dimmer::Timer<2>::ticksPerMicrosecond * DIMMER_ZC_DELAY_US;
-    constexpr int kkMinOnTicks = Dimmer::Timer<1>::ticksPerMicrosecond * DIMMER_MIN_ON_TIME_US;
-    constexpr int kkMinOffTicks = Dimmer::Timer<1>::ticksPerMicrosecond * DIMMER_MIN_OFF_TIME_US;
+    //constexpr int kZCDelayTicks = Dimmer::Timer<1>::ticksPerMicrosecond * DIMMER_ZC_DELAY_US;
+    // constexpr int kkMinOnTicks = Dimmer::Timer<1>::ticksPerMicrosecond * DIMMER_MIN_ON_TIME_US;
+    // constexpr int kkMinOffTicks = Dimmer::Timer<1>::ticksPerMicrosecond * DIMMER_MIN_OFF_TIME_US;
 
-    dimmer_config.zero_crossing_delay_ticks = Dimmer::Timer<2>::microsToTicks(DIMMER_ZC_DELAY_US);
+    dimmer_config.zero_crossing_delay_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_ZC_DELAY_US);
     dimmer_config.minimum_on_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_ON_TIME_US);
     dimmer_config.minimum_off_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_OFF_TIME_US);
     dimmer_config.internal_1_1v_ref = Dimmer::kVRef;
@@ -89,15 +91,18 @@ void read_config()
 
     // find last configuration
     // the first byte is the cycle, which increases by one once the last position has been written
+    _D(5, debug_printf("eeprom "));
     while((pos + sizeof(config_t)) < EEPROM.length()) {
         EEPROM.get(pos, cycle);
-        _D(5, debug_printf("eeprom cycle %ld position %d id\n", cycle, pos));
+        _D(5, Serial.printf_P(PSTR("pos=%lu:%u "), cycle, pos));
         if (cycle >= max_cycle) {
             eeprom_position = pos; // last position with highest cycle number is the config written last
             max_cycle = cycle;
         }
         pos += sizeof(config_t);
     }
+    _D(5, Serial.printf_P(PSTR("max=%u\n"), max_cycle));
+
     EEPROM.get(eeprom_position, config);
     EEPROM.end();
 
@@ -231,7 +236,7 @@ void display_dimmer_info() {
 #if HAVE_READ_VCC
     Serial.print(F("VCC,"));
 #endif
-    Serial.printf_P(PSTR("ACFrq=%u,"), DIMMER_AC_FREQUENCY);
+    Serial.printf_P(PSTR("ACFrq=%u,"), dimmer._get_frequency());
 #if SERIAL_I2C_BRDIGE
     Serial.print(F("Pr=UART,"));
 #else
@@ -245,8 +250,7 @@ void display_dimmer_info() {
         DIMMER_TIMER1_PRESCALER, DIMMER_TIMER2_PRESCALER,
         (dimmer_config.bits.leading_edge ? 'L' : 'T')
     );
-    Serial.printf_P(PSTR("Ticks=%.2f/%.2f"), Dimmer::Timer<1>::ticksPerMicrosecond, Dimmer::Timer<2>::ticksPerMicrosecond);
-    Serial.printf_P(PSTR(",Lvls=%u,P="), DIMMER_MAX_LEVEL);
+    Serial.printf_P(PSTR("Ticks=%.2f,Lvls=" _STRINGIFY(DIMMER_MAX_LEVEL) ",P="), Dimmer::Timer<1>::ticksPerMicrosecond);
     for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
         Serial.print((int)Dimmer::Channel::pins[i]);
         Serial.print(',');
@@ -291,7 +295,14 @@ void display_dimmer_info() {
     Serial.flush();
 }
 
-unsigned long frequency_wait_timeout;
+unsigned long frequency_wait_timer;
+bool frequency_measurement;
+
+void dimmer_measure_frequency()
+{
+    frequency_measurement = true;
+    frequency_wait_timer = 0;
+}
 
 dimmer_scheduled_calls_t dimmer_scheduled_calls;
 unsigned long metrics_next_event;
@@ -315,24 +326,18 @@ void setup() {
 
     dimmer_i2c_slave_setup();
     read_config();
-    dimmer.begin();
 
 #if HAVE_POTI
     pinMode(POTI_PIN, INPUT);
 #endif
-
 #if HAVE_NTC
     pinMode(NTC_PIN, INPUT);
 #endif
+    pinMode(ZC_SIGNAL_PIN, INPUT);
 
-    restore_level();
+    register_mem.data.errors = {};
 
-#if HIDE_DIMMER_INFO == 0
-    // run main loop till the frequency is available
-    frequency_wait_timeout = millis() + min(550, FREQUENCY_TEST_DURATION);
-    dimmer_scheduled_calls.print_info = true;
-
-#endif
+    dimmer_measure_frequency();
     _D(5, debug_printf("exiting setup\n"));
 }
 
@@ -390,13 +395,209 @@ void Dimmer::DimmerBase::send_fading_completion_events() {
 uint16_t poti_level = 0;
 #endif
 
+static volatile uint8_t timer1_overflow;
+
+ISR(TIMER1_OVF_vect)
+{
+    timer1_overflow++;
+}
+
+#if 1
+
+class FrequencyMeasurement {
+public:
+    static constexpr uint8_t kMeasurementBufferSize = 120;
+    static constexpr uint16_t kTimeout = kMeasurementBufferSize * Dimmer::kMaxMicrosPerHalfWave * 2;
+
+#if HAVE_UINT24
+    struct Ticks {
+        union {
+            __uint24 __counter;
+            struct __attribute__((__packed__)) {
+                uint16_t _counter;
+                uint8_t _overflow;
+            };
+        };
+
+        Ticks() {}
+        Ticks(uint8_t overflow, uint16_t counter) : _counter(counter), _overflow(overflow) {
+            __counter += DIMMER_MEASURE_ADJ_CYCLE_CNT;
+        }
+
+        __uint24 get() const {
+            return __counter;
+        }
+    };
+
+#else // +84 byte code size
+    struct __attribute__((__packed__)) Ticks {
+        uint8_t _overflow;
+        uint16_t _counter;
+
+        Ticks() {}
+        Ticks(uint8_t overflow, uint16_t counter) : _overflow(overflow), _counter(counter) {}
+
+        uint32_t get() const {
+            return _overflow * 0x10000UL + _counter + DIMMER_MEASURE_ADJ_CYCLE_CNT;
+        }
+    };
+#endif
+    static constexpr size_t TicksSize = sizeof(Ticks);
+    static_assert(TicksSize == 3, "check struct");
+
+    FrequencyMeasurement() : _frequency(NAN), _errors(0), _count(0) {}
+
+    // addition to the constructor but inlined
+    static inline void start() {
+        TCNT1 = 0;
+        TIFR1 |= (1 << TOV1);
+        timer1_overflow = 0;
+    }
+
+    void calc() {
+        _D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
+        if (_count > 4) {
+            uint32_t ticks_sum = 0;
+            for(uint8_t i = 0; i < _count; i++) {
+                ticks_sum += _ticks[i].get();
+            }
+            _frequency = (1000000 * Dimmer::FrequencyTimer::ticksPerMicrosecond / 2.0) * _count / ticks_sum;
+            // Serial.printf_P(PSTR("ticks=%lu frequency=%f count=%u error=%u\n"), ticks_sum, _frequency, _count, _errors);
+            _D(5, debug_printf("ticks=%lu f=%f cnt=%u err=%u\n", ticks_sum, _frequency, _count, _errors));
+        }
+        else {
+            Serial.printf_P(PSTR("+REM=errors=%u,zc=%u\n"), _errors, _count);
+        }
+    }
+
+    void zc_measure_handler(uint16_t counter) {
+#if DIMMER_ZC_INTERRUPT_MODE == CHANGE
+#error TODO not implemented
+#else
+        // reset counter
+        TCNT1 = 0;
+        // remove overflow flag
+        TIFR1 |= (1 << TOV1);
+        Ticks ticks(timer1_overflow, counter);
+        timer1_overflow = 0;
+
+        auto l_ticks = ticks.get();
+        if (l_ticks < Dimmer::kMinCyclesPerHalfWave || l_ticks > Dimmer::kMaxCyclesPerHalfWave) {
+            _errors++;
+        }
+        else {
+            _ticks[_count] = ticks;
+            if (++_count == kMeasurementBufferSize) {
+                calc();
+                detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
+                frequency_wait_timer = millis(); // end measurement
+            }
+        }
+#endif
+    }
+
+    float get_frequency() const {
+        return _frequency;
+    }
+
+    float _frequency;
+    uint16_t _errors;
+    Ticks _ticks[kMeasurementBufferSize];
+    uint8_t _count;
+};
+
+#else
+
+class FrequencyMeasurement {
+public:
+    static constexpr uint16_t kMeasurementCycles = 900; // 900x48Hz = ~9.375seconds
+    static constexpr uint16_t kTimeout = 20000;
+
+    FrequencyMeasurement() : _frequency(NAN), _count(0) {}
+
+    // addition to the constructor but inlined
+    inline void start() {
+        _start = micros();
+    }
+
+    void calc() {
+        if (_count > 4) {
+            uint32_t diff = _end - _start;
+            _frequency = (1000000UL / 2UL) * _count / (float)diff;
+            Serial.printf("sum=%lu frequency=%f count=%u\n", diff, _frequency, _count);
+        }
+    }
+
+    void zc_measure_handler(uint16_t counter) {
+        _end = micros();
+        _count++;
+        if (_count == kMeasurementCycles) {
+            calc();
+            detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
+        }
+    }
+
+    float get_frequency() const {
+        return _frequency;
+    }
+
+    float _frequency;
+    uint32_t _start;
+    uint32_t _end;
+    uint16_t _count;
+};
+
+#endif
+
+static constexpr size_t FrequencyMeasurementSize = sizeof(FrequencyMeasurement);
+
+static FrequencyMeasurement *measure;
+
+static void zc_measure_handler() {
+    volatile uint16_t counter = TCNT1;
+    measure->zc_measure_handler(counter);
+}
+
 void loop()
 {
+    // run in main loop that the I2C slave is responding
+    if (frequency_measurement) {
+        if (frequency_wait_timer == 0) {
+            _D(5, debug_printf("measuring\n"));
+            dimmer.end();
+
+            frequency_wait_timer = millis() + FrequencyMeasurement::kTimeout;
+            measure = new FrequencyMeasurement();
+            cli();
+            attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), zc_measure_handler, DIMMER_ZC_INTERRUPT_MODE);
+            Dimmer::FrequencyTimer::begin();
+            measure->start();
+            sei();
+        }
+        else if (millis() >= frequency_wait_timer) {
+            cli();
+            detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
+            Dimmer::FrequencyTimer::end();
+            sei();
+            frequency_measurement = false;
+            dimmer.set_frequency(measure->get_frequency());
+            delete measure;
+
+            dimmer.begin();
+            restore_level();
 #if HIDE_DIMMER_INFO == 0
-    if (dimmer_scheduled_calls.print_info && millis() >= frequency_wait_timeout) {
+            dimmer_scheduled_calls.print_info = true;
+#endif
+            return;
+        }
+        return;
+    }
+
+
+#if HIDE_DIMMER_INFO == 0
+    if (dimmer_scheduled_calls.print_info) {
         dimmer_scheduled_calls.print_info = false;
         display_dimmer_info();
-        register_mem.data.errors = {};
     }
 #endif
 
@@ -467,18 +668,15 @@ void loop()
         #elif HAVE_READ_VCC
             Serial.printf_P(PSTR("VCC=%u,"), read_vcc());
         #endif
-        #if FREQUENCY_TEST_DURATION
-            Serial.printf_P(PSTR("frq=%.3f,"), dimmer._get_frequency());
-        #endif
         #if HAVE_POTI
             Serial.printf_P(PSTR("poti=%u,"), raw_poti_value);
         #endif
-        Serial.printf_P(PSTR("mode=%c,lvl="), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
-
+        Serial.printf_P(PSTR("hw=%u,diff=%d,"), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks);
+        Serial.printf_P(PSTR("frq=%.3f,mode=%c,lvl="), dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
         for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
             Serial.printf_P(PSTR("%d,"), register_mem.data.level[i]);
         }
-        Serial.printf_P(PSTR("hf=%u,ticks="), Dimmer::kTicksPerHalfWave);
+        Serial.printf_P(PSTR("hf=%u,ticks="), (unsigned)dimmer._get_ticks_per_halfwave());
         for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
             Serial.print(dimmer._get_ticks(i, register_mem.data.level[i]));
             if (i < Dimmer::Channel::max) {
@@ -571,11 +769,7 @@ void loop()
 #else
                 0,
 #endif
-#if FREQUENCY_TEST_DURATION
                 dimmer._get_frequency(),
-#else
-                NAN,
-#endif
 #if HAVE_READ_INT_TEMP
                 int_temp,
 #else

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include "timers.h"
 #include "helpers.h"
 #include "dimmer_def.h"
 #include "dimmer_protocol.h"
@@ -54,100 +55,30 @@ namespace Dimmer {
     static constexpr TickType TickTypeMax = ~0;
     static constexpr float kVRef = INTERNAL_VREF_1_1V;
 
+
     template<int _Timer>
     struct Timer {};
 
     template<>
-    struct Timer<1> {
-        static constexpr uint16_t prescaler = DIMMER_TIMER1_PRESCALER;
-        static constexpr uint8_t extraTicks = (prescaler == 8 ? (8) : (1));
-        static constexpr uint8_t prescalerBV =
-            prescaler == 1 ?
-                (1 << CS10) :
-                prescaler == 8 ?
-                    (1 << CS11) :
-                    prescaler == 64 ?
-                        ((1 << CS10) | (1 << CS11)) :
-                        prescaler == 256 ?
-                            (1 << CS12) :
-                            prescaler == 1024 ?
-                                ((1 << CS10) | (1 << CS12)) : -1;
-
-        static_assert(prescalerBV != -1, "prescaler not defined");
-        static constexpr float ticksPerMicrosecond =  (F_CPU / prescaler / 1000000.0);
-
-        static inline void start() {
-            TCCR1B |= prescalerBV;
-        }
-
-        static inline void pause() {
-            TCCR1B = 0;
-        }
-
-        static inline TickType microsToTicks(uint32_t micros) {
-            return micros * ticksPerMicrosecond;
-        }
-
-        static inline TickType ticksToMicros(uint32_t ticks) {
-            return ticks / ticksPerMicrosecond;
-        }
-
+    struct Timer<1> : Timers::TimerBase<1, DIMMER_TIMER1_PRESCALER> {
+        static constexpr uint8_t extraTicks = (prescaler == 1 ? 64 : (prescaler == 8 ? 8 : 1));
     };
 
     template<>
-    struct Timer<2> {
-        static constexpr uint16_t prescaler = DIMMER_TIMER2_PRESCALER;
-        static constexpr uint8_t prescalerBV =
-            prescaler == 1 ?
-                (1 << CS20) :
-                prescaler == 8 ?
-                    (1 << CS21) :
-                    prescaler == 32 ?
-                        ((1 << CS20) | (1 << CS21)) :
-                        prescaler == 64 ?
-                            (1 << CS22) :
-                            prescaler == 128 ?
-                                ((1 << CS20) | (1 << CS22)) :
-                                prescaler == 256 ?
-                                    ((1 << CS21) | (1 << CS22)) :
-                                    prescaler == 1024 ?
-                                        ((1 << CS20) | (1 << CS21) | (1 << CS22)) : -1;
-
-        static_assert(prescalerBV != -1, "prescaler not defined");
-
-        static constexpr float ticksPerMicrosecond =  (F_CPU / prescaler / 1000000.0);
-
-        static inline void start() {
-            TCCR2B |= prescalerBV;
-        }
-
-        static inline void pause() {
-            TCCR2B = 0;
-        }
-
-        static inline TickType microsToTicks(uint32_t micros) {
-            return micros * ticksPerMicrosecond;
-        }
-
-        static inline TickType ticksToMicros(uint32_t ticks) {
-            return ticks / ticksPerMicrosecond;
-        }
-
+    struct Timer<2> : Timers::TimerBase<2, DIMMER_TIMER2_PRESCALER> {
     };
 
-    static inline void enableTimers() {
-        TIMSK1 |= (1 << OCIE1A);
-        TCCR1A = 0;
-        TCCR1B = 0;
-        TIMSK2 |= (1 << OCIE2A);
-        TCCR2A = 0;
-        TCCR2B = 0;
-    }
-
-    static inline void disableTimers() {
-        TIMSK1 &= ~(1 << OCIE1A);
-        TIMSK2 &= ~(1 << OCIE2A);
-    }
+    struct FrequencyTimer : Timers::TimerBase<1, 1> {
+        static inline void begin() {
+            TCCR1A = 0;
+            TCCR1B = prescalerBV;
+            TIMSK1 |= _BV(TOIE1);
+        }
+        static inline void end() {
+            TIMSK1 &= ~_BV(TOIE1);
+            TCCR1B = 0;
+        }
+    };
 
     struct Channel {
         using type = ChannelType;
@@ -157,6 +88,8 @@ namespace Dimmer {
         static constexpr type any = -1;
         static constexpr const uint8_t pins[size] = { DIMMER_MOSFET_PINS };
     };
+
+    static_assert(Channel::size <= 8, "limited to 8 channels");
 
     struct Level {
         using type = LevelType;
@@ -168,23 +101,26 @@ namespace Dimmer {
         static constexpr type current = -1;
     };
 
-    static constexpr uint8_t kFrequency = 50;
-    static constexpr TickType kTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kFrequency * 2));
-
     static_assert(Level::size >= 255, "at least 255 levels required");
+
+    // filter all zc interrupts that occur fastere than (frequency + kZCFilterFrequency)
+    static constexpr int8_t kZCFilterFrequency = -5;
 
     static constexpr uint8_t kMinFrequency = 48;
     static constexpr uint8_t kMaxFrequency = 62;
 
-    static constexpr TickType kMinTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kMaxFrequency * 2));
-    static constexpr TickType kMaxTicksPerHalfWave = (F_CPU / Timer<1>::prescaler / (kMinFrequency * 2));
+    static constexpr uint16_t kMinMicrosPerHalfWave = (1000000 / (kMaxFrequency * 2.0));
+    static constexpr uint16_t kMaxMicrosPerHalfWave = (1000000 / (kMinFrequency * 2.0));
+
+    static constexpr TickMultiplierType kMinCyclesPerHalfWave = (F_CPU / (kMaxFrequency * 2));
+    static constexpr TickMultiplierType kMaxCyclesPerHalfWave = (F_CPU / (kMinFrequency * 2));
+
+    static constexpr TickType kMinTicksPerHalfWave = kMinCyclesPerHalfWave / Timer<1>::prescaler;
+    static constexpr TickType kMaxTicksPerHalfWave = kMaxCyclesPerHalfWave / Timer<1>::prescaler;
 
     static_assert((F_CPU / Timer<1>::prescaler / (kMinFrequency * 2)) < TickTypeMax, "adjust timer 1 prescaler");
 
     static constexpr uint8_t kOnSwitchCounterMax = 0xfe;
-
-    static constexpr float timer1TicksPerMicroSeconds =  Timer<1>::ticksPerMicrosecond;
-    static constexpr float timer2TicksPerMicroSeconds =  Timer<2>::ticksPerMicrosecond;
 
     static_assert(kMaxTicksPerHalfWave < LevelTypeMax, "Increase prescaler to reduce ticks per halfwave");
     static_assert(Level::max > 63, "64 or more levels required");
@@ -204,10 +140,16 @@ namespace Dimmer {
         dimmer_channel_t ordered_channels[Channel::size + 1];                   // current dimming levels in ticks
         dimmer_channel_t ordered_channels_buffer[Channel::size + 1];            // next dimming levels
         uint8_t on_counter[Channel::size];                                      // counts halfwaves from 0 to 254 after switching on
-        uint32_t halfwave_ticks;
-        uint8_t frequency;
+        TickType halfwave_ticks;
+        float zc_diff_ticks;
+        uint8_t zc_diff_count;
+        float frequency;
         uint8_t channel_state;                                                  // bitset of the channel state
         bool toggle_state: 1;
+
+#if DIMMER_OUT_OF_SYNC_LIMIT
+        uint16_t out_of_sync_counter;
+#endif
 
 #if HAVE_FADE_COMPLETION_EVENT
         Level::type fading_completed[Channel::size];
@@ -226,6 +168,10 @@ namespace Dimmer {
         void begin();
         void end();
         void zc_interrupt_handler();
+
+        inline void set_frequency(float freq) {
+            frequency = freq;
+        }
 
         inline void set_mode(ModeType mode) {
             _config.bits.leading_edge = (mode == ModeType::LEADING_EDGE);
@@ -279,19 +225,19 @@ namespace Dimmer {
         void _apply_fading();
 
         inline TickType _get_ticks_per_halfwave() const {
-            return kTicksPerHalfWave;
+            return halfwave_ticks;
         }
 
-        uint16_t __get_ticks(Channel::type channel, Level::type level) const;
+        TickType __get_ticks(Channel::type channel, Level::type level) const;
 
-        inline uint16_t _get_ticks(Channel::type channel, Level::type level) {
+        inline TickType _get_ticks(Channel::type channel, Level::type level) {
             return _config.bits.leading_edge ?
                 (_get_ticks_per_halfwave() - __get_ticks(channel, level)) :
                 __get_ticks(channel, level);
 
         }
 
-        inline uint16_t _get_min_on_ticks(Channel::type channel) const {
+        inline TickType _get_min_on_ticks(Channel::type channel) const {
             if (on_counter[channel] < kOnSwitchCounterMax && _config.switch_on_count && _config.switch_on_minimum_ticks && on_counter[channel] < _config.switch_on_count) {
                 return _config.switch_on_minimum_ticks;
             }
@@ -316,13 +262,15 @@ namespace Dimmer {
             return level;
         }
 
-        void compare_a_interrupt();
+        void compare_interrupt();
 
         void _timer_setup();
         void _timer_remove();
-        void _start_timer1();
-        void _start_timer2();
-        float _get_frequency();
+        void _start_halfwave();
+        void _delay_halfwave();
+        inline float _get_frequency() const {
+            return frequency;
+        }
         void _set_mosfet_gate(Channel::type channel, bool state);
         void _calculate_channels();
 

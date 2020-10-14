@@ -11,43 +11,28 @@ using namespace Dimmer;
 volatile uint8_t *dimmer_pins_addr[Channel::size];
 uint8_t dimmer_pins_mask[Channel::size];
 DimmerBase dimmer(register_mem.data);
-constexpr const uint8_t Dimmer::Channel::pins[Dimmer::Channel::size]; // = { DIMMER_MOSFET_PINS };
+constexpr const uint8_t Dimmer::Channel::pins[Dimmer::Channel::size];
 
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
+// start halfwave
 ISR(TIMER1_COMPA_vect)
 {
-    dimmer.compare_a_interrupt();
+    dimmer.compare_interrupt();
 }
 
-// start halfwave cycle
-ISR(TIMER2_COMPA_vect)
+// delayed start
+ISR(TIMER1_COMPB_vect)
 {
-    Timer<2>::pause(); // pause until next zero crossing interrupt
-    dimmer._start_timer1();
+    dimmer._start_halfwave();
 }
 
-#if FREQUENCY_TEST_DURATION
+#if 1 //FREQUENCY_TEST_DURATION
 
-volatile uint8_t zero_crossing_int_counter = 0;
-volatile unsigned long zero_crossing_frequency_time = 0;
+volatile uint8_t zero_crossing_int_counter;
+volatile unsigned long zero_crossing_frequency_time;
 volatile uint16_t zero_crossing_frequency_period; // milliseconds for DIMMER_AC_FREQUENCY interrupts
-volatile ulong zc_min_time = 0;
-
-float DimmerBase::_get_frequency()
-{
-    if (!zero_crossing_frequency_period) {
-        return NAN;
-    }
-    auto last = millis() - zero_crossing_frequency_time;
-    if (last > 1000 / kMaxTicksPerHalfWave) { // signal lost
-        zero_crossing_frequency_period = 0;
-        dimmer_scheduled_calls.report_error = true;
-        register_mem.data.errors.frequency_low++;
-        return NAN;
-    }
-    return 500 * kFrequency / (float)zero_crossing_frequency_period;
-}
+volatile unsigned long long zc_min_time;
 
 #endif
 
@@ -59,12 +44,21 @@ bool zc_timings_output = false;
 
 void DimmerBase::begin()
 {
-    _D(5, debug_printf("ch=%u prescaler=%u/%u hwticks=%u levels=%u\n",
+    if (frequency == 0 || isnan(frequency)) {
+        return;
+    }
+    halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / frequency) + _config.halfwave_adjust_ticks;
+    zc_diff_ticks = 0;
+    zc_diff_count = 0;
+
+    _D(5, debug_printf("ch=%u levels=%u prescaler=%u ",
         Channel::size,
-        Timer<1>::prescaler,
-        Timer<2>::prescaler,
-        kTicksPerHalfWave,
-        Level::max)
+        Level::max,
+        Timer<1>::prescaler)
+    );
+    _D(5, debug_printf("f=%f ticks=%ld\n",
+        frequency,
+        halfwave_ticks)
     );
 
 #if ZC_MAX_TIMINGS
@@ -74,6 +68,7 @@ void DimmerBase::begin()
     zc_timings_counter = 0;
 #endif
 
+    zc_min_time = 0;
     dimmer_scheduled_calls = {};
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
@@ -88,32 +83,39 @@ void DimmerBase::begin()
         _D(5, debug_printf("ch=%u pin=%u addr=%02x mask=%02x\n", i, Channel::pins[i], dimmer_pins_addr[i], dimmer_pins_mask[i]));
     }
 
-    pinMode(ZC_SIGNAL_PIN, INPUT);
+    cli();
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
         dimmer.zc_interrupt_handler();
     }, DIMMER_ZC_INTERRUPT_MODE);
 
-    _D(5, debug_printf("enabling timers\n"));
-    enableTimers();
+    _D(5, debug_printf("starting timer\n"));
+    Timer<1>::begin();
+    Timer<1>::disable();
+    sei();
 }
 
 void DimmerBase::end()
 {
-    _D(5, debug_printf("Removing dimmer timer...\n"));
+    if (frequency == 0 || isnan(frequency)) {
+        return;
+    }
+    _D(5, debug_printf("ending timer...\n"));
 
     dimmer_scheduled_calls = {};
 
     cli();
+    detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
+    Timer<1>::end();
     for(Channel::type i = 0; i < Dimmer::Channel::size; i++) {
         digitalWrite(Channel::pins[i], DIMMER_MOSFET_OFF_STATE);
         pinMode(Channel::pins[i], INPUT);
     }
-    disableTimers();
     sei();
 }
 
 #if ZC_MAX_TIMINGS
-void dimmer_record_zc_timings(ulong time) {
+void dimmer_record_zc_timings(ulong time)
+{
     if (zc_timings_output) {
         zc_timings[zc_timings_counter] = time;
         zc_timings_counter = (zc_timings_counter + 1) % ZC_MAX_TIMINGS;
@@ -123,74 +125,88 @@ void dimmer_record_zc_timings(ulong time) {
 
 void DimmerBase::zc_interrupt_handler()
 {
-    auto time = micros();
-    if (time < zc_min_time) { // filter misfire of the ZC circuit
-        if (zc_min_time - time >= 0x7fffffffUL) {   // timer overflow
-            zc_min_time = ~zc_min_time + 1;
-        }
-        if (time < zc_min_time) {
-            register_mem.data.errors.zc_misfire++;
-#if ZC_MAX_TIMINGS
-            dimmer_record_zc_timings(time);
-#endif
-            return;
-        }
-    }
+    int16_t diff = 0;
     if (dimmer_config.zero_crossing_delay_ticks) {
-        _start_timer2(); // delay timer1 until actual zero crossing
-    } else {
-        _start_timer1(); // no delay, start timer1
+        // schedule next _start_halfwave() call
+        diff = OCR1B - TCNT1;
+        Timer<1>::enable_compareB();
+        OCR1B = dimmer_config.zero_crossing_delay_ticks + TCNT1;
+        Timer<1>::clear_compareB_flag();
     }
-    zc_min_time = time + (ulong)(1e6 / kFrequency / 3);       // filter above 90Hz @60Hz mains
+    else {
+        _start_halfwave(); // no delay
+    }
+#if DIMMER_OUT_OF_SYNC_LIMIT
+    out_of_sync_counter = 0;
+#endif
+
 #if ZC_MAX_TIMINGS
     dimmer_record_zc_timings(time);
 #endif
     memcpy(ordered_channels, ordered_channels_buffer, sizeof(ordered_channels));
     sei();
+    if (zc_diff_count < 254) { // get average of the first 250 values
+        if (zc_diff_count >= 3) {
+            zc_diff_ticks += diff;
+            if (zc_diff_count == 253) {
+                zc_diff_ticks /= 250;
+            }
+        }
+        zc_diff_count++;
+    }
+    else {
+        // check if the zc interrupt is off
+        if (abs(zc_diff_ticks - diff) > 50) {
+            // Serial.printf("%d us\n", (int)(abs(zc_diff_ticks - diff) / Timer<1>::ticksPerMicrosecond));
+        }
+        zc_diff_ticks = ((zc_diff_ticks * 100.0) + diff) / 101.0;
+    }
+
     _apply_fading();
 
-// #if FREQUENCY_TEST_DURATION
-//     zero_crossing_int_counter++;
-//     if (zero_crossing_int_counter == kFrequency) {
-//         auto _millis = millis();
-//         zero_crossing_frequency_period = (_millis - zero_crossing_frequency_time);
-//         zero_crossing_int_counter = 0;
-//         zero_crossing_frequency_time = _millis;
-//         if (zero_crossing_frequency_period > 500 / DIMMER_LOW_FREQUENCY) {
-//             dimmer_scheduled_calls.report_error = true;
-//             register_mem.data.errors.frequency_low++;
-//         }
-//         else if (zero_crossing_frequency_period < 500 / DIMMER_HIGH_FREQUENCY) {
-//             dimmer_scheduled_calls.report_error = true;
-//             register_mem.data.errors.frequency_high++;
-//         }
-//     }
-// #endif
-    //_D(10, Serial.println(F("ZC Signal Int")));
+    _D(10, Serial.println(F("zc int")));
 }
 
 // turn mosfets for active channels on
-void DimmerBase::_start_timer1()
+void DimmerBase::_start_halfwave()
 {
-    Channel::type i;
-
     TCNT1 = 0;
     OCR1A = 0;
-    Timer<1>::start();
+    OCR1B = halfwave_ticks;
+    Timer<1>::clear_compareA_B_flag();
+
+    Channel::type i;
+    toggle_state = _config.bits.leading_edge ? DIMMER_MOSFET_OFF_STATE : DIMMER_MOSFET_ON_STATE;
+    channel_ptr = 0;
+#if DIMMER_OUT_OF_SYNC_LIMIT
+    if (++out_of_sync_counter > DIMMER_OUT_OF_SYNC_LIMIT) {
+        Timer<1>::disable();
+        for(i = 0; i < Channel::size; i++) {
+            _set_mosfet_gate(i, DIMMER_MOSFET_OFF_STATE);
+        }
+        Serial.println(F("+REM=out of sync"));
+        return;
+    }
+#else
+    Timer<1>::disable_compareB();
+#endif
 
     if (ordered_channels[0].ticks) { // any channel dimmed?
-        toggle_state = _config.bits.leading_edge ? DIMMER_MOSFET_OFF_STATE : DIMMER_MOSFET_ON_STATE;
-        channel_ptr = 0;
+#if DIMMER_OUT_OF_SYNC_LIMIT
+        Timer<1>::enable_compareA_disable_compareB();
+#else
+        Timer<1>::enable_compareA();
+#endif
         OCR1A = ordered_channels[0].ticks;
+        for(i = 0; ordered_channels[i].ticks; i++) {
+            _set_mosfet_gate(ordered_channels[i].channel, toggle_state);
+        }
         for(i = 0; i < Channel::size; i++) {
             if (_get_level(i) == Level::off) {
                 _set_mosfet_gate(i, DIMMER_MOSFET_OFF_STATE);
             }
         }
-        for(i = 0; ordered_channels[i].ticks; i++) {
-            _set_mosfet_gate(ordered_channels[i].channel, toggle_state);
-        }
-        toggle_state = toggle_state == DIMMER_MOSFET_OFF_STATE ? DIMMER_MOSFET_ON_STATE : DIMMER_MOSFET_OFF_STATE;
+        toggle_state = !toggle_state;
 
         for(i = 0; ordered_channels[i].ticks; i++) {
             auto &counter = on_counter[ordered_channels[i].channel];
@@ -200,6 +216,12 @@ void DimmerBase::_start_timer1()
         }
     }
     else {
+#if DIMMER_OUT_OF_SYNC_LIMIT
+        Timer<1>::enable_compareB_disable_compareA();
+#else
+        Timer<1>::disable_compareA();
+#endif
+
         // enable or disable channels
         for(i = 0; i < Channel::size; i++) {
             _set_mosfet_gate(i, _get_level(i) == Level::max ? DIMMER_MOSFET_ON_STATE : DIMMER_MOSFET_OFF_STATE);
@@ -207,7 +229,7 @@ void DimmerBase::_start_timer1()
     }
 }
 
-void DimmerBase::compare_a_interrupt()
+void DimmerBase::compare_interrupt()
 {
     ChannelStateType *channel = &ordered_channels[channel_ptr++];
     ChannelStateType *next_channel = &ordered_channels[channel_ptr];
@@ -215,8 +237,8 @@ void DimmerBase::compare_a_interrupt()
         _set_mosfet_gate(channel->channel, toggle_state);    // turn off current channel
 
         if (next_channel->ticks == 0) {
-            // no more channels to turn off, end timer
-            Timer<1>::pause();
+            // no more channels to change, disable timer
+            Timer<1>::enable_compareB_disable_compareA();
             break;
         }
         else if (next_channel->ticks > channel->ticks) {
@@ -229,14 +251,6 @@ void DimmerBase::compare_a_interrupt()
         channel_ptr++;
         next_channel = &ordered_channels[channel_ptr];
     }
-}
-
-// delay for zero crossing
-void DimmerBase::_start_timer2()
-{
-    Timer<2>::start();
-    TCNT2 = 0;
-    OCR2A = dimmer_config.zero_crossing_delay_ticks;
 }
 
 static inline void dimmer_bubble_sort(ChannelStateType channels[], Channel::type count)
@@ -269,7 +283,7 @@ void DimmerBase::_calculate_channels()
         }
         else if (level > Level::off) {
             new_channel_state |= (1 << i);
-            ordered_channels[count].ticks = _get_ticks(i, level) + dimmer_config.zero_crossing_delay_ticks;
+            ordered_channels[count].ticks = _get_ticks(i, level);
             ordered_channels[count].channel = i;
             count++;
         }
@@ -346,7 +360,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
         _D(5, debug_printf("Relative fading time %.3f\n", time));
     }
 
-    fade.count = Dimmer::kFrequency * 2.0f * time;
+    fade.count = frequency * time * 2;
     if (fade.count == 0) {
         _D(5, debug_printf("count=%u time=%f\n", fade.count, time));
         return;
@@ -401,7 +415,7 @@ void DimmerBase::_apply_fading()
     _calculate_channels();
 }
 
-uint16_t DimmerBase::__get_ticks(Channel::type channel, Level::type level) const
+TickType DimmerBase::__get_ticks(Channel::type channel, Level::type level) const
 {
     auto halfWaveTicks = _get_ticks_per_halfwave();
     TickType rangeTicks = halfWaveTicks - _config.minimum_on_time_ticks - _config.minimum_off_time_ticks;
