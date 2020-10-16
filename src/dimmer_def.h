@@ -4,6 +4,16 @@
 
 #pragma once
 
+// enable debug code
+#ifndef DEBUG
+#define DEBUG                                                   0
+#endif
+
+// enable debug commands
+#ifndef DEBUG_COMMANDS
+#define DEBUG_COMMANDS                                          1
+#endif
+
 // pin for the zero crossing signal
 #ifndef ZC_SIGNAL_PIN
 #define ZC_SIGNAL_PIN                                           3
