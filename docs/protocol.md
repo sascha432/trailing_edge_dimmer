@@ -10,13 +10,13 @@ The examples are using the UART protocol and can send to the dimmer using any te
 
 Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
 
-    // +i2ct=17,89,22
+    // +I2CT=17,89,22
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
     Wire.write(DIMMER_REGISTER_COMMAND);
     Wire.write(DIMMER_COMMAND_READ_VCC);
     if (Wire.endTransmission() == 0) {
 
-        // +i2cr=17,02
+        // +I2CR=17,02
         uint16_t vcc;
         if (Wire.requestFrom(DIMMER_I2C_ADDRESS, sizeof(vcc)) == sizeof(vcc)) {
             Wire.readBytes(reinterpret_cast<const uint8_t *>(&vcc), sizeof(vcc));
@@ -47,7 +47,7 @@ Channels are 0 based and -1 / 0xff means all channels
 
 Set *from level* to -1, *channel* to 0, *to level* to 0x0301, *time* 7.5 (seconds) and execute fade command
 
-    +i2ct=17,80,ff,ff,00,03,01,00,00,f0,40,11
+    +I2CT=17,80,ff,ff,00,03,01,00,00,f0,40,11
                 ^^^^^ from level           ^^ command
                       ^^ channnel
                          ^^^^^ to level
@@ -55,11 +55,11 @@ Set *from level* to -1, *channel* to 0, *to level* to 0x0301, *time* 7.5 (second
 
 Short version
 
-    +i2ct=7580ffff0003000000f04011
+    +I2CT=7580ffff0003000000f04011
 
 Assuming *from level* is the default -1, set *channel* to -1, *to level* to 0x0301, *time* 7.5
 
-    +i2ct=17,82,ff,03,01,00,00,f0,40,11
+    +I2CT=17,82,ff,03,01,00,00,f0,40,11
 
 ## DIMMER_COMMAND_SET_LEVEL
 
@@ -70,12 +70,12 @@ The fading command uses following registers
 
 Set *channel* to 1, *to level* to 777 (0x0309) and execute set level command
 
-    +i2ct=17,82,01,09,03
-    +i2ct=17,89,10
+    +I2CT=17,82,01,09,03
+    +I2CT=17,89,10
 
 To send the command in one transmission, the time can be filled with any data
 
-    +i2ct=17,82,01,09,03,00,00,00,00,10
+    +I2CT=17,82,01,09,03,00,00,00,00,10
 
 ## DIMMER_COMMAND_READ_xxx
 
@@ -92,8 +92,8 @@ If no further data is sent after the read command, the register is set automatic
 
 Read VCC
 
-    +i2ct=17,89,22
-    +i2cr=17,02
+    +I2CT=17,89,22
+    +I2CR=17,02
 
 Response (0x3613 = 4.918V)
 
@@ -101,26 +101,26 @@ Response (0x3613 = 4.918V)
 
 Read internal temperature
 
-    +i2ct=17,89,21
-    +i2cr=17,04
+    +I2CT=17,89,21
+    +I2CR=17,04
 
 Read int. temp and VCC
 
 In this example, *DIMMER_REGISTER_READ_LENGTH* is set manually to 6 byte, followed by the start address *DIMMER_REGISTER_TEMP*
 
-    +i2ct=17,89,21,89,22,8a,06,9c
-    +i2cr=17,06
+    +I2CT=17,89,21,89,22,8a,06,9c
+    +I2CR=17,06
 
 If the temperature is requested last, it is not required to set read length and register address
 
-    +i2ct=17,89,22,89,21
-    +i2cr=17,06
+    +I2CT=17,89,22,89,21
+    +I2CR=17,06
 
 
 Read AC frequency
 
-    +i2ct=17,89,23
-    +i2cr=17,04
+    +I2CT=17,89,23
+    +I2CR=17,04
 
 
 ## DIMMER_COMMAND_READ_CHANNELS
@@ -140,56 +140,56 @@ The byte after command specifies the number of channels and start address, each 
 
 Channel 1 - 4
 
-    +i2ct=17,89,12,40
-    +i2cr=17,08
+    +I2CT=17,89,12,40
+    +I2CR=17,08
 
 Channel 8
 
-    +i2ct=17,89,12,17
-    +i2cr=17,02
+    +I2CT=17,89,12,17
+    +I2CR=17,02
 
 Channel 2 and 3
 
-    +i2ct=17,89,12,21
-    +i2cr=17,04
+    +I2CT=17,89,12,21
+    +I2CR=17,04
 
 ## DIMMER_COMMAND_WRITE_EEPROM
 
 Store current dimming levels in EEPROM. Might be delayed due to wear leveling.
 
-    +i2ct=17,89,50
+    +I2CT=17,89,50
 
 ## DIMMER_COMMAND_WRITE_CFG_NOW
 
 Store configuration and dimming levels in EEPROM
 
-    +i2ct=17,89,92
+    +I2CT=17,89,92
 
 ## DIMMER_COMMAND_WRITE_EEPROM_NOW
 
 Store current dimming levels in EEPROM
 
-    +i2ct=17,89,93
+    +I2CT=17,89,93
 
 ## DIMMER_COMMAND_RESTORE_FS
 
 Restore factory settings and re-initialize EEPROM wear leveling
 
-    +i2ct=17,89,51
+    +I2CT=17,89,51
 
 ## DIMMER_COMMAND_GET_TIMER_TICKS
 
 Get ticks per microsecond for Timer 1
 
-    +i2ct=17,89,52
-    +i2cr=17,04
+    +I2CT=17,89,52
+    +I2CR=17,04
 
 ## DIMMER_COMMAND_READ_AC_FREQUENCY
 
 Read AC frequency
 
-    +i2ct=17,89,23
-    +i2cr=17,04
+    +I2CT=17,89,23
+    +I2CR=17,04
 
 ## Reading firmware version
 
@@ -225,13 +225,13 @@ To make any changes permanent, **DIMMER_COMMAND_WRITE_CFG_NOW** needs to be exec
 
 Read all settings
 
-    +i2ct=17,8a,10,a2
-    +i2cr=17,10
+    +I2CT=17,8a,10,a2
+    +I2CR=17,10
 
 Read temperature check interval
 
-    +i2ct=17,8a,01,a8
-    +i2cr=17,01
+    +I2CT=17,8a,01,a8
+    +I2CR=17,01
 
 Response (0x1e, 30 seconds)
 
@@ -239,37 +239,29 @@ Response (0x1e, 30 seconds)
 
 Set temperature check interval/metrics reporting to 30 seconds
 
-    +i2ct=17,a8,1e
+    +I2CT=17,a8,1e
 
-**Note:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+i2ct=17,89,54*) can be used to force a check without waiting
+**Note:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=17,89,54*) can be used to force a check without waiting
 
 Setting the linear correction factor to 1.0
 
-    +i2ct=17,a9,00,00,80,3f
+    +I2CT=17,a9,00,00,80,3f
 
 ## DIMMER_COMMAND_PRINT_INFO
 
 Print dimmer info on serial port
 
-    +i2ct=17,89,53
+    +I2CT=17,89,53
 
 ## DIMMER_COMMAND_SET_MODE
 
 Set dimmer mode. The following byte indicates the mode. 0 is trailng edge, 1 is leading edge. It is recommended to turn all channels off before switching mode.
 
-    +i2ct=17,89,56,01
+    +I2CT=17,89,56,01
 
 ## DIMMER_COMMAND_RESET
 
 Reset ATmega via WDT
-
-## DIMMER_COMMAND_ZC_TIMINGS_OUTPUT
-
-If ZC_MAX_TIMINGS is enabled, the dimmer outputs the zero crossing timings to the serial console every ZC_MAX_TIMINGS_INTERVAL milliseconds. ZC_MAX_TIMINGS needs to be equal or higher than the amount of expected data within this period. Collecting the data does not cause a delay of the ZC interrupt.
-
-The data expected is a boolean. Non-zero values enable the output on.
-
-    +i2ct=17,89,60,1
 
 ### Outut format
 
@@ -326,27 +318,57 @@ Print metrics on serial port in human readable form. The following byte enables 
 
 For example 0x0a * 100ms = 1s
 
-    +i2ct=17,89,55,0a
+    +I2CT=17,89,55,0a
 
 ## DIMMER_COMMAND_FORCE_TEMP_CHECK
 
 Force temperature check and report metrics if enabled
 
-    +i2ct=17,89,54
+    +I2CT=17,89,54
 
-## Commands available in DEBUG mode
+## Commands available if DEBUG or DEBUG_COMMANDS is set to 1
+
+### DIMMER_COMMAND_INCR_ZC_DELAY
+
+Increase zero crossing delay by 1 or the following byte value
+
+    +I2CT=17,89,82[,<byte>]
+
+### DIMMER_COMMAND_DECR_ZC_DELAY
+
+Decrease zero crossing delay by 1 or the following byte value
+
+    +I2CT=17,89,83[,<byte>]
+
+### DIMMER_COMMAND_SET_ZC_DELAY
+
+Set zero crossing delay to the value of the following word
+
+    +I2CT=17,89,84,<lo-byte>,<hi-byte>
+
+### DIMMER_COMMAND_INCR_HW_TICKS
+
+Increase halfwave length by 1 or the following byte value
+
+    +I2CT=17,89,85[,<byte>]
+
+### DIMMER_COMMAND_DECR_HW_TICKS
+
+Decrease halfwave length by 1 or the following byte value
+
+    +I2CT=17,89,86[,<byte>]
 
 ### DIMMER_COMMAND_DUMP_CHANNELS
 
-Dump active channels
+Print dimmed channels. Channels that are off or fully on are not listed
 
-    +i2ct=17,89,ed
+    +I2CT=17,89,ed
 
 ### DIMMER_COMMAND_DUMP_MEM
 
-Dump the content of the register memory
+Print the contents of the register memory
 
-    +i2ct=17,89,ee
+    +I2CT=17,89,ee
 
 ## Temperature, VCC status and AC Frequency (DIMMER_METRICS_REPORT)
 
@@ -392,55 +414,71 @@ The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*,
 
 When a channel is turned on or off, this event is fired. If fading is used, the event is fired immediately before fading reaches the final state. The event data is one byte containing a bitset of the channel states.
 
-## First time setup, and general configuration
+For example channel 0 and 2 are on
 
-Following commands are available for calibration
+    +I2CT=18F505
 
-### Zero crossing
+All channels off
 
-#### Increase zero crossing delay
+    +I2CT=18F500
 
-    +i2ct=17,89,82
+## Commands cheatsheet
 
-#### Decrease zero crossing delay
+Not all commands are available if DEBUG_COMMANDS is not enabled. They are marked with (*)
 
-    +i2ct=17,89,83
+### Increase zero crossing delay by 10 (*)
 
-#### Set zero crossing delay to 7F and print setting
+    +I2CT=17,89,82,0a
 
-    +i2ct=17,89,92,7F,00
+### Decrease zero crossing delay by 10 (*)
 
-### Displaying and storing settings
+    +I2CT=17,89,83,0a
 
-#### Write current settings to EEPROM
+### Set zero crossing delay to 1500 (0x05DC) and print setting (*)
 
-    +i2ct=17,89,92
+    +I2CT=17,89,84,DC,05
 
-#### Restore factory defaults
+### Print register memory(*)
 
-    +i2ct=17,89,51
+    +I2CT=17,89,ee
 
-#### Print Information
+### Print configuration
 
-    +i2ct=17,89,53
+Print current configuration. The command can be used to backup/restore the configuration or translate it to a human readable form with cfg_tool.py
 
-#### Print metrics every 5 seconds
+    +I2CT=17,89,91
 
-    +i2ct=17,89,55,32
+For example
 
-#### Turn print metrics off
+    +REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412
 
-    +i2ct=17,89,55,00
+### Write current settings to EEPROM
 
-#### Print version and configuration
+    +I2CT=17,89,92
 
-    +i2ct=17,89,91
+### Restore factory defaults
 
-#### Print register memory
+    +I2CT=17,89,51
 
-    +i2ct=17,89,ee
+### Print Information
 
-#### Read firmware version
+    +I2CT=17,89,53
 
-    +i2ct=17,8a,02,b9
-    +i2cr=17,02
+### Print metrics every 5 seconds (50=0x32 * 100ms)
+
+Available only if HAVE_PRINT_METRICS is set to 1
+
+    +I2CT=17,89,55,32
+
+### Turn print metrics off
+
+    +I2CT=17,89,55,00
+
+### Print version and configuration
+
+    +I2CT=17,89,91
+
+### Read firmware version
+
+    +I2CT=17,8a,02,b9
+    +I2CR=17,02

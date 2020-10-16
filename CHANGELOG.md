@@ -3,12 +3,14 @@
 ## 2.2.0
 
 - Removed linear correction
+- Removed ZC_MAX_TIMINGS
 - Min./max. level range can be configured
 - DIMMER_MIN_LEVEL has been replaced by a configurable level that is applied for a specific amount of time when the dimmer is turned on
 - Trailing edge/leading edge mode
 - Frequency auto detection (50/60Hz)
 - Increased ZC delay to 16bit / 500ns resolution
 - Filter invalid ZC signals and continue to run up to several seconds without being synchronized
+- Python tool to convert configuration to json and back
 
 ## 2.1.5
 

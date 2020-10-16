@@ -354,12 +354,6 @@ uint16_t print_metrics_interval;
 
 #endif
 
-#if ZC_MAX_TIMINGS
-
-unsigned long print_zc_timings;
-
-#endif
-
 #if HAVE_FADE_COMPLETION_EVENT
 
 unsigned long next_fading_event_check;
@@ -718,23 +712,6 @@ void loop()
         _write_config();
     }
 
-#if ZC_MAX_TIMINGS
-    if (zc_timings_output && millis() >= print_zc_timings) {
-        auto tmp = zc_timings[0]; // copy first timing before resetting counter
-        auto counter = zc_timings_counter;
-        zc_timings_counter = 0;
-        print_zc_timings = millis() + 1000;
-        if (counter) {
-            Serial.printf_P(PSTR("+REM=ZC,%lx "), tmp);
-            for(uint8_t i = 1; i < counter; i++) {
-                Serial_printf("%lx ", zc_timings[i] - tmp); // use relative time to reduce output
-                tmp = zc_timings[i];
-            }
-            Serial.println();
-        }
-    }
-#endif
-
 #if USE_TEMPERATURE_CHECK
     if (millis() >= next_temp_check) {
 
@@ -742,6 +719,9 @@ void loop()
 #if HAVE_NTC
         float ntc_temp = get_ntc_temperature();
         current_temp = ntc_temp;
+        if (ntc_temp < 0) {
+            current_temp = 0;
+        }
 #endif
 #if HAVE_READ_INT_TEMP
         float int_temp = get_internal_temperature();
@@ -771,12 +751,12 @@ void loop()
 #endif
                 dimmer._get_frequency(),
 #if HAVE_READ_INT_TEMP
-                int_temp,
+                ntc_temp,
 #else
                 NAN,
 #endif
 #if HAVE_NTC
-                ntc_temp
+                int_temp,
 #else
                 NAN
 #endif

@@ -168,105 +168,6 @@ void _dimmer_i2c_on_receive(int length)
                     }
                     break;
 
-#if ZC_MAX_TIMINGS
-                case DIMMER_COMMAND_ZC_TIMINGS_OUTPUT:
-                    zc_timings_output = (length-- > 0 && Wire.read() != 0);
-                    zc_timings_counter = 0;
-                    break;
-#endif
-
-#if 1
-                // FOR CALIBRATION
-                // undocumented, for calibration and testing
-                case 0x82:
-                    register_mem.data.cfg.zero_crossing_delay_ticks++;
-                    Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
-                    break;
-                case 0x83:
-                    register_mem.data.cfg.zero_crossing_delay_ticks--;
-                    Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
-                    break;
-                case 0x92:
-                    if (length-- >= (int)sizeof(register_mem.data.cfg.zero_crossing_delay_ticks)) {
-                        Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.cfg.zero_crossing_delay_ticks), sizeof(register_mem.data.cfg.zero_crossing_delay_ticks));
-                    }
-                    Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%02x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
-                    break;
-                case 0x84:
-                    dimmer.halfwave_ticks += Wire.read();
-                    Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
-                    break;
-                case 0x85:
-                    dimmer.halfwave_ticks -= Wire.read();
-                    Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
-                    break;
-#if 0
-                case 0x90: { // toggle pins on/off
-                        if (length-- > 1) {
-                            dimmer_timer_remove();
-
-                            auto port_ptr = unique_ptr<volatile uint8_t *>(new volatile uint8_t *[length]);
-                            auto pins_ptr = unique_ptr<uint8_t>(new uint8_t[length]);
-                            auto mask_ptr = unique_ptr<uint8_t>(new uint8_t[length]);
-
-                            auto port = port_ptr.get();
-                            auto pins = pins_ptr.get();
-                            auto mask = mask_ptr.get();
-                            auto time = (unsigned long)((uint8_t)Wire.read());
-                            if (time > 100) {
-                                time -= 100;
-                                time *= 10;
-                            }
-                            uint8_t count = 0;
-                            Serial.printf_P(PSTR("+REM=time=%lu,pins="), time);
-                            time *= 1000UL;
-                            while(length-- > 0) {
-                                auto pin = (uint8_t)Wire.read();
-                                pinMode(pin, OUTPUT);
-                                pins[count] = pin;
-                                port[count] = portOutputRegister(digitalPinToPort(pin));
-                                mask[count] = digitalPinToBitMask(pin);;
-                                Serial.print((unsigned)pin);
-                                if (length > 0) {
-                                    Serial.print(',');
-                                }
-                                count++;
-                            }
-                            Serial.println();
-                            auto timeout = millis() + 30e3;
-
-                            while(millis() < timeout) {
-                                for(uint8_t state = 0; state < 2; state++) {
-                                    auto end = micros() + time;
-                                    for(uint8_t i = 0; i < count; i++) {
-                                        if (state) {
-                                            *port[i] |= mask[i];
-                                        }
-                                        else {
-                                            *port[i] &= ~mask[i];
-                                        }
-                                    }
-                                    Serial.print('\b');
-                                    Serial.print(state ? '+' : '-');
-                                    while(micros() < end) {
-                                    }
-                                }
-                            }
-                            Serial.println(F("+REM=done"));
-
-                            for(uint8_t i = 0; i < count; i++) {
-                                pinMode(pins[i], INPUT);
-                                *port[i] &= ~mask[i];
-                            }
-                            // delete port;
-                            // delete pins;
-                            // delete mask;
-
-                            dimmer_timer_setup();
-                        }
-                    }
-                    break;
-#endif
                 case DIMMER_COMMAND_PRINT_CONFIG: { // print command to restore parameters
                         auto ptr = reinterpret_cast<uint8_t *>(&register_mem.data.cfg);
                         Serial.printf_P(PSTR("+REM=v%02x,i2ct=%02x%02x"), Dimmer::Version::kVersion, DIMMER_I2C_ADDRESS, DIMMER_REGISTER_OPTIONS);
@@ -276,20 +177,58 @@ void _dimmer_i2c_on_receive(int length)
                         Serial.println();
                     } break;
 
+                case DIMMER_COMMAND_WRITE_CFG_NOW:
+                    _write_config(true, true);
+                    break;
+
                 case DIMMER_COMMAND_WRITE_EEPROM_NOW:
-                    _write_config(true);
+                    _write_config(true, false);
                     break;
-#endif
 
-#if USE_TEMPERATURE_CHECK
-                case DIMMER_COMMAND_FORCE_TEMP_CHECK:
-                    next_temp_check = 0;
+#if DEBUG_COMMANDS
+                case DIMMER_COMMAND_INCR_ZC_DELAY:
+                    if (length > 0) {
+                        length--;
+                        register_mem.data.cfg.zero_crossing_delay_ticks += Wire.read();
+                    }
+                    else {
+                        register_mem.data.cfg.zero_crossing_delay_ticks++;
+                    }
+                    goto print_zcdelay;
+                case DIMMER_COMMAND_DECR_ZC_DELAY:
+                    if (length > 0) {
+                        length--;
+                        register_mem.data.cfg.zero_crossing_delay_ticks -= Wire.read();
+                    }
+                    else {
+                        register_mem.data.cfg.zero_crossing_delay_ticks--;
+                    }
+                    goto print_zcdelay;
+                case DIMMER_COMMAND_SET_ZC_DELAY:
+                    if (length-- >= (int)sizeof(register_mem.data.cfg.zero_crossing_delay_ticks)) {
+                        Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.cfg.zero_crossing_delay_ticks), sizeof(register_mem.data.cfg.zero_crossing_delay_ticks));
+                    }
+                    print_zcdelay:
+                    Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
-#endif
+                case DIMMER_COMMAND_INCR_HW_TICKS:
+                    if (length > 0) {
+                        length--;
+                        dimmer.halfwave_ticks += Wire.read();
+                    }
+                    goto print_ticks;
+                case DIMMER_COMMAND_DECR_HW_TICKS:
+                    if (length > 0) {
+                        length--;
+                        dimmer.halfwave_ticks -= Wire.read();
+                    }
+                    print_ticks:
+                    Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
+                    break;
 
-#if DIMMER_COMMAND_DUMP_CHANNELS
                 case DIMMER_COMMAND_DUMP_CHANNELS: {
                         auto &tmp = dimmer.ordered_channels;
+                        Serial.print(F("+REM="));
                         if (tmp[0].ticks) {
                             for(Dimmer::Channel::type i = 0; tmp[i].ticks; i++) {
                                 Serial.printf_P(PSTR("%u=%u(%u) "), tmp[i].channel, tmp[i].ticks, dimmer._get_level(tmp[i].channel));
@@ -301,14 +240,18 @@ void _dimmer_i2c_on_receive(int length)
                         }
                     }
                     break;
+                case DIMMER_COMMAND_DUMP_MEM: {
+                        auto ptr = register_mem.raw;
+                        for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++, ptr++) {
+                            Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
+                        }
+                    } break;
 #endif
 
-#if DIMMER_COMMAND_DUMP_MEM
-                case DIMMER_COMMAND_DUMP_MEM:
-                    auto ptr = register_mem.raw;
-                    for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++, ptr++) {
-                        Serial.printf_P(PSTR("[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
-                    }
+#if USE_TEMPERATURE_CHECK
+                case DIMMER_COMMAND_FORCE_TEMP_CHECK:
+                    next_temp_check = 0;
+                    metrics_next_event = 0;
                     break;
 #endif
 

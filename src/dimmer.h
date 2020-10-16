@@ -221,7 +221,6 @@ namespace Dimmer {
         //
         void send_fading_completion_events();
 
-    //private:
         void _apply_fading();
 
         inline TickType _get_ticks_per_halfwave() const {
@@ -274,7 +273,6 @@ namespace Dimmer {
         void _set_mosfet_gate(Channel::type channel, bool state);
         void _calculate_channels();
 
-    private:
         register_mem_cfg_t &_config;
         register_mem_t &_register_mem;
     };

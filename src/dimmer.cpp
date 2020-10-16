@@ -36,12 +36,6 @@ volatile unsigned long long zc_min_time;
 
 #endif
 
-#if ZC_MAX_TIMINGS
-volatile unsigned long *zc_timings = nullptr;
-volatile uint8_t zc_timings_counter;
-bool zc_timings_output = false;
-#endif
-
 void DimmerBase::begin()
 {
     if (frequency == 0 || isnan(frequency)) {
@@ -60,13 +54,6 @@ void DimmerBase::begin()
         frequency,
         halfwave_ticks)
     );
-
-#if ZC_MAX_TIMINGS
-    if (!zc_timings) {
-        zc_timings = new ulong[ZC_MAX_TIMINGS];
-    }
-    zc_timings_counter = 0;
-#endif
 
     zc_min_time = 0;
     dimmer_scheduled_calls = {};
@@ -113,16 +100,6 @@ void DimmerBase::end()
     sei();
 }
 
-#if ZC_MAX_TIMINGS
-void dimmer_record_zc_timings(ulong time)
-{
-    if (zc_timings_output) {
-        zc_timings[zc_timings_counter] = time;
-        zc_timings_counter = (zc_timings_counter + 1) % ZC_MAX_TIMINGS;
-    }
-}
-#endif
-
 void DimmerBase::zc_interrupt_handler()
 {
     int16_t diff = 0;
@@ -140,9 +117,6 @@ void DimmerBase::zc_interrupt_handler()
     out_of_sync_counter = 0;
 #endif
 
-#if ZC_MAX_TIMINGS
-    dimmer_record_zc_timings(time);
-#endif
     memcpy(ordered_channels, ordered_channels_buffer, sizeof(ordered_channels));
     sei();
     if (zc_diff_count < 254) { // get average of the first 250 values

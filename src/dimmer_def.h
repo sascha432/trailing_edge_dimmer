@@ -174,25 +174,6 @@
 #define POTI_CHANNEL                                            0
 #endif
 
-#ifndef ZC_MAX_TIMINGS
-// 4 byte RAM required for each timing
-#define ZC_MAX_TIMINGS                                          0
-#endif
-
-#if ZC_MAX_TIMINGS > 255
-#error ZC_MAX_TIMINGS is limited to 255, decrease ZC_MAX_TIMINGS_INTERVAL to collect more data
-#endif
-
-#ifndef ZC_MAX_TIMINGS_INTERVAL
-#define ZC_MAX_TIMINGS_INTERVAL                                 500
-#endif
-
-#if ZC_MAX_TIMINGS
-extern volatile unsigned long *zc_timings;
-extern volatile uint8_t zc_timings_counter;
-extern bool zc_timings_output;
-#endif
-
 #ifndef SERIAL_I2C_BRDIGE
 #define SERIAL_I2C_BRDIGE                                       0
 #endif
