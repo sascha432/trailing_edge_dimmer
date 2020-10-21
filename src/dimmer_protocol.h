@@ -31,13 +31,14 @@
 #define DIMMER_REGISTER_OPTIONS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, options))
 #define DIMMER_REGISTER_MAX_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, max_temp))
 #define DIMMER_REGISTER_FADE_IN_TIME        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, fade_in_time))
-#define DIMMER_REGISTER_TEMP_CHECK_INT      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, temp_check_interval))
 #define DIMMER_REGISTER_ZC_DELAY_TICKS      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, zero_crossing_delay_ticks))
 #define DIMMER_REGISTER_MIN_ON_TIME_TICKS   (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, minimum_on_time_ticks))
 #define DIMMER_REGISTER_MIN_OFF_TIME_TICKS  (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, minimum_off_time_ticks))
-#define DIMMER_REGISTER_INT_1_1V_REF        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, internal_1_1v_ref))
+#define DIMMER_REGISTER_INT_VREF11          (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, internal_vref11))
 #define DIMMER_REGISTER_INT_TEMP_OFS        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, int_temp_offset))
-#define DIMMER_REGISTER_METRICS_INT         (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, report_metrics_max_interval))
+#define DIMMER_REGISTER_NTC_TEMP_OFS        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, ntc_temp_offset))
+#define DIMMER_REGISTER_METRICS_INT         (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, report_metrics_interval))
+#define DIMMER_REGISTER_ADJ_HW_CYCLES       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, halfwave_adjust_cycles))
 #define DIMMER_REGISTER_VERSION             0xb9
 #define DIMMER_REGISTER_RANGE_BEGIN         (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, range_begin))
 #define DIMMER_REGISTER_RANGE_END           (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, range_end))
@@ -70,9 +71,10 @@
 #define DIMMER_COMMAND_PRINT_METRICS        0x55
 #define DIMMER_COMMAND_SET_MODE             0x56
 #define DIMMER_COMMAND_ZC_TIMINGS_OUTPUT    0x60
+#define DIMMER_COMMAND_GET_CFG_LEN          0x90
 #define DIMMER_COMMAND_PRINT_CONFIG         0x91
-#define DIMMER_COMMAND_WRITE_CFG_NOW        0x92
 #define DIMMER_COMMAND_WRITE_EEPROM_NOW     0x93
+#define DIMMER_COMMAND_MEASURE_FREQ         0x94
 #if DEBUG || DEBUG_COMMANDS
 #define DIMMER_COMMAND_INCR_ZC_DELAY        0x82
 #define DIMMER_COMMAND_DECR_ZC_DELAY        0x83
@@ -93,4 +95,9 @@
 #define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED 0x04
 #define DIMMER_OPTIONS_MODE_LEADING_EDGE    0x20
 
+// dimmer_eeprom_written_t.flags
+#define DIMMER_EEPROM_EVT_CF_UPDATED        0x01
+
+
+// the version address is fixed and cannot be changed due to compatibility with older versions
 static_assert(DIMMER_REGISTER_VERSION == 0xb9, "Invalid offset");

@@ -31,12 +31,9 @@
 #endif
 
 // zero crossing interrupt trigger mode
-// if CHANGE is used, the zero crossing signal is the average time between rising and
-// falling measured over 2 or more halfwaves. this mode can be used for asymmetrical and symmetrical signals
 #ifndef DIMMER_ZC_INTERRUPT_MODE
 #define DIMMER_ZC_INTERRUPT_MODE                                RISING
 //#define DIMMER_ZC_INTERRUPT_MODE                                FALLING
-//#define DIMMER_ZC_INTERRUPT_MODE                                CHANGE
 #endif
 
 // DIMMER_MIN_ON_TIME_US and DIMMER_MIN_OFF_TIME_US remove the unusable part of the halfwave
@@ -76,9 +73,8 @@
 #endif
 
 // adjustment for measuring clock cycles
-// avr-gcc (atmega328p, -O2) adds 37 cpu cycles before reading the counter
 #ifndef DIMMER_MEASURE_ADJ_CYCLE_CNT
-#define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -37
+#define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -39
 #endif
 
 // keep dimmer enabled when loosing the ZC signal for up to
@@ -86,7 +82,7 @@
 // once the signal is lost, it will start to drift and get out of sync. adjust the
 // limit to keep the drift below 200µs
 #ifndef DIMMER_OUT_OF_SYNC_LIMIT
-#define DIMMER_OUT_OF_SYNC_LIMIT                                250
+#define DIMMER_OUT_OF_SYNC_LIMIT                                2500
 #endif
 
 // default mode
@@ -117,9 +113,7 @@
 #endif
 
 // maximum number of different dimming levels
-// some non dimmable LEDs can be dimmed inside a narrow window of 10-20% of the halfwave
-// this reduces the number of effective levels and should be taken in account when
-// choosing this number. the limit is the number of ticks the timer
+// the range can be adjusted with range_begin and range_end
 #ifndef DIMMER_MAX_LEVEL
 #define DIMMER_MAX_LEVEL                                        8192
 #endif
@@ -182,6 +176,11 @@
 #define DEFAULT_BAUD_RATE                                       57600
 #endif
 
+// interval in milliseconds
+#ifndef DIMMER_TEMPERATURE_CHECK_INTERVAL
+#define DIMMER_TEMPERATURE_CHECK_INTERVAL                      2000UL
+#endif
+
 #ifndef HAVE_NTC
 #define HAVE_NTC                                                1
 #endif
@@ -198,14 +197,6 @@
 
 #ifndef HAVE_READ_INT_TEMP
 #define HAVE_READ_INT_TEMP                                      1
-#endif
-
-#ifndef USE_TEMPERATURE_CHECK
-#if HAVE_NTC || HAVE_READ_INT_TEMP
-#define USE_TEMPERATURE_CHECK                                   1
-#else
-#define USE_TEMPERATURE_CHECK                                   0
-#endif
 #endif
 
 // NTC pin
