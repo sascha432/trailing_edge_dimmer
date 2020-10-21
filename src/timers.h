@@ -6,6 +6,34 @@
 
 #include <Arduino.h>
 
+// Timer 1 & 2
+// tested with Atmega328P and Atmega328PB @ 8 and 16MHz
+
+#if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega328PB__)
+#else
+#warning Verify that timers are compatible with the MCU
+#endif
+
+#if (F_CPU == 16000000L) || (F_CPU == 8000000L)
+#else
+#warning Verify that timers are compatible with the CPU frequency
+#endif
+
+#ifndef _BV
+#define _BV(bit) (1 << (bit))
+#endif
+
+static_assert(
+    _BV(1) == (1 << 1) &&
+    _BV(2) == (1 << 2) &&
+    _BV(3) == (1 << 3) &&
+    _BV(4) == (1 << 4) &&
+    _BV(5) == (1 << 5) &&
+    _BV(6) == (1 << 6) &&
+    _BV(7) == (1 << 7) &&
+    _BV(8) == (1 << 8), "_BV() is not compatible"
+);
+
 namespace Timers {
 
     template<int _Timer, uint8_t _Prescaler>
@@ -16,9 +44,9 @@ namespace Timers {
         static constexpr uint16_t prescaler = _Prescaler;
         static constexpr uint8_t prescalerBV =
             prescaler == 1 ?
-                (1 << CS10) :
+                _BV(CS10) :
                 prescaler == 8 ?
-                    (1 << CS11) :
+                    _BV(CS11) :
                     prescaler == 64 ?
                         ((1 << CS10) | (1 << CS11)) :
                         prescaler == 256 ?
