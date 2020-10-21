@@ -23,7 +23,6 @@ Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoW
         }
     }
 
-
 ## DIMMER_COMMAND_FADE
 
 The fading command uses following registers
@@ -90,6 +89,8 @@ If no further data is sent after the read command, the register is set automatic
 - DIMMER_REGISTER_TEMP (float)
 - DIMMER_REGISTER_VCC (uint16)
 
+***Note:*** Reading temperature and VCC requires some time to adjust the ADC. The result might not be available for up to 100ms after issuing the command
+
 Read VCC
 
     +I2CT=17,89,22
@@ -116,12 +117,12 @@ If the temperature is requested last, it is not required to set read length and 
     +I2CT=17,89,22,89,21
     +I2CR=17,06
 
-
 Read AC frequency
+
+***Note:*** this cancels any pending temperature measurements
 
     +I2CT=17,89,23
     +I2CR=17,04
-
 
 ## DIMMER_COMMAND_READ_CHANNELS
 
@@ -155,21 +156,48 @@ Channel 2 and 3
 
 ## DIMMER_COMMAND_WRITE_EEPROM
 
-Store current dimming levels in EEPROM. Might be delayed due to wear leveling.
+Store current dimming levels in EEPROM. If the following byte is 92, the configuration is also stored. If the data matches the last stored configuration, nothing is written to the EEPROM
 
-    +I2CT=17,89,50
+***Note:*** The command might be delayed due to the wear leveling algorithm. The maximum delay is *EEPROM_REPEATED_WRITE_DELAY* (5 seconds by default) Any changes during this time will be written to the EEPROM as well
 
-## DIMMER_COMMAND_WRITE_CFG_NOW
+See *DIMMER_COMMAND_WRITE_EEPROM_NOW* how to force writing immediatelly.
 
-Store configuration and dimming levels in EEPROM
+In UART or I2C master/master mode, the event *DIMMER_EEPROM_WRITTEN* confirms successful execution. It also indicates if any data has been written to the EEPROM.
 
-    +I2CT=17,89,92
+    +I2CT=17,89,50[,92]
+
+## DIMMER_COMMAND_GET_CFG_LEN
+
+Get start address and length of the configuration
+
+***Note:*** this cancels any pending temperature measurements
+
+    +I2CT=17,89,90
+    +I2CR=17,02
+
+## DIMMER_COMMAND_PRINT_CONFIG
+
+Print version and configuration on serial port. The I2CT command in the output can be used to restore the configuration if the firmware version matches
+
+    +I2CT=17,89,91
 
 ## DIMMER_COMMAND_WRITE_EEPROM_NOW
 
-Store current dimming levels in EEPROM
+Store current dimming levels in EEPROM immediately without the wear leveling algorithm or comparing the EEPROM for changes. During normal operation it is recommended to use *DIMMER_COMMAND_WRITE_EEPROM* instead. If the following byte is 92, the configuration is also stored.
 
-    +I2CT=17,89,93
+In UART or I2C master/master mode, the event *DIMMER_EEPROM_WRITTEN* confirms successful execution
+
+***Note:*** This command cancels all previous *DIMMER_COMMAND_WRITE_EEPROM* commands that have not been executed yet. If the configuration was set to be saved, it will be saved as well.
+
+It is recommended to execute this command several times after the initial calibration. This ensures that several copies of the configuration exist and can be used in case of a read failure or damanged EEPROM cells.
+
+    +I2CT=17,89,93[,92]
+
+## DIMMER_COMMAND_MEASURE_FREQ
+
+Start frequency measurement. This turns all channels off and the dimmer will not execute any commands during measurement. After the measurement has finished, the dimmer restarts and all pending requests (including writing configuration to the EEPROM) are reset
+
+    +I2CT=17,89,94
 
 ## DIMMER_COMMAND_RESTORE_FS
 
@@ -179,7 +207,9 @@ Restore factory settings and re-initialize EEPROM wear leveling
 
 ## DIMMER_COMMAND_GET_TIMER_TICKS
 
-Get ticks per microsecond for Timer 1
+Get ticks per microsecond for Timer 1 as float
+
+***Note:*** this cancels any pending temperature measurements
 
     +I2CT=17,89,52
     +I2CR=17,04
@@ -187,6 +217,8 @@ Get ticks per microsecond for Timer 1
 ## DIMMER_COMMAND_READ_AC_FREQUENCY
 
 Read AC frequency
+
+***Note:*** this cancels any pending temperature measurements
 
     +I2CT=17,89,23
     +I2CR=17,04
@@ -213,8 +245,8 @@ Reading the firmware version is using the same transmission for all versions. Th
 ### Options
 
 - Bit 0: Restore last levels on power up
-- Bit 1: Report temperature and over-temperature alarm (UART only)
-- Bit 2: Temperature alarm indication. Needs to be cleared manually
+- Bit 1: Report temperature and over-temperature alarm (UART or I2C in master/master mode required)
+- Bit 2: Temperature alarm indicator. Needs to be cleared manually
 - Bit 3: unused
 - Bit 4: unused
 - Bit 5: Leading edge mode
@@ -243,10 +275,6 @@ Set temperature check interval/metrics reporting to 30 seconds
 
 **Note:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=17,89,54*) can be used to force a check without waiting
 
-Setting the linear correction factor to 1.0
-
-    +I2CT=17,a9,00,00,80,3f
-
 ## DIMMER_COMMAND_PRINT_INFO
 
 Print dimmer info on serial port
@@ -255,24 +283,19 @@ Print dimmer info on serial port
 
 ## DIMMER_COMMAND_SET_MODE
 
-Set dimmer mode. The following byte indicates the mode. 0 is trailng edge, 1 is leading edge. It is recommended to turn all channels off before switching mode.
+Set dimmer mode. The following byte indicates the mode. 0 is trailng edge, 1 is leading edge. It is recommended to turn all channels off **before** switching mode
 
     +I2CT=17,89,56,01
 
 ## DIMMER_COMMAND_RESET
 
+**NOTE:** Depending on the boot loader, this functionality might not be available or cause the firmware to lock up. It is recommended to pull the reset pin LOW for 10ms to reset the firmware
+
 Reset ATmega via WDT
 
-### Outut format
-
-The first argument is the return value of micros() hex encoded. Every following the difference to the previous time.
-
-+REM=ZC,\<microseconds\> [\<delay\> [\<delay\> ...]]
-
-    +REM=ZC,17f8c010 20b8 20b4 20b4 20b8 20b4 20b8 ...
-
-
 ### Compile options
+
+**NOTE:** This section is not up to date
 
 `+REM=options=EEPROM,NTC=19,Int.Temp,Temp.Chk,VCC,Fade,LCF,ACFrq=60,Pr=UART,CE=1,Addr=17,CPU=8,Pre=8/64,Ticks=1.000/0.125,Lvls=8333,Chs=4`
 

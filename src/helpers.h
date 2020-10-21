@@ -66,61 +66,24 @@ static inline void __debug_printf_i(uint16_t interval, const char *format, ...) 
 #define _ASSERT_EXPR(cond, expr, ...)       ( (!(cond)) ? debug_printf(expr, _STRINGIFY(cond), ##__VA_ARGS__) + assert_failed() : 0 )
 #endif
 
-template <class T>
-class unique_ptr {
-public:
-    typedef T* T_ptr_t;
 
-    constexpr unique_ptr() : _ptr(nullptr) {
+
+template< typename T > class unique_ptr
+{
+public:
+    using pointer = T*;
+    unique_ptr() noexcept : ptr(nullptr) {}
+    unique_ptr(pointer p) : ptr(p) {}
+    pointer operator->() const noexcept { return ptr; }
+    T& operator[](decltype(sizeof(0)) i) const { return ptr[i]; }
+    void reset(pointer p = pointer()) noexcept
+    {
+        delete ptr;
+        ptr = p;
     }
-    constexpr unique_ptr(nullptr_t) : _ptr(nullptr) {
-    }
-    explicit unique_ptr(T_ptr_t ptr) : _ptr(ptr) {
-    }
-    ~unique_ptr() {
-        _delete();
-    }
-    inline unique_ptr &operator=(nullptr_t) {
-        reset(nullptr);
-        return *this;
-    }
-    inline T_ptr_t operator *() const {
-        return _ptr;
-    }
-    inline T_ptr_t operator ->() const {
-        return _ptr;
-    }
-    inline operator bool() const {
-        return _ptr != nullptr;
-    }
-    inline T_ptr_t get() const {
-        return _ptr;
-    }
-    inline void reset(nullptr_t = nullptr) {
-        _delete();
-    }
-    void reset(T_ptr_t ptr) {
-        _delete();
-        _ptr = ptr;
-    }
-    T_ptr_t release() {
-        auto ptr = _ptr;
-        _ptr = nullptr;
-        return ptr;
-    }
-    void swap(T_ptr_t &ptr) {
-        auto tmp_ptr = ptr;
-        ptr = _ptr;
-        _ptr = tmp_ptr;
-    }
+    T& operator*() const { return *ptr; }
 private:
-    void _delete() {
-        if (_ptr) {
-            delete _ptr;
-            _ptr = nullptr;
-        }
-    }
-    T_ptr_t _ptr;
+    pointer ptr;
 };
 
 #ifndef FPSTR

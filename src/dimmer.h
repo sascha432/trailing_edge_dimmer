@@ -16,8 +16,6 @@ extern register_mem_union_t register_mem;
 using dimmer_channel_id_t = int8_t;
 using dimmer_level_t = int16_t;
 
-//#if __ARM
-
 struct dimmer_fade_t {
     float level;
     float step;
@@ -61,7 +59,7 @@ namespace Dimmer {
 
     template<>
     struct Timer<1> : Timers::TimerBase<1, DIMMER_TIMER1_PRESCALER> {
-        static constexpr uint8_t extraTicks = (prescaler == 1 ? 64 : (prescaler == 8 ? 8 : 1));
+        static constexpr uint8_t extraTicks = (64 / prescaler) + 1;
     };
 
     template<>
@@ -76,6 +74,7 @@ namespace Dimmer {
         }
         static inline void end() {
             TIMSK1 &= ~_BV(TOIE1);
+            TCCR1A = 0;
             TCCR1B = 0;
         }
     };

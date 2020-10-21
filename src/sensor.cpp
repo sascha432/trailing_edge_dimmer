@@ -23,7 +23,7 @@ float get_internal_temperature()
         while (bit_is_set(ADCSRA, ADSC)) ;
         sum += ADCW;
     }
-    return (((sum / 10.0) - (is_Atmega328PB ? 247.0f : 324.31f)) / 1.22f) + (float)(dimmer_config.int_temp_offset / 4.0f);
+    return (((sum / 10.0) - (is_Atmega328PB ? 247.0f : 324.31f)) / 1.22f) + (float)dimmer_config.int_temp_offset;
 }
 
 #endif
@@ -74,7 +74,7 @@ uint16_t read_vcc_int()
         while (bit_is_set(ADCSRA, ADSC));
         sum += ADCW;
     }
-    return (10UL * 1000UL * 1024UL) * dimmer_config.internal_1_1v_ref / (float)sum;
+    return (10UL * 1000UL * 1024UL) * (float)dimmer_config.internal_vref11 / (float)sum;
 }
 
 #endif
@@ -138,7 +138,7 @@ float get_ntc_temperature()
 #ifdef FAKE_NTC_VALUE
     return FAKE_NTC_VALUE;
 #else
-    return convert_to_celsius(read_ntc_value()) + (float)(dimmer_config.ntc_temp_offset / 4.0f);
+    return convert_to_celsius(read_ntc_value()) + (float)dimmer_config.ntc_temp_offset;
 #endif
 }
 

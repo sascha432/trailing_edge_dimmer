@@ -5,6 +5,7 @@
 #include "i2c_slave.h"
 #include "helpers.h"
 #include "dimmer.h"
+#include "measure_frequency.h"
 
 register_mem_union_t register_mem;
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
@@ -97,6 +98,7 @@ void _dimmer_i2c_on_receive(int length)
                 case DIMMER_COMMAND_READ_NTC:
                     register_mem.data.temp = NAN;
 #if HAVE_NTC
+                    dimmer_scheduled_calls.read_int_temp = false;
                     dimmer_scheduled_calls.read_ntc_temp = true;
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
@@ -104,6 +106,7 @@ void _dimmer_i2c_on_receive(int length)
                 case DIMMER_COMMAND_READ_INT_TEMP:
                     register_mem.data.temp = NAN;
 #if HAVE_READ_INT_TEMP
+                    dimmer_scheduled_calls.read_ntc_temp = false;
                     dimmer_scheduled_calls.read_int_temp = true;
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
@@ -116,31 +119,16 @@ void _dimmer_i2c_on_receive(int length)
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.vcc));
                     break;
                 case DIMMER_COMMAND_READ_AC_FREQUENCY:
+                    dimmer_scheduled_calls.read_ntc_temp = false;
+                    dimmer_scheduled_calls.read_int_temp = false;
                     register_mem.data.temp = dimmer._get_frequency();
                     _D(5, debug_printf("I2C get AC frequency=%.3f\n", register_mem.data.temp));
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
-                case DIMMER_COMMAND_WRITE_EEPROM:
-                    write_config();
-                    break;
-                case DIMMER_COMMAND_RESTORE_FS:
-                    init_eeprom();
-                    break;
+
                 case DIMMER_COMMAND_GET_TIMER_TICKS:
-                    // if (length-- > 0) {
-                    //     switch(Wire.read()) {
-                    //         case 1:
-                    //             register_mem.data.temp = Dimmer::Timer<1>::ticksPerMicrosecond;
-                    //             break;
-                    //         case 2:
-                    //             register_mem.data.temp = Dimmer::Timer<2>::ticksPerMicrosecond;
-                    //             break;
-                    //         default:
-                    //             register_mem.data.temp = NAN;
-                    //             break;
-                    //     }
-                    //     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
-                    // }
+                    dimmer_scheduled_calls.read_ntc_temp = false;
+                    dimmer_scheduled_calls.read_int_temp = false;
                     register_mem.data.temp = Dimmer::Timer<1>::ticksPerMicrosecond;
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
@@ -168,21 +156,55 @@ void _dimmer_i2c_on_receive(int length)
                     }
                     break;
 
+                case DIMMER_COMMAND_GET_CFG_LEN: {
+                        dimmer_scheduled_calls.read_ntc_temp = false;
+                        dimmer_scheduled_calls.read_int_temp = false;
+                        register_mem.data.temp_bytes[0] = DIMMER_REGISTER_OPTIONS;
+                        register_mem.data.temp_bytes[1] = sizeof(register_mem.data.cfg);
+                        i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp_bytes[0]) * 2);
+                    }
+                    break;
+
                 case DIMMER_COMMAND_PRINT_CONFIG: { // print command to restore parameters
                         auto ptr = reinterpret_cast<uint8_t *>(&register_mem.data.cfg);
-                        Serial.printf_P(PSTR("+REM=v%02x,i2ct=%02x%02x"), Dimmer::Version::kVersion, DIMMER_I2C_ADDRESS, DIMMER_REGISTER_OPTIONS);
+                        Serial.printf_P(PSTR("+REM=v%04x,i2ct=%02x%02x"), Dimmer::Version::kVersion, DIMMER_I2C_ADDRESS, DIMMER_REGISTER_OPTIONS);
                         for(uint8_t i = DIMMER_REGISTER_OPTIONS; i < DIMMER_REGISTER_OPTIONS + sizeof(register_mem.data.cfg); i++) {
                             Serial.printf_P(PSTR("%02x"), *ptr++);
                         }
                         Serial.println();
                     } break;
 
-                case DIMMER_COMMAND_WRITE_CFG_NOW:
-                    _write_config(true, true);
+                case DIMMER_COMMAND_RESTORE_FS:
+                    init_eeprom();
+                    break;
+
+                case DIMMER_COMMAND_WRITE_EEPROM:
+                    if (length-- > 0 && Wire.read() == 0x92) {
+                        dimmer_scheduled_calls.eeprom_update_config = true;
+                    }
+                    write_config();
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM_NOW:
-                    _write_config(true, false);
+                    if (length-- > 0 && Wire.read() == 0x92) {
+                        dimmer_scheduled_calls.eeprom_update_config = true;
+                    }
+                    dimmer_scheduled_calls.write_eeprom = false;
+                    _write_config(true);
+                    break;
+
+                case DIMMER_COMMAND_MEASURE_FREQ: {
+                        _D(5, debug_printf("Starting frequency measurement...\n"));
+                        Serial.println(F("+REM=freq"));
+                        dimmer.end();
+                        delay(500);
+                        start_measure_frequency();
+                    }
+                    break;
+
+                case DIMMER_COMMAND_FORCE_TEMP_CHECK:
+                    next_temp_check = 0;
+                    metrics_next_event = 0;
                     break;
 
 #if DEBUG_COMMANDS
@@ -247,14 +269,6 @@ void _dimmer_i2c_on_receive(int length)
                         }
                     } break;
 #endif
-
-#if USE_TEMPERATURE_CHECK
-                case DIMMER_COMMAND_FORCE_TEMP_CHECK:
-                    next_temp_check = 0;
-                    metrics_next_event = 0;
-                    break;
-#endif
-
             }
         }
     }
@@ -278,7 +292,6 @@ void dimmer_init_register_mem()
 {
     register_mem = {};
     register_mem.data.from_level = Dimmer::Level::invalid;
-    // register_mem.data.cfg.version = Dimmer::Version::kVersion;
 }
 
 void dimmer_copy_config_to(register_mem_cfg_t &config)
@@ -289,7 +302,6 @@ void dimmer_copy_config_to(register_mem_cfg_t &config)
 void dimmer_copy_config_from(const register_mem_cfg_t &config)
 {
     memcpy(&register_mem.data.cfg, &config, sizeof(register_mem.data.cfg));
-    // register_mem.data.cfg.version = Dimmer::Version::kVersion;
 }
 
 void dimmer_i2c_slave_setup()

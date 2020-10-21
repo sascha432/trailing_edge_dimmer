@@ -27,21 +27,13 @@ ISR(TIMER1_COMPB_vect)
     dimmer._start_halfwave();
 }
 
-#if 1 //FREQUENCY_TEST_DURATION
-
-volatile uint8_t zero_crossing_int_counter;
-volatile unsigned long zero_crossing_frequency_time;
-volatile uint16_t zero_crossing_frequency_period; // milliseconds for DIMMER_AC_FREQUENCY interrupts
-volatile unsigned long long zc_min_time;
-
-#endif
 
 void DimmerBase::begin()
 {
     if (frequency == 0 || isnan(frequency)) {
         return;
     }
-    halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / frequency) + _config.halfwave_adjust_ticks;
+    halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / frequency) + (_config.halfwave_adjust_cycles / Timer<1>::prescaler);
     zc_diff_ticks = 0;
     zc_diff_count = 0;
 
@@ -55,7 +47,6 @@ void DimmerBase::begin()
         halfwave_ticks)
     );
 
-    zc_min_time = 0;
     dimmer_scheduled_calls = {};
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
