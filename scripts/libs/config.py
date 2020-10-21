@@ -6,8 +6,6 @@ import re
 import struct
 import json
 import importlib
-import sys
-
 class Config:
 
     def is_version_supported(major, minor, revision=0, throw=False):

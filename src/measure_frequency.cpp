@@ -5,6 +5,22 @@
 #include "measure_frequency.h"
 
 // currently only single filter stage implemented
+// WORK IN PROGRESS
+
+// TODO
+// improve algorithm for invalid ZC signals
+//
+// after initial frequency detection, measure the halfwave time again filtering invalid signals
+//
+// the halfwave resolution is 62.5ns but the timer runs with prescaler 8 and 500ns - to match the excact halfwave length, one tick can be removed and replaced with
+// a short delay. right now the halfwave stays pretty much in sync when disconnecting the ZC signal, moving a few 100µs back and forth but over several seconds it gets out of sync
+// i also noticed that the ZC signal coming from the dimmer is a bit asymmetrical, one half wave is detected ~18µs ealier using RISING as interrupt source... checking with the oscilloscope
+// shows the same but the center of the signal matches the zerocrossing. using CHANGE as trigger might be a solution. the C0G capacitors still seems to be a bit temperature sensitive
+// moving the signal a few µs per °C, but not like the X5R which had 100µs offset per a few degree...
+//
+// what effect does the load have on the zero crossing? and the snubber network? you can see a certain offset when the mosfets are open (no load, no snubber, just a resistor)
+// testing some transformers seems to cause a pretty big shift, as well as some LEDs with buck regulators. the spike when turning the mosfets off sometimes causes a voltage drop at the gate
+// driver turning them on again. the 1nF capacitor might not be enough when switching inductive loads like transformers
 
 static void attach_zc_measure_handler();
 static void detach_zc_measure_handler();

@@ -4,13 +4,14 @@
 
 - Removed linear correction
 - Removed ZC_MAX_TIMINGS
-- Min./max. level range can be configured
-- DIMMER_MIN_LEVEL has been replaced by a configurable level that is applied for a specific amount of time when the dimmer is turned on
+- Level range can be configured
+- Minimum on-time can be adjusted dynamically for devices that need a certain level to start-up
 - Trailing edge/leading edge mode
 - Frequency auto detection (50/60Hz)
 - Increased ZC delay to 16bit / 500ns resolution
 - Filter invalid ZC signals and continue to run up to several seconds without being synchronized
-- Python tool to convert configuration to json and back
+- Python tool to configure/monitor the dimmer over the serial port (for version 2.1.x and 2.2.x only)
+- EEPROM wear leveling improved and fail-safe added
 
 ## 2.1.5
 

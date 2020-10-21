@@ -4,16 +4,22 @@ Firmware for a trailing edge MOSFET dimmer.
 
 * 16666 different dimming levels
 * Up to 8 different channels
+* Trailing edge or leading edge mode
 * Store last levels in EEPROM and restore during startup
 * EEPROM wear level protection
 * Serial protocol to control the dimmer
 * I2C or UART interface
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
-* Highly configurable to match hardware
+* Highly configurable to match any hardware
+* 50/60Hz auto detection
 
 [I2C/UART protocol](docs/protocol.md)
 
-[Change Log v2.1.5](CHANGELOG.md)
+[Change Log v2.2.0](CHANGELOG.md)
+
+## Version 2.2.x
+
+Version 3.0.x has been cancelled and the most useful features will go into 2.2.x. That also means that the serial protocol won't change and only new features require changes on the master side.
 
 ## WiFi Firmware update
 
