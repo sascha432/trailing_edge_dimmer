@@ -5,76 +5,22 @@
 import re
 import struct
 import json
+import importlib
+import sys
 
 class Config:
 
-    configs = {
-        '2.2.1': {
-            'options': {
-                'restore_level': 0x01,
-                'report_metrics': 0x02,
-                'temp_alarm_triggered': 0x04
-            },
-            'struct': {
-                'i2c_address': 'B',
-                'mem_address': 'B',
-                'options': 'B',
-                'max_temp': 'B',
-                'fade_in_time': 'f',
-                'temp_check_interval': 'B',
-                'linear_correction_factor': 'f',
-                'zero_crossing_delay_ticks': 'B',
-                'minimum_on_time_ticks': 'H',
-                'minimum_off_time_ticks': 'H',
-                'internal_1_1v_ref': 'f',
-                'int_temp_offset': 'b',
-                'ntc_temp_offset': 'b',
-                'report_metrics_max_interval': 'B'
-            }
-        },
-        '2.2.x': {
-            'options': {
-                'restore_level': 0x01,
-                'report_metrics': 0x02,
-                'temp_alarm_triggered': 0x04,
-                'leading_edge_mode': 0x20,
-            },
-            'struct': {
-                'i2c_address': 'B',
-                'mem_address': 'B',
-                'options': 'B',
-                'max_temp': 'B',
-                'fade_in_time': 'f',
-                'temp_check_interval': 'B',
-                '__empty0': 'B',
-                '__empty1': 'B',
-                'halfwave_adjust_ticks': 'b',
-                'zero_crossing_delay_ticks': 'H',
-                'minimum_on_time_ticks': 'H',
-                'minimum_off_time_ticks': 'H',
-                'internal_1_1v_ref': 'f',
-                'int_temp_offset': 'b',
-                'ntc_temp_offset': 'b',
-                'report_metrics_max_interval': 'B',
-                'range_begin': 'h',
-                'range_end': 'h',
-                'switch_on_minimum_ticks': 'H',
-                'switch_on_count': 'B',
-            }
-        }
-    }
-
-    def is_version_supported(major, minor, revision = 'x', throw = False):
-        key = '%s.%s.%s' % (str(major), str(minor), str(revision))
-        if key in Config.configs:
-            return key
-        key = '%s.%s.x' % (str(major), str(minor))
-        if key in Config.configs:
-            return key
-        if throw:
-            raise Exception('version %s.%s.x not supported' % (str(major), str(minor)))
-        return False
-
+    def is_version_supported(major, minor, revision=0, throw=False):
+        try:
+            version_key = '%u_%u_%u' % (major, minor, revision)
+            structs = importlib.import_module('libs.fw_ver_%u_%u_%u' % (major, minor, revision), package=None)
+        except:
+            try:
+                version_key = '%u_%u_x' % (major, minor)
+                structs = importlib.import_module('libs.fw_ver_%u_%u_x' % (major, minor), package=None)
+            except:
+                raise Exception('version %u.%u.x not supported' % (major, minor))
+        return structs
 
     def get_version(data):
         if isinstance(data, str):
@@ -86,99 +32,36 @@ class Config:
         revision = version & 0x1f
         return (major, minor, revision)
 
-    def __init__(self, major_version, minor_version = None):
-        if minor_version==None:
-            version_key = major_version
-        else:
-            version_key = Config.is_version_supported(major_version, minor_version, True)
+    def __init__(self, major, minor, revision):
+        self.structs = Config.is_version_supported(major, minor, revision)
         self.version = 'unknown'
-        self.struct = Config.configs[version_key]['struct']
-        self.options = Config.configs[version_key]['options']
-        self.config = {}
+        self.register_mem_cfg_t = None
 
-    def get_unpack(self):
-        s = '<'
-        for key, val in self.struct.items():
-            s = s + val
-        return s
-
-    def get_length(self):
-        return struct.calcsize(self.get_unpack())
-
-    def set_items(self, items):
-        self.config = self.struct.copy();
-        n = 0
-        for key, val in self.config.items():
-            self.config[key] = items[n]
-            n += 1
-
-    def validate_value(self, type, val):
-        if isinstance(val, str):
-            if type=='f':
-                val = float(val)
-            else:
-                val = int(val)
-        if type in 'BbHh' and not isinstance(val, int):
-            raise ValueError('value not integer: %s' % str(val))
-        if type in 'f' and not isinstance(val, float):
-            raise ValueError('value not float: %s' % str(val))
-        if type=='B':
-            if val<0 or val>255:
-                raise ValueError('value out of range: 0 to 255: %d' % val)
-        if type=='b':
-            if val<-128 or val>127:
-                raise ValueError('value out of range: -128 to 127: %d' % val)
-        if type=='H':
-            if val<0 or val>65535:
-                raise ValueError('value out of range: 0 to 65535: %d' % val)
-        if type=='h':
-            if val<-32768 or val>32867:
-                raise ValueError('value out of range: -32868 to 32867: %d' % val)
-        return val
-
-    def set_item(self, key, val):
-        if not key in self.config:
-            raise KeyError('key does not exist: %s' % key)
-        type = self.struct[key]
-        val = self.validate_value(type, val)
-        if val!=None:
-            self.config[key] = val
-            return True
-        return False
-
-    def dump(self):
-        names = list(self.struct.keys())
-        for key, val in self.config.items():
-            print('%s = %s' % (key, str(val)))
-
-    def get_json(self):
-        tmp = self.config.copy();
-        tmp['i2c_address'] = '0x%02x' % tmp['i2c_address']
-        tmp['mem_address'] = '0x%02x' % tmp['mem_address']
-        tmp['options'] = '0b{:08b}'.format(tmp['options'])
-        return json.dumps(tmp, indent=2)
-
-    def get_bytes(self):
-        b = bytearray()
-        for key, val in self.config.items():
-            fmt = self.struct[key]
-            try:
-                packed = struct.pack('<' + fmt, val)
-            except:
-                raise Exception('invalid type for key: %s: type: %s' % (key, type(val)))
-            b = b + packed;
-        return b
+    def bytearray_to_hex(self, array):
+        return ''.join('%02x' % b for b in array)
 
     def get_command(self):
-        return '+I2CT=' + self.get_bytes().hex()
+        if self.register_mem_cfg_t==None:
+            raise Exception('register_mem_cfg_t not set')
+        return '+I2CT=17a2' + self.bytearray_to_hex(bytearray(self.register_mem_cfg_t))
 
     def set_items_fromhex(self, data):
-            fmt = self.get_unpack()
-            config = bytearray.fromhex(data)
-            size = struct.calcsize(fmt)
-            if len(config)<size:
-                raise ValueError('not enough data: required: %u: %u' % (size, len(config)))
-            self.set_items(struct.unpack(fmt, config[0:size]));
+        data = bytearray.fromhex(data)
+        self.register_mem_cfg_t = self.structs.register_mem_cfg_t.from_buffer_copy(data[2:])
+
+    def get_json(self):
+        # self.register_mem_cfg_t.__getattribute__('internal_vref11').value = 1.12
+        # self.register_mem_cfg_t.int_temp_offset.value = 1.25
+        # print(self.register_mem_cfg_t.__getattribute__('internal_vref11'))
+        # print(int(self.register_mem_cfg_t.__getattribute__('internal_vref11')))
+        # print(self.register_mem_cfg_t.__getattribute__('internal_vref11'))
+        # print(self.register_mem_cfg_t.__getattribute__('internal_vref11').value)
+
+        json = {}
+        for field in self.register_mem_cfg_t._fields_:
+            name = field[0]
+            json[name] = self.register_mem_cfg_t.__getattribute__(name).__repr__()
+        return json
 
     def get_from_command(self, cmd):
         m = re.match('^\+i2ct=([0-9a-f]+)', cmd, re.IGNORECASE)
@@ -197,9 +80,26 @@ class Config:
         m = re.match('^\+rem=v([0-9a-f]{1,4}),i2ct=([0-9a-f]+)', cmd, re.IGNORECASE)
         if m:
             (major, minor, revision) = Config.get_version(m[1])
-            Config.is_version_supported(major, minor, revision, True)
+            self.structs = Config.is_version_supported(major, minor, revision, True)
             self.version = '%u.%u.%u' % (major, minor, revision)
             self.set_items_fromhex(m[2])
             return True
 
         raise ValueError("could not find valid hex data")
+
+    def set_item(self, key, val):
+        if self.register_mem_cfg_t==None:
+            raise Exception('register_mem_cfg_t not set')
+        n = 0
+        num = None
+        for field in self.register_mem_cfg_t._fields_:
+            if field[0]==key:
+                num = n
+                break
+            n += 1
+        if num==None:
+            raise Exception('field %s not found', val)
+
+        # self.register_mem_cfg_t._fields_[num] =  val
+        # print(bytearray(self.register_mem_cfg_t))
+

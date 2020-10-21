@@ -6,6 +6,7 @@ import sys
 import argparse
 import libs.config as config
 import time
+import json
 
 parser = argparse.ArgumentParser(description="Firmware Configuration Tool")
 parser.add_argument("action", help="action to execute", choices=["display", "modify", "monitor"])
@@ -66,7 +67,7 @@ if args.action!='monitor':
                 for val in version:
                     parts.append(int(val))
                 if len(parts) == 2:
-                    parts.append('x')
+                    parts.append(None)
                 version = parts
             except:
                 parser.error('version format: major.minor[.revision]')
@@ -103,7 +104,9 @@ if args.port:
             version_key = config.Config.is_version_supported(version[0], version[1], version[2], False)
             if version_key==False:
                 parser.error('version %s.%s.%s not supported' % (str(version[0]), str(version[1]), str(version[2])))
-            cfg = config.Config(version_key)
+
+            cfg = config.Config(version[0], version[1], version[2])
+            sp.structs = cfg.structs
 
         if monitor:
             print("Monitoring serial port...")
@@ -122,7 +125,7 @@ if args.port:
                     n = -1
                     break
                 except Exception as e:
-                    print('Parse error: %s', str(e))
+                    # print('Parse error: %s', str(e))
                     pass
                 n += 1
 
@@ -138,7 +141,7 @@ if args.port:
 
             if args.action=='display':
                 if args.json==True:
-                    print(cfg.get_json())
+                    print(json.dumps(cfg.get_json(), indent=2))
                 else:
                     print(cfg.get_command())
             elif args.action=='modify':
@@ -159,10 +162,7 @@ if args.port:
             ser.close()
 
 else:
-    version_key = config.Config.is_version_supported(version[0], version[1], version[2], False)
-    if version_key==False:
-        parser.error('version %s.%s.%s not supported' % (str(version[0]), str(version[1]), str(version[2])))
-    cfg = config.Config(version_key)
+    cfg = config.Config(version[0], version[1], version[2])
 
     try:
         cfg.get_from_rem_command(args.data)

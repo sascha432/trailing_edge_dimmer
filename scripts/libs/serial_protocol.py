@@ -14,6 +14,7 @@ class Protocol:
         if master_address==None:
             master_address = address + 1
         self.serial = serial
+        self.structs = None
         self.address = address
         self.master_address = master_address
 
@@ -24,7 +25,6 @@ class Protocol:
             self.raw_line = line
             if line!='':
                 break
-
         if line.lower().startswith('+rem='):
             err = 'comment'
         else:
@@ -47,7 +47,7 @@ class Protocol:
                 except Exception as e:
                     err = 'invalid data: ' + str(e)
 
-        print('Received %s: %s' % (err, line))
+        # print('Received %s: %s' % (err, line))
         return line
 
     def read_request(self, length, timeout=None):
@@ -71,19 +71,16 @@ class Protocol:
             if len(data):
                 if isinstance(data, bytearray):
                     if data[0]==0xf0:
-                        fmt = 'BBHfff'
-                        (t, temp, vcc, frequency, ntc_temp, internal_temp, ) = struct.unpack(fmt, data)
-                        print('Metrics: temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%.2f°C' % (temp, vcc, frequency, ntc_temp, internal_temp))
+                        metrics = self.structs.dimmer_metrics_t.from_buffer_copy(data[1:])
+                        print('Metrics: temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%.2f°C' % (metrics.temp_check_value, metrics.vcc, metrics.frequency, metrics.ntc_temp, metrics.internal_temp))
                         return 0xf0
                     if data[0]==0xf1:
-                        fmt = 'BBB'
-                        (t, temp, max_temp, ) = struct.unpack(fmt, data)
-                        print('OVER TEMPERATURE: temp=%u°C max=%u°C' % (temp, max_temp))
+                        event = self.structs.dimmer_over_temperature_event_t.from_buffer_copy(data[1:])
+                        print('OVER TEMPERATURE: temp=%u°C max=%u°C' % (event.current_temp, event.max_temp))
                         return 0xf1
                     if data[0]==0xf3:
-                        fmt = '<BIHB'
-                        (t, cycle, pos, written) = struct.unpack(fmt, data)
-                        print('EEPROM written: cycle=%u position=%u written=%u' % (cycle, pos, written))
+                        event = self.structs.dimmer_eeprom_written_t.from_buffer_copy(data[1:])
+                        print('EEPROM written: cycle=%u position=%u written=%u' % (event.write_cycle, event.write_position, event.bytes_written))
                         return 0xf3
         except Exception as e:
             print('Invalid data: %s: %s' % (e, self.raw_line))
