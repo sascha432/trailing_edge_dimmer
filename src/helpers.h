@@ -124,8 +124,6 @@ inline void swap(T &a, T &b) {
 
 bool Serial_readLine(String &input, bool allowEmpty);
 
-typedef unsigned long ulong;
-
 // #define STR(s)                                  _STR(s)
 // #define _STR(s)                                 #s
 

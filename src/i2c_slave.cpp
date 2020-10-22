@@ -8,7 +8,6 @@
 #include "measure_frequency.h"
 
 register_mem_union_t register_mem;
-extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
 uint8_t validate_register_address()
 {
@@ -175,14 +174,14 @@ void _dimmer_i2c_on_receive(int length)
                     } break;
 
                 case DIMMER_COMMAND_RESTORE_FS:
-                    init_eeprom();
+                    conf.initEEPROM();
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM:
                     if (length-- > 0 && Wire.read() == 0x92) {
                         dimmer_scheduled_calls.eeprom_update_config = true;
                     }
-                    write_config();
+                    conf.scheduleWriteConfig();
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM_NOW:
@@ -190,7 +189,7 @@ void _dimmer_i2c_on_receive(int length)
                         dimmer_scheduled_calls.eeprom_update_config = true;
                     }
                     dimmer_scheduled_calls.write_eeprom = false;
-                    _write_config(true);
+                    conf._writeConfig(true);
                     break;
 
                 case DIMMER_COMMAND_MEASURE_FREQ: {
@@ -288,27 +287,11 @@ void _dimmer_i2c_on_request()
     register_mem.data.cmd.read_length = 0;
 }
 
-void dimmer_init_register_mem()
-{
-    register_mem = {};
-    register_mem.data.from_level = Dimmer::Level::invalid;
-}
-
-void dimmer_copy_config_to(register_mem_cfg_t &config)
-{
-    memcpy(&config, &register_mem.data.cfg, sizeof(config));
-}
-
-void dimmer_copy_config_from(const register_mem_cfg_t &config)
-{
-    memcpy(&register_mem.data.cfg, &config, sizeof(register_mem.data.cfg));
-}
-
 void dimmer_i2c_slave_setup()
 {
     _D(5, debug_printf("I2C slave address: %#02x\n", DIMMER_I2C_ADDRESS));
 
-    dimmer_init_register_mem() ;
+    conf.initRegisterMem();
 
     Wire.begin(DIMMER_I2C_ADDRESS);
     Wire.onReceive(_dimmer_i2c_on_receive);

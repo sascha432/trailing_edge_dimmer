@@ -97,7 +97,7 @@ ISR(TIMER1_COMPB_vect) {
 }
 #endif
 
-unsigned long poll_channels[DIMMER_CHANNELS];
+uint32_t poll_channels[DIMMER_CHANNELS];
 
 void setup() {
 
@@ -172,7 +172,7 @@ void setup() {
                     if (length >= sizeof(dimmer_eeprom_written_t)) {
                         dimmer_eeprom_written_t eeprom;
                         Wire.readBytes(reinterpret_cast<uint8_t *>(&eeprom), sizeof(eeprom));
-                        Serial.printf_P(PSTR("EEPROM written: cycle %lu, position %u, bytes written %u\n"), (unsigned long)eeprom.write_cycle, eeprom.write_position, eeprom.bytes_written);
+                        Serial.printf_P(PSTR("EEPROM written: cycle %lu, position %u, bytes written %u\n"), (uint32_t)eeprom.write_cycle, eeprom.write_position, eeprom.bytes_written);
                     }
                 }
                 break;
@@ -268,7 +268,7 @@ void write_eeprom() {
     endTransmission();
 }
 
-unsigned long poll_channels_interval = 0;
+uint32_t poll_channels_interval = 0;
 
 void check_poll_channels() {
     if (millis() > poll_channels_interval) {
@@ -296,7 +296,7 @@ void fade(int channel, uint16_t toLevel, float time) {
     Wire.write(reinterpret_cast<const uint8_t *>(&time), sizeof(time));
     Wire.write(DIMMER_COMMAND_FADE);
     if (endTransmission() == 0) {
-        unsigned long endPolling = millis() + (time * 1000) + 300;
+        uint32_t endPolling = millis() + (time * 1000) + 300;
         if (channel == -1 || channel == 0xff) {
             uint8_t count = DIMMER_CHANNELS - 1;
             do {

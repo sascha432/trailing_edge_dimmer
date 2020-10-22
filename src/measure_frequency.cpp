@@ -26,10 +26,10 @@ static void attach_zc_measure_handler();
 static void detach_zc_measure_handler();
 static void reset_measurement_timeout();
 
-static constexpr unsigned long kFrequencyWaitTimerInit = 0;
-static constexpr unsigned long kFrequencyWaitTimerDone = ~0;
+static constexpr uint32_t kFrequencyWaitTimerInit = 0;
+static constexpr uint32_t kFrequencyWaitTimerDone = ~0;
 
-unsigned long frequency_wait_timer;
+uint32_t frequency_wait_timer;
 bool frequency_measurement;
 
 volatile uint16_t timer1_overflow;

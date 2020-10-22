@@ -5,11 +5,11 @@
 // 1-8 Channel Dimmer with I2C interface
 
 #include <Arduino.h>
-#include <EEPROM.h>
 #include <crc16.h>
 #include "dimmer.h"
 #include "sensor.h"
 #include "i2c_slave.h"
+#include "config.h"
 #include "helpers.h"
 #include "measure_frequency.h"
 
@@ -27,199 +27,7 @@
 // frequency detection and continue without zc signal
 // Flash: [========  ]  78.7% (used 24168 bytes from 30720 bytes)
 // lash: [========  ]  78.7% (used 24188 bytes from 30720 bytes
-
-static constexpr uint16_t kInvalidPosition = ~0;
-
-EEPROM_config_t config;
-uint16_t eeprom_position;
-unsigned long eeprom_write_timer = -EEPROM_REPEATED_WRITE_DELAY;
-
-void reset_config()
-{
-    dimmer_init_register_mem();
-    dimmer_config.max_temp = 75;
-    dimmer_config.bits.restore_level = DIMMER_RESTORE_LEVEL;
-    dimmer_config.bits.leading_edge = (DIMMER_TRAILING_EDGE == 0);
-    dimmer_config.fade_in_time = 4.5f;
-    dimmer_config.zero_crossing_delay_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_ZC_DELAY_US);
-    dimmer_config.minimum_on_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_ON_TIME_US);
-    dimmer_config.minimum_off_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_OFF_TIME_US);
-#ifdef INTERNAL_TEMP_OFS
-    dimmer_config.int_temp_offset = INTERNAL_TEMP_OFS;
-#endif
-    dimmer_config.range_begin = Dimmer::Level::min;
-    dimmer_config.range_end = Dimmer::Level::max;
-    dimmer_config.report_metrics_interval = 2;
-
-    dimmer_copy_config_to(config.cfg);
-}
-
-unsigned long get_eeprom_num_writes(unsigned long cycle, uint16_t position)
-{
-    return (kEEPROMMaxCopies * (cycle - 1)) + (position / sizeof(EEPROM_config_t));
-}
-
-
-void init_eeprom()
-{
-    // initialize EEPROM and wear leveling
-    // invalidates cycle number and crc only
-    EEPROM_config_header_t header = { 0, ~0U };
-    uint16_t pos = sizeof(EEPROM_config_t);
-    while((pos + sizeof(EEPROM_config_t)) <= EEPROM.length()) {
-        EEPROM.put(pos, header);
-        pos += sizeof(EEPROM_config_t);
-    }
-
-    // create first valid configuration
-    eeprom_position = 0;
-    config = {};
-    config.eeprom_cycle = 1;
-    reset_config();
-    config.crc16 = crc16_update(&config.cfg, sizeof(config.cfg));
-    EEPROM.put(0, config);
-    _D(5, debug_printf("init eeprom cycle=%lu pos=%u crc=%04x\n", (unsigned long)config.eeprom_cycle, (unsigned)eeprom_position, config.crc16));
-    Serial.println(F("+REM=EEPROMR,init"));
-}
-
-void read_config()
-{
-    uint16_t pos = 0;
-    uint32_t max_cycle = 0;
-    EEPROM_config_t temp_config;
-
-    eeprom_position = kInvalidPosition;
-
-    // read entire eeprom and check which entries are valid
-    // if the most recent configuration cannot be read, the previous one is used
-
-    _D(5, debug_printf("reading eeprom "));
-#if DEBUG
-    char type;
-    uint32_t start = micros();
-#endif
-    while((pos + sizeof(temp_config)) <= EEPROM.length()) {
-        EEPROM.get(pos, temp_config);
-        auto crc = crc16_update(&temp_config.cfg, sizeof(temp_config.cfg));
-        if (crc == temp_config.crc16) {
-            // valid configuration
-            if (temp_config.eeprom_cycle >= max_cycle) {
-                // if cycle is equal or greater max_cycle, the configuration is more recent
-                // remember max_cycle, positition and copy data
-                max_cycle = temp_config.eeprom_cycle;
-                eeprom_position = pos;
-                config = temp_config;
-#if DEBUG
-                type = 'N'; // new
-#endif
-            }
-#if DEBUG
-            else {
-                type = 'O'; // old
-            }
-#endif
-        }
-#if DEBUG
-        else {
-            type = 'E'; // error
-        }
-        _D(5, Serial.printf_P(PSTR("%lu:%u<%c> "), temp_config.eeprom_cycle, pos, type));
-#endif
-        pos += sizeof(config);
-    }
-    _D(5, Serial.printf_P(PSTR("max_cycle=%ld pos=%d time=%lu\n"), max_cycle, eeprom_position, micros() - start));
-
-    if (eeprom_position == kInvalidPosition) { // no valid entries found
-        init_eeprom();
-        _D(5, debug_print_memory(&config.cfg, sizeof(config.cfg)));
-        return;
-    }
-
-    dimmer_copy_config_from(config.cfg);
-    _D(5, debug_print_memory(&config.cfg, sizeof(config.cfg)));
-    Serial.printf_P(PSTR("+REM=EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x\n"), (unsigned long)max_cycle, eeprom_position, get_eeprom_num_writes(max_cycle, eeprom_position), config.crc16);
-}
-
-void _write_config(bool force)
-{
-    EEPROM_config_t temp_config;
-    dimmer_eeprom_written_t event = {};
-
-    if (dimmer_scheduled_calls.eeprom_update_config) {
-        event.config_updated = true;
-        dimmer_copy_config_to(config.cfg);
-    }
-
-    memcpy(&config.level, &register_mem.data.level, sizeof(config.level));
-    config.crc16 = crc16_update(&config.cfg, sizeof(config.cfg));
-
-    EEPROM.get(eeprom_position, temp_config);
-
-    _D(5, debug_printf("_write_config force=%u reg_mem=%u memcmp=%d\n", force, event.config_updated, memcmp(&config, &temp_config, sizeof(config))));
-
-    if (force || memcmp(&config, &temp_config, sizeof(config))) {
-        _D(5, debug_printf("old eeprom write cycle %lu, position %u, ", (unsigned long)config.eeprom_cycle, eeprom_position));
-        eeprom_position += sizeof(config);
-        if (eeprom_position + sizeof(config) >= EEPROM.length()) { // end reached, start from beginning and increase cycle counter
-            eeprom_position = 0;
-            config.eeprom_cycle++;
-            config.crc16 = crc16_update(&config.cfg, sizeof(config.cfg)); // recalculate CRC
-        }
-        _D(5, debug_printf("new cycle %lu, position %u\n", (unsigned long)config.eeprom_cycle, eeprom_position));
-        EEPROM.put(eeprom_position, config);
-        eeprom_write_timer = millis();
-        event.bytes_written = sizeof(config);
-    }
-    else {
-        _D(5, debug_printf("configuration didn't change, skipping write cycle\n"));
-        eeprom_write_timer = millis();
-        event.bytes_written = 0;
-    }
-    dimmer_scheduled_calls.write_eeprom = false;
-    dimmer_scheduled_calls.eeprom_update_config = false;
-
-    event.write_cycle = config.eeprom_cycle;
-    event.write_position = eeprom_position;
-
-    _D(5, debug_printf("eeprom written event: cycle %lu, pos %u, written %u\n", (unsigned long)event.write_cycle, event.write_position, event.bytes_written));
-    Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-    Wire.write(DIMMER_EEPROM_WRITTEN);
-    Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
-    Wire.endTransmission();
-
-    Serial.printf_P(PSTR("+REM=EEPROMW,c=%lu,p=%u,n=%lu,w=%u,f=%u,crc=%04x\n"),
-        (unsigned long)event.write_cycle,
-        eeprom_position,
-        get_eeprom_num_writes(event.write_cycle, eeprom_position),
-        event.bytes_written,
-        event.flags,
-        config.crc16
-    );
-}
-
-void write_config()
-{
-    long lastWrite = millis() - eeprom_write_timer;
-    if (!dimmer_scheduled_calls.write_eeprom) { // no write scheduled
-        _D(5, debug_printf("scheduling eeprom write cycle, last write %d seconds ago\n", (int)(lastWrite / 1000UL)));
-        eeprom_write_timer = millis() + ((lastWrite > EEPROM_REPEATED_WRITE_DELAY) ? EEPROM_WRITE_DELAY : EEPROM_REPEATED_WRITE_DELAY);
-        dimmer_scheduled_calls.write_eeprom = true;
-    } else {
-        _D(5, debug_printf("eeprom write cycle already scheduled in %d seconds\n", (int)(lastWrite / -1000L)));
-    }
-}
-
-void restore_level()
-{
-    if (dimmer_config.bits.restore_level) {
-        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
-            _D(5, debug_printf("restoring ch=%u level=%u time=%f\n", i, config.level[i], dimmer_config.fade_in_time));
-            if (config.level[i] && dimmer_config.fade_in_time) {
-                dimmer.fade_channel_to(i, config.level[i], dimmer_config.fade_in_time);
-            }
-        }
-    }
-}
+// 29888
 
 void rem() {
 #if SERIAL_I2C_BRDIGE
@@ -248,7 +56,7 @@ void display_dimmer_info() {
 
     rem();
     Serial.print(F("options="));
-    Serial.printf_P(PSTR("EEPROM=%lu,"), get_eeprom_num_writes(config.eeprom_cycle, eeprom_position));
+    Serial.printf_P(PSTR("EEPROM=%lu,"), conf.getEEPROMWriteCount());
 #if HAVE_NTC
     Serial.printf_P(PSTR("NTC=A%u,"), NTC_PIN - A0);
 #endif
@@ -308,7 +116,7 @@ void display_dimmer_info() {
 }
 
 dimmer_scheduled_calls_t dimmer_scheduled_calls;
-unsigned long metrics_next_event;
+uint32_t metrics_next_event;
 
 void setup() {
 
@@ -328,7 +136,7 @@ void setup() {
 #endif
 
     dimmer_i2c_slave_setup();
-    read_config();
+    conf.readConfig();
 
 #if HAVE_POTI
     pinMode(POTI_PIN, INPUT);
@@ -344,18 +152,18 @@ void setup() {
     _D(5, debug_printf("exiting setup\n"));
 }
 
-unsigned long next_temp_check;
+uint32_t next_temp_check;
 
 #if HAVE_PRINT_METRICS
 
-unsigned long print_metrics_timeout;
+uint32_t print_metrics_timeout;
 uint16_t print_metrics_interval;
 
 #endif
 
 #if HAVE_FADE_COMPLETION_EVENT
 
-unsigned long next_fading_event_check;
+uint32_t next_fading_event_check;
 
 void Dimmer::DimmerBase::send_fading_completion_events() {
 
@@ -388,6 +196,18 @@ void Dimmer::DimmerBase::send_fading_completion_events() {
 uint16_t poti_level = 0;
 #endif
 
+void restore_level()
+{
+    if (dimmer_config.bits.restore_level) {
+        // restore levels from EEPROM configuration
+        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
+            _D(5, debug_printf("restoring ch=%u level=%u time=%f\n", i, config.level[i], dimmer_config.fade_in_time));
+            if (config.level[i] && dimmer_config.fade_in_time) {
+                dimmer.fade_channel_to(i, config.level[i], dimmer_config.fade_in_time);
+            }
+        }
+    }
+}
 
 void loop()
 {
@@ -524,8 +344,8 @@ void loop()
     }
 #endif
 
-    if (dimmer_scheduled_calls.write_eeprom && millis() >= eeprom_write_timer) {
-        _write_config();
+    if (dimmer_scheduled_calls.write_eeprom && conf.isEEPROMWriteTimerExpired()) {
+        conf._writeConfig(false);
     }
 
     if (millis() >= next_temp_check) {
@@ -547,7 +367,7 @@ void loop()
             _D(5, debug_printf("OVER TEMPERATURE PROTECTION temp=%d\n", current_temp));
             dimmer.fade_from_to(Dimmer::Channel::any, Dimmer::Level::current, Dimmer::Level::off, 10);
             dimmer_config.bits.over_temperature_alert_triggered = 1;
-            write_config();
+            conf.scheduleWriteConfig();
             Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
             Wire.write(DIMMER_TEMPERATURE_ALERT);
             Wire.write((uint8_t)current_temp);

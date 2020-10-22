@@ -13,7 +13,7 @@ class FrequencyMeasurement;
 
 using overflow_counter_t = uint16_t;
 
-extern unsigned long frequency_wait_timer;
+extern uint32_t frequency_wait_timer;
 extern FrequencyMeasurement *measure;
 extern volatile overflow_counter_t timer1_overflow;
 extern bool frequency_measurement;

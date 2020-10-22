@@ -83,7 +83,7 @@ uint16_t read_vcc_int()
 
 uint16_t raw_poti_value;
 static int32_t poti_value;
-static unsigned long poti_read_timer = 0;
+static uint32_t poti_read_timer = 0;
 
 int32_t read_poti()
 {

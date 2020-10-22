@@ -7,16 +7,6 @@
 #include "dimmer.h"
 #include "i2c_slave.h"
 
-void read_config();
-void write_config();
-
-// clear EEPROM and store default settings
-void init_eeprom();
-
-// set force=true to write the eeprom without changes
-// set update_regmem_cfg=true to update register_mem.data.cfg
-void _write_config(bool force = false);
-
  // bitset
 struct dimmer_scheduled_calls_t {
     uint8_t read_vcc: 1;
@@ -31,12 +21,12 @@ struct dimmer_scheduled_calls_t {
 };
 
 #if HAVE_PRINT_METRICS
-extern unsigned long print_metrics_timeout;
+extern uint32_t print_metrics_timeout;
 extern uint16_t print_metrics_interval;
 #endif
 
-extern unsigned long next_temp_check;
-extern unsigned long metrics_next_event;
+extern uint32_t next_temp_check;
+extern uint32_t metrics_next_event;
 
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
