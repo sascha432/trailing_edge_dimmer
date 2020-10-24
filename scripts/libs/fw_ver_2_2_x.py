@@ -38,8 +38,8 @@ class register_mem_cfg_t(Structure):
                 ("zero_crossing_delay_ticks", c_uint16),
                 ("minimum_on_time_ticks", c_uint16),
                 ("minimum_off_time_ticks", c_uint16),
-                ("range_begin", c_int16),
-                ("range_end", c_int16),
+                ("range_begin", c_uint16),
+                ("range_divider", c_uint16),
                 ("internal_vref11", c_internal_vref11),
                 ("int_temp_offset", c_temp_ofs_t),
                 ("ntc_temp_offset", c_temp_ofs_t),
@@ -47,6 +47,39 @@ class register_mem_cfg_t(Structure):
                 ("halfwave_adjust_ticks", c_int8),
                 ("switch_on_minimum_ticks", c_uint16),
                 ("switch_on_count", c_uint8)]
+
+
+    def __getattribute__(self, key):
+        if key=='range_end':
+            return self.__get_range_end()
+        return Structure.__getattribute__(self, key)
+
+    def __setattr__(self, key, val):
+        if key=='range_end':
+            self.__set_range_end(val)
+        else:
+            Structure.__setattr__(self, key, val)
+
+    def __get_range_end(self, max_level = 8192):
+        range_divider = Structure.__getattribute__(self, 'range_divider')
+        if range_divider==0:
+            return max_level
+        return int((max_level * max_level) / (range_divider - Structure.__getattribute__(self, 'range_begin')))
+
+    def __set_range_end(self, range_end, max_level = 8192):
+        range_begin = self.__getattribute__('range_begin')
+        if range_end==0:
+            range_begin = 0
+            range_divider = 0
+        elif range_end==max_level:
+            if range_begin==0:
+                range_divider = 0
+            else:
+                range_divider = range_begin
+        else:
+            range_divider = int(max_level * max_level / range_end + range_begin);
+        Structure.__setattr__(self, 'range_begin', range_begin)
+        Structure.__setattr__(self, 'range_divider', range_divider)
 
 class dimmer_metrics_t(Structure):
     _pack_ = 1

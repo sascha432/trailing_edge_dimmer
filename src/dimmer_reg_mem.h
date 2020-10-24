@@ -164,8 +164,28 @@ typedef struct __attribute__((__packed__)) {
     uint16_t zero_crossing_delay_ticks;
     uint16_t minimum_on_time_ticks;
     uint16_t minimum_off_time_ticks;
-    int16_t range_begin;
-    int16_t range_end;
+    uint16_t range_begin;
+    uint16_t range_divider;
+
+    uint16_t get_range_end() const {
+        if (range_divider == 0) {
+            return DIMMER_MAX_LEVEL;
+        }
+        return ((uint32_t)DIMMER_MAX_LEVEL * DIMMER_MAX_LEVEL) / (range_divider - range_begin);
+    }
+    void set_range_end(uint16_t range_end) {
+        if (!range_end) {
+            range_begin = 0;
+            range_divider = 0;
+        }
+        else if (range_end == DIMMER_MAX_LEVEL) {
+            range_divider = range_begin ? range_begin : 0;
+        }
+        else {
+            range_divider = (((uint32_t)DIMMER_MAX_LEVEL * DIMMER_MAX_LEVEL) / range_end) + range_begin;
+        }
+    }
+
     internal_vref11_t internal_vref11;
     temp_ofs_t int_temp_offset;
     temp_ofs_t ntc_temp_offset;

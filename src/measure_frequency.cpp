@@ -207,7 +207,7 @@ static void cleanup_measurement()
 bool run_frequency_measurement()
 {
     if (frequency_wait_timer == kFrequencyWaitTimerInit) {
-        _D(5, debug_printf("measuring\n"));
+        _D(5, debug_printf("measuring...\n"));
         dimmer.end();
 
         // give everything some time to settle before starting the measurement

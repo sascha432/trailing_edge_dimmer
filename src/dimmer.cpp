@@ -384,7 +384,16 @@ TickType DimmerBase::__get_ticks(Channel::type channel, Level::type level) const
 {
     auto halfWaveTicks = _get_ticks_per_halfwave();
     TickType rangeTicks = halfWaveTicks - _config.minimum_on_time_ticks - _config.minimum_off_time_ticks;
-    TickType ticks = ((TickMultiplierType)rangeTicks * (TickType)(level + _config.range_begin) ) / (TickType)(_config.range_begin + _config.range_end) + _config.minimum_on_time_ticks;
+    TickType ticks;
+
+    if (_config.range_divider == 0) {
+        ticks = ((TickMultiplierType)rangeTicks * level) / Level::max;
+    }
+    else {
+        ticks = ((TickMultiplierType)rangeTicks * (level + _config.range_begin)) / _config.range_divider;
+    }
+    ticks += _config.minimum_on_time_ticks;
+
     TickType max_ticks = halfWaveTicks - _config.minimum_off_time_ticks;
     if (ticks > max_ticks) {
         return max_ticks;

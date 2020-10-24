@@ -41,8 +41,6 @@ void Config::resetConfig()
 #ifdef NTC_TEMP_OFS
     register_mem.data.cfg.ntc_temp_offset = NTC_TEMP_OFS;
 #endif
-    register_mem.data.cfg.range_begin = Dimmer::Level::min;
-    register_mem.data.cfg.range_end = Dimmer::Level::max;
     register_mem.data.cfg.report_metrics_interval = 5;
 
     copyFromRegisterMem(_config.cfg);

@@ -94,11 +94,11 @@ int32_t read_poti()
 
     analogReference(DEFAULT);
     raw_poti_value = 0;
-    for(uint8_t i = 0; i < 5; i++) {
-        delay(1);
+    for(uint8_t i = 0; i < 32; i++) {
+        delayMicroseconds(100);
         raw_poti_value += analogRead(POTI_PIN);
     }
-    raw_poti_value /= 5;
+    raw_poti_value /= 32;
 
     static constexpr uint8_t dead_zone = 50;
     return (poti_value = (((int32_t)(raw_poti_value) - dead_zone) * Dimmer::Level::max) / (1024 - (dead_zone * 2)));

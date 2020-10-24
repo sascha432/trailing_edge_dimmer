@@ -80,7 +80,7 @@ void display_dimmer_info() {
         Serial.print(pin);
         Serial.print(',');
     }
-    Serial.printf_P(PSTR("range=%d-%d\n"), dimmer_config.range_begin, dimmer_config.range_end);
+    Serial.printf_P(PSTR("range=%d-%d\n"), dimmer_config.range_begin, dimmer_config.get_range_end());
     Serial.flush();
 
     rem();
@@ -226,7 +226,7 @@ void loop()
 #if HAVE_POTI
     {
         auto level = read_poti();
-        if (abs(level - poti_level) >= max(1, (Dimmer::Level::max / 100))) { // 1% steps
+        if (abs(level - poti_level) >= max(1, (Dimmer::Level::max / 256))) { // ~0.39% steps
             if (level < (int32_t)Dimmer::Level::min) {
                 level = Dimmer::Level::min;
             }
