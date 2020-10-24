@@ -30,9 +30,7 @@
 // 29888
 
 void rem() {
-#if SERIAL_I2C_BRDIGE
     Serial.print(F("+REM="));
-#endif
 }
 
 #if HIDE_DIMMER_INFO == 0
@@ -55,60 +53,54 @@ void display_dimmer_info() {
     Serial.flush();
 
     rem();
-    Serial.print(F("options="));
-    Serial.printf_P(PSTR("EEPROM=%lu,"), conf.getEEPROMWriteCount());
+    Serial.printf_P(PSTR("options=EEPROM=%lu,"), conf.getEEPROMWriteCount());
 #if HAVE_NTC
     Serial.printf_P(PSTR("NTC=A%u,"), NTC_PIN - A0);
 #endif
 #if HAVE_READ_INT_TEMP
-    Serial.print(F("Int.Temp,"));
+    Serial.print(F("int.temp,"));
 #endif
 #if HAVE_READ_VCC
     Serial.print(F("VCC,"));
 #endif
-    Serial.printf_P(PSTR("ACFrq=%u,"), dimmer._get_frequency());
-#if SERIAL_I2C_BRDIGE
-    Serial.print(F("Pr=UART,"));
-#else
-    Serial.print(F("Pr=I2C,"));
-#endif
 #if HAVE_FADE_COMPLETION_EVENT
-    Serial.print(F("CE=1,"));
+    Serial.print(F("fading_events=1,"));
 #endif
-    Serial.printf_P(PSTR("Addr=%02x,Pre=%u/%u,Mode=%c,"),
+#if SERIAL_I2C_BRDIGE
+    Serial.print(F("proto=UART,"));
+#else
+    Serial.print(F("proto=I2C,"));
+#endif
+    Serial.printf_P(PSTR("addr=%02x,mode=%c,"),
         DIMMER_I2C_ADDRESS,
-        DIMMER_TIMER1_PRESCALER, DIMMER_TIMER2_PRESCALER,
         (dimmer_config.bits.leading_edge ? 'L' : 'T')
     );
-    Serial.printf_P(PSTR("Ticks=%.2f,Lvls=" _STRINGIFY(DIMMER_MAX_LEVEL) ",P="), Dimmer::Timer<1>::ticksPerMicrosecond);
-    for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
-        Serial.print((int)Dimmer::Channel::pins[i]);
+    Serial.printf_P(PSTR("timer1=%u/%.2f,lvls=" _STRINGIFY(DIMMER_MAX_LEVEL) ",pins="), Dimmer::Timer<1>::prescaler, Dimmer::Timer<1>::ticksPerMicrosecond);
+    for(auto pin: Dimmer::Channel::pins) {
+        Serial.print(pin);
         Serial.print(',');
     }
-    Serial.printf_P(PSTR("Range=%d-%d\n"), dimmer_config.range_begin, dimmer_config.range_end);
+    Serial.printf_P(PSTR("range=%d-%d\n"), dimmer_config.range_begin, dimmer_config.range_end);
     Serial.flush();
 
     rem();
-    Serial.print(F("values="));
-    Serial.printf_P(PSTR("Restore=%u,ACFrq=%.3f,vref11=%.3f"), dimmer_config.bits.restore_level, dimmer._get_frequency(), (float)dimmer_config.internal_vref11);
-    Serial.print(',');
+    Serial.printf_P(PSTR("values=restore=%u,f=%.3fHz,vref11=%.3f,"), dimmer_config.bits.restore_level, dimmer._get_frequency(), (float)dimmer_config.internal_vref11);
 #if HAVE_NTC
-    Serial.printf_P(PSTR("NTC=%.2f/%+u,"), get_ntc_temperature(), dimmer_config.ntc_temp_offset);
+    Serial.printf_P(PSTR("NTC=%.2f/%+.2f,"), get_ntc_temperature(), (float)dimmer_config.ntc_temp_offset);
 #endif
 #if HAVE_READ_INT_TEMP
-    Serial.printf_P(PSTR("Int.Temp=%.2f/%+u,"), get_internal_temperature(), dimmer_config.int_temp_offset);
+    Serial.printf_P(PSTR("int.temp=%.2f/%+.2f,"), get_internal_temperature(), (float)dimmer_config.int_temp_offset);
 #endif
-    Serial.printf_P(PSTR("max.tmp=%u,metrics=%u,"), dimmer_config.max_temp, REPORT_METRICS_INTERVAL(dimmer_config.report_metrics_interval));
+    Serial.printf_P(PSTR("max.temp=%u,metrics=%u,"), dimmer_config.max_temp, REPORT_METRICS_INTERVAL(dimmer_config.report_metrics_interval));
 #if HAVE_READ_VCC
     Serial.printf_P(PSTR("VCC=%.3f,"), read_vcc() / 1000.0);
 #endif
-    Serial.printf_P(PSTR("Min.on=%u,Min.off=%u,ZC.delay=%u,"),
+    Serial.printf_P(PSTR("min.on-time=%u,min.off=%u,ZC-delay=%u,"),
         dimmer_config.minimum_on_time_ticks,
         dimmer_config.minimum_off_time_ticks,
         dimmer_config.zero_crossing_delay_ticks
     );
-    Serial.flush();
-    Serial.printf_P(PSTR("Sw.On=%u/%u\n"),
+    Serial.printf_P(PSTR("sw.on-time=%u/%u\n"),
         dimmer_config.switch_on_minimum_ticks,
         dimmer_config.switch_on_count
     );
@@ -167,11 +159,11 @@ uint32_t next_fading_event_check;
 
 void Dimmer::DimmerBase::send_fading_completion_events() {
 
-    FadingCompletionEvent_t buffer[Dimmer::Channel::size];
+    FadingCompletionEvent_t buffer[Dimmer::Channel::size()];
     FadingCompletionEvent_t *ptr = buffer;
 
     cli();
-    for(Channel::type i = 0; i < Dimmer::Channel::size; i++) {
+    for(Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
         if (dimmer.fading_completed[i] != Dimmer::Level::invalid) {
             *ptr++ = { i, dimmer.fading_completed[i] };
             dimmer.fading_completed[i] = Dimmer::Level::invalid;
@@ -200,10 +192,10 @@ void restore_level()
 {
     if (dimmer_config.bits.restore_level) {
         // restore levels from EEPROM configuration
-        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
-            _D(5, debug_printf("restoring ch=%u level=%u time=%f\n", i, config.level[i], dimmer_config.fade_in_time));
-            if (config.level[i] && dimmer_config.fade_in_time) {
-                dimmer.fade_channel_to(i, config.level[i], dimmer_config.fade_in_time);
+        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
+            _D(5, debug_printf("restoring ch=%u level=%u time=%f\n", i, conf.level(i), dimmer_config.fade_in_time));
+            if (conf.level(i) && dimmer_config.fade_in_time) {
+                dimmer.fade_channel_to(i, conf.level(i), dimmer_config.fade_in_time);
             }
         }
     }
@@ -286,7 +278,7 @@ void loop()
 #if HAVE_PRINT_METRICS
     if (print_metrics_interval && millis() >= print_metrics_timeout) {
         print_metrics_timeout = millis() + print_metrics_interval;
-        Serial.print(F("+REM="));
+        rem();
         #if HAVE_NTC
             Serial.printf_P(PSTR("NTC=%.3f,"), get_ntc_temperature());
         #endif
@@ -301,13 +293,14 @@ void loop()
         #if HAVE_POTI
             Serial.printf_P(PSTR("poti=%u,"), raw_poti_value);
         #endif
-        Serial.printf_P(PSTR("hw=%u,diff=%d,"), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks);
-        Serial.printf_P(PSTR("frq=%.3f,mode=%c,lvl="), dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
-        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
+        // Serial.printf_P(PSTR("hw=%u,diff=%d,"), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks);
+        // Serial.printf_P(PSTR("frq=%.3f,mode=%c,lvl="), dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
+        Serial.printf_P(PSTR("hw=%u,diff=%d,frq=%.3f,mode=%c,lvl="), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks, dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
+        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
             Serial.printf_P(PSTR("%d,"), register_mem.data.level[i]);
         }
         Serial.printf_P(PSTR("hf=%u,ticks="), (unsigned)dimmer._get_ticks_per_halfwave());
-        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size; i++) {
+        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
             Serial.print(dimmer._get_ticks(i, register_mem.data.level[i]));
             if (i < Dimmer::Channel::max) {
                 Serial.print(',');

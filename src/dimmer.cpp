@@ -8,10 +8,10 @@
 
 using namespace Dimmer;
 
-volatile uint8_t *dimmer_pins_addr[Channel::size];
-uint8_t dimmer_pins_mask[Channel::size];
+volatile uint8_t *dimmer_pins_addr[Channel::size()];
+uint8_t dimmer_pins_mask[Channel::size()];
 DimmerBase dimmer(register_mem.data);
-constexpr const uint8_t Dimmer::Channel::pins[Dimmer::Channel::size];
+constexpr const uint8_t Dimmer::Channel::pins[Dimmer::Channel::size()];
 
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
@@ -38,7 +38,7 @@ void DimmerBase::begin()
     zc_diff_count = 0;
 
     _D(5, debug_printf("ch=%u levels=%u prescaler=%u ",
-        Channel::size,
+        Channel::size(),
         Level::max,
         Timer<1>::prescaler)
     );
@@ -50,7 +50,7 @@ void DimmerBase::begin()
     dimmer_scheduled_calls = {};
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
-    for(Channel::type i = 0; i < Channel::size; i++) {
+    for(Channel::type i = 0; i < Channel::size(); i++) {
 	    dimmer_pins_mask[i] = digitalPinToBitMask(Channel::pins[i]);
 	    dimmer_pins_addr[i] = portOutputRegister(digitalPinToPort(Channel::pins[i]));
 #if HAVE_FADE_COMPLETION_EVENT
@@ -84,7 +84,7 @@ void DimmerBase::end()
     cli();
     detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
     Timer<1>::end();
-    for(Channel::type i = 0; i < Dimmer::Channel::size; i++) {
+    for(Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
         digitalWrite(Channel::pins[i], DIMMER_MOSFET_OFF_STATE);
         pinMode(Channel::pins[i], INPUT);
     }
@@ -146,7 +146,7 @@ void DimmerBase::_start_halfwave()
 #if DIMMER_OUT_OF_SYNC_LIMIT
     if (++out_of_sync_counter > DIMMER_OUT_OF_SYNC_LIMIT) {
         Timer<1>::disable();
-        for(i = 0; i < Channel::size; i++) {
+        for(i = 0; i < Channel::size(); i++) {
             _set_mosfet_gate(i, DIMMER_MOSFET_OFF_STATE);
         }
         Serial.println(F("+REM=out of sync"));
@@ -166,7 +166,7 @@ void DimmerBase::_start_halfwave()
         for(i = 0; ordered_channels[i].ticks; i++) {
             _set_mosfet_gate(ordered_channels[i].channel, toggle_state);
         }
-        for(i = 0; i < Channel::size; i++) {
+        for(i = 0; i < Channel::size(); i++) {
             if (_get_level(i) == Level::off) {
                 _set_mosfet_gate(i, DIMMER_MOSFET_OFF_STATE);
             }
@@ -188,7 +188,7 @@ void DimmerBase::_start_halfwave()
 #endif
 
         // enable or disable channels
-        for(i = 0; i < Channel::size; i++) {
+        for(i = 0; i < Channel::size(); i++) {
             _set_mosfet_gate(i, _get_level(i) == Level::max ? DIMMER_MOSFET_ON_STATE : DIMMER_MOSFET_OFF_STATE);
         }
     }
@@ -237,11 +237,11 @@ static inline void dimmer_bubble_sort(ChannelStateType channels[], Channel::type
 // channels that are off or fully on won't be added
 void DimmerBase::_calculate_channels()
 {
-    ChannelStateType ordered_channels[Channel::size + 1];
+    ChannelStateType ordered_channels[Channel::size() + 1];
     Channel::type count = 0;
     uint8_t new_channel_state = 0;
 
-    for(Channel::type i = 0; i < Channel::size; i++) {
+    for(Channel::type i = 0; i < Channel::size(); i++) {
         auto level = _get_level(i);
         if (level >= Level::max) {
             new_channel_state |= (1 << i);
@@ -291,7 +291,7 @@ void DimmerBase::set_level(Channel::type channel, Level::type level)
 {
     _D(5, debug_printf("set_level ch=%d level=%d\n", channel, level))
     if (channel == Channel::any) {
-        for(Channel::type i = 0; i < Channel::size; i++) {
+        for(Channel::type i = 0; i < Channel::size(); i++) {
             set_channel_level(i, level);
         }
     } else {
@@ -345,7 +345,7 @@ void DimmerBase::fade_from_to(Channel::type channel, Level::type from_level, Lev
 {
     _D(5, debug_printf("fade_from_to ch=%d from=%d to=%d time=%f\n", channel, from_level, to_level, time))
     if (channel == Channel::any) {
-        for(Channel::type i = 0; i < Channel::size; i++) {
+        for(Channel::type i = 0; i < Channel::size(); i++) {
             fade_channel_from_to(i, from_level, to_level, time, absolute_time);
         }
     }
@@ -356,7 +356,7 @@ void DimmerBase::fade_from_to(Channel::type channel, Level::type from_level, Lev
 
 void DimmerBase::_apply_fading()
 {
-    for(Channel::type i = 0; i < Dimmer::Channel::size; i++) {
+    for(Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
         dimmer_fade_t &fade = fading[i];
         if (fade.count) {
             fade.level += fade.step;

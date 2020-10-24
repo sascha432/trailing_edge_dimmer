@@ -9,7 +9,7 @@
 
 register_mem_union_t register_mem;
 
-uint8_t validate_register_address()
+inline uint8_t validate_register_address()
 {
     uint8_t offset = register_mem.data.address - DIMMER_REGISTER_START_ADDR;
     if (offset < (uint8_t)sizeof(register_mem_t)) {
@@ -21,14 +21,14 @@ uint8_t validate_register_address()
 void i2c_write_to_register(uint8_t data)
 {
     register_mem.raw[validate_register_address()] = data;
-    _D(5, debug_printf("I2C write @ %#02x = %u (%#02x)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR , data&0xff, data&0xff));
+    _D(5, debug_printf("I2C write %#02x: %#02x (%u, %d)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR , data, data, (int8_t)data));
     register_mem.data.address++;
 }
 
 uint8_t i2c_read_from_register()
 {
     auto data = register_mem.raw[validate_register_address()];
-    _D(5, debug_printf("I2C read @ %#02x = %u (%#02x)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR, data&0xff, data&0xff));
+    _D(5, debug_printf("I2C read %#02x: %#02x (%u, %d)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR, data, data, (int8_t)data));
     register_mem.data.address++;
     return data;
 }
@@ -36,12 +36,8 @@ uint8_t i2c_read_from_register()
 void i2c_slave_set_register_address(int length, uint8_t address, int8_t read_length)
 {
     register_mem.data.cmd.read_length += read_length;
-    if (length <= 1) { // no more data available
-        register_mem.data.address = address;
-    } else {
-        register_mem.data.address = DIMMER_REGISTER_ADDRESS;
-    }
-    _D(5, debug_printf("I2C auto set register address %#02x, read length %d\n", register_mem.data.address, read_length));
+    register_mem.data.address = (length <= 1) ? /* no more data available */ address : DIMMER_REGISTER_ADDRESS;
+    _D(5, debug_printf("I2C auto=%#02x read_len=%d\n", register_mem.data.address, read_length));
 }
 
 void _dimmer_i2c_on_receive(int length)
@@ -51,11 +47,11 @@ void _dimmer_i2c_on_receive(int length)
     register_mem.data.cmd.read_length = 0;
     while(length-- > 0) {
         auto addr = register_mem.data.address;
-        _D(5, debug_printf("I2C write, register address %#02x, data left %d\n", addr, length));
+        _D(5, debug_printf("I2C receive=%#02x left=%d\n", addr, length));
         i2c_write_to_register(Wire.read());
         if (addr == DIMMER_REGISTER_ADDRESS) {
             register_mem.data.address--;
-            _D(5, debug_printf("I2C set register address = %#02x\n", register_mem.data.address));
+            _D(5, debug_printf("I2C set=%#02x\n", register_mem.data.address));
 
             // legacy version request
             //
@@ -71,7 +67,7 @@ void _dimmer_i2c_on_receive(int length)
             register_mem.data.address = DIMMER_REGISTER_ADDRESS;
         }
         else if (addr == DIMMER_REGISTER_COMMAND) {
-            _D(5, debug_printf("I2C command = %#02x\n", register_mem.data.cmd.command));
+            _D(5, debug_printf("I2C cmd=%#02x\n", register_mem.data.cmd.command));
             switch(register_mem.data.cmd.command) {
                 case DIMMER_COMMAND_READ_CHANNELS:
                     {
@@ -87,11 +83,11 @@ void _dimmer_i2c_on_receive(int length)
                     }
                     break;
                 case DIMMER_COMMAND_SET_LEVEL:
-                    _D(5, debug_printf("I2C set level cmd=%d, channel=%d\n", register_mem.data.to_level, register_mem.data.channel));
+                    _D(5, debug_printf("I2C set=%d ch=%d\n", register_mem.data.to_level, register_mem.data.channel));
                     dimmer.set_level(register_mem.data.channel, register_mem.data.to_level);
                     break;
                 case DIMMER_COMMAND_FADE:
-                    _D(5, debug_printf("I2C fade cmd from=%d, to=%d, channel=%d, fade_time=%f\n", register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
+                    _D(5, debug_printf("I2C fade from=%d to=%d ch=%d t=%f\n", register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
                     dimmer.fade_from_to(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
                     break;
                 case DIMMER_COMMAND_READ_NTC:
@@ -121,7 +117,7 @@ void _dimmer_i2c_on_receive(int length)
                     dimmer_scheduled_calls.read_ntc_temp = false;
                     dimmer_scheduled_calls.read_int_temp = false;
                     register_mem.data.temp = dimmer._get_frequency();
-                    _D(5, debug_printf("I2C get AC frequency=%.3f\n", register_mem.data.temp));
+                    _D(5, debug_printf("I2C get frequency=%.3f\n", register_mem.data.temp));
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
 
@@ -165,40 +161,30 @@ void _dimmer_i2c_on_receive(int length)
                     break;
 
                 case DIMMER_COMMAND_PRINT_CONFIG: { // print command to restore parameters
-                        auto ptr = reinterpret_cast<uint8_t *>(&register_mem.data.cfg);
                         Serial.printf_P(PSTR("+REM=v%04x,i2ct=%02x%02x"), Dimmer::Version::kVersion, DIMMER_I2C_ADDRESS, DIMMER_REGISTER_OPTIONS);
-                        for(uint8_t i = DIMMER_REGISTER_OPTIONS; i < DIMMER_REGISTER_OPTIONS + sizeof(register_mem.data.cfg); i++) {
-                            Serial.printf_P(PSTR("%02x"), *ptr++);
+                        for(const auto data: Dimmer::RegisterMemory::config()) {
+                            Serial.printf_P(PSTR("%02x"), data);
                         }
                         Serial.println();
                     } break;
 
                 case DIMMER_COMMAND_RESTORE_FS:
-                    conf.initEEPROM();
+                    conf.restoreFactory();
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM:
-                    if (length-- > 0 && Wire.read() == 0x92) {
+                    if (length-- > 0 && Wire.read() == DIMMER_COMMAND_WRITE_CONFIG) {
                         dimmer_scheduled_calls.eeprom_update_config = true;
                     }
                     conf.scheduleWriteConfig();
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM_NOW:
-                    if (length-- > 0 && Wire.read() == 0x92) {
+                    if (length-- > 0 && Wire.read() == DIMMER_COMMAND_WRITE_CONFIG) {
                         dimmer_scheduled_calls.eeprom_update_config = true;
                     }
                     dimmer_scheduled_calls.write_eeprom = false;
                     conf._writeConfig(true);
-                    break;
-
-                case DIMMER_COMMAND_MEASURE_FREQ: {
-                        _D(5, debug_printf("Starting frequency measurement...\n"));
-                        Serial.println(F("+REM=freq"));
-                        dimmer.end();
-                        delay(500);
-                        start_measure_frequency();
-                    }
                     break;
 
                 case DIMMER_COMMAND_FORCE_TEMP_CHECK:
@@ -207,6 +193,19 @@ void _dimmer_i2c_on_receive(int length)
                     break;
 
 #if DEBUG_COMMANDS
+                case DIMMER_COMMAND_MEASURE_FREQ: {
+                        _D(5, debug_printf("Frequency measurement...\n"));
+                        Serial.println(F("+REM=freq"));
+                        dimmer.end();
+                        delay(500);
+                        start_measure_frequency();
+                    }
+                    break;
+
+                case DIMMER_COMMAND_INIT_EEPROM:
+                    conf.initEEPROM();
+                    break;
+
                 case DIMMER_COMMAND_INCR_ZC_DELAY:
                     if (length > 0) {
                         length--;
@@ -262,11 +261,12 @@ void _dimmer_i2c_on_receive(int length)
                     }
                     break;
                 case DIMMER_COMMAND_DUMP_MEM: {
-                        auto ptr = register_mem.raw;
+                        auto ptr = Dimmer::RegisterMemory::raw::begin();
                         for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++, ptr++) {
                             Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
                         }
-                    } break;
+                    }
+                    break;
 #endif
             }
         }
@@ -276,20 +276,17 @@ void _dimmer_i2c_on_receive(int length)
 
 void _dimmer_i2c_on_request()
 {
-    static constexpr auto beginPtr = register_mem.raw - DIMMER_REGISTER_START_ADDR;
-    static constexpr auto endPtr = register_mem.raw + sizeof(register_mem_t);
-
-    _D(9, debug_printf("I2C slave onRequest: %#02x, length %u\n", register_mem.data.address, register_mem.data.cmd.read_length));
-    auto ptr = beginPtr + register_mem.data.address;
-    while(register_mem.data.cmd.read_length-- && ptr < endPtr) {
-        Wire.write(*ptr++);
-    }
-    register_mem.data.cmd.read_length = 0;
+#if DEBUG
+    auto tmp = register_mem.data.cmd.read_length;
+#endif
+    Dimmer::RegisterMemory::request data(register_mem.data.address, register_mem.data.cmd.read_length);
+    _D(9, debug_printf("I2C on_request addr=%#02x len=%u avail=%u\n", register_mem.data.address, tmp, data.size()));
+    Wire.write(data.data(), data.size());
 }
 
 void dimmer_i2c_slave_setup()
 {
-    _D(5, debug_printf("I2C slave address: %#02x\n", DIMMER_I2C_ADDRESS));
+    _D(5, debug_printf("I2C slave address=%#02x\n", DIMMER_I2C_ADDRESS));
 
     conf.initRegisterMem();
 

@@ -81,14 +81,18 @@ namespace Dimmer {
 
     struct Channel {
         using type = ChannelType;
-        static constexpr type size = ::size_of(DIMMER_MOSFET_PINS);
+        static constexpr type kSize = ::size_of(DIMMER_MOSFET_PINS);
         static constexpr type min = 0;
-        static constexpr type max = size - 1;
+        static constexpr type max = kSize - 1;
         static constexpr type any = -1;
-        static constexpr const uint8_t pins[size] = { DIMMER_MOSFET_PINS };
+        static constexpr const uint8_t pins[kSize] = { DIMMER_MOSFET_PINS };
+
+        static constexpr type size() {
+            return kSize;
+        }
     };
 
-    static_assert(Channel::size <= 8, "limited to 8 channels");
+    static_assert(Channel::size() <= 8, "limited to 8 channels");
 
     struct Level {
         using type = LevelType;
@@ -133,12 +137,12 @@ namespace Dimmer {
     };
 
     struct dimmer_t {
-        Level::type level[Channel::size];                                       // current level
-        dimmer_fade_t fading[Channel::size];                                    // calculated fading data
+        Level::type level[Channel::size()];                                     // current level
+        dimmer_fade_t fading[Channel::size()];                                  // calculated fading data
         Channel::type channel_ptr;
-        dimmer_channel_t ordered_channels[Channel::size + 1];                   // current dimming levels in ticks
-        dimmer_channel_t ordered_channels_buffer[Channel::size + 1];            // next dimming levels
-        uint8_t on_counter[Channel::size];                                      // counts halfwaves from 0 to 254 after switching on
+        dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks
+        dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels
+        uint8_t on_counter[Channel::size()];                                    // counts halfwaves from 0 to 254 after switching on
         TickType halfwave_ticks;
         float zc_diff_ticks;
         uint8_t zc_diff_count;
@@ -151,7 +155,7 @@ namespace Dimmer {
 #endif
 
 #if HAVE_FADE_COMPLETION_EVENT
-        Level::type fading_completed[Channel::size];
+        Level::type fading_completed[Channel::size()];
 #endif
     };
 
