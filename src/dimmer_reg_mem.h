@@ -58,18 +58,26 @@ struct __attribute__((__packed__)) ShiftedFloat {
 
     _Type _value;
 };
+
+#include <math.h>
+
 template<typename _Type, uint32_t _Multiplier, uint32_t _Divider = 1>
 struct __attribute__((__packed__)) FixedPointFloat {
 
     static constexpr float multiplier = _Multiplier / (float)_Divider;
     static constexpr float inverted_multiplier = 1.0f / multiplier; // avoid any float divison
-    static constexpr float rounding = 1.0f / multiplier / 1.9999999f;
+    // static constexpr float rounding = 1.0f / multiplier / 1.9999999f;
 
     static float toFloat(_Type value) {
         return value * inverted_multiplier;
     }
     static _Type fromFloat(float f) {
-        return (f + rounding) * multiplier;
+        return static_cast<_Type>(lround(f * multiplier));
+        //29686 = same code size
+        // if (f < 0.0f) {
+        //     return (f - rounding) * multiplier;
+        // }
+        // return (f + rounding) * multiplier;
     }
 
     FixedPointFloat() = default;

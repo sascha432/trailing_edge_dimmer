@@ -110,6 +110,26 @@ class Protocol:
     def receive(self, length):
         self.write('RQ %d bytes from 0x%02x' % (length, self.address), '+I2CR=%02x%02x' % (self.address, length))
 
+    def send_config(self, cfg):
+        data = cfg.get_command().encode()
+        print("Sending configuration: ", data)
+        self.serial.write(data + b'\n')
+        self.store_config()
+
+    def wait_for_eeprom(self):
+        n = 0
+        while n < 30:
+            line = self.readline()
+            if self.print_data(line)==0xf3:
+                return
+            n += 1
+        raise Exception('timeout waiting for EEPROM write event')
+
+
+    def store_config(self):
+        print("Sending write EEPROM command...")
+        self.write_eeprom(True)
+
     def get_version(self):
         self.transmit('8a02b9')
         self.receive(2)
@@ -117,9 +137,6 @@ class Protocol:
 
     def print_config(self):
         self.transmit('8991')
-
-    def store_config(self):
-        self.write_eeprom(True)
 
     def write_eeprom(self, config = False):
         if config:

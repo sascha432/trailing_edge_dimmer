@@ -6,6 +6,8 @@ import re
 import struct
 import json
 import importlib
+from . import floats
+
 class Config:
 
     def is_version_supported(major, minor, revision=0, throw=False):
@@ -88,16 +90,13 @@ class Config:
     def set_item(self, key, val):
         if self.register_mem_cfg_t==None:
             raise Exception('register_mem_cfg_t not set')
-        n = 0
-        num = None
-        for field in self.register_mem_cfg_t._fields_:
-            if field[0]==key:
-                num = n
-                break
-            n += 1
-        if num==None:
-            raise Exception('field %s not found', val)
 
-        # self.register_mem_cfg_t._fields_[num] =  val
-        # print(bytearray(self.register_mem_cfg_t))
-
+        attr = self.register_mem_cfg_t.__getattribute__(key)
+        if isinstance(attr, int):
+            self.register_mem_cfg_t.__setattr__(key, int(val))
+        elif isinstance(attr, float):
+            self.register_mem_cfg_t.__setattr__(key, float(val))
+        elif isinstance(attr, floats.ShiftedFloat) or isinstance(attr, floats.FixedPointFloat):
+            attr.value = float(val)
+        else:
+            raise Exception('Invalid type: %s: %s' % (type(attr), key))

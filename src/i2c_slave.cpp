@@ -40,6 +40,14 @@ void i2c_slave_set_register_address(int length, uint8_t address, int8_t read_len
     _D(5, debug_printf("I2C auto=%#02x read_len=%d\n", register_mem.data.address, read_length));
 }
 
+uint8_t Wire_read_uint8_t(int &length, uint8_t default_value)
+{
+    if (length-- > 0) {
+        return Wire.read();
+    }
+    return default_value;
+}
+
 void _dimmer_i2c_on_receive(int length)
 {
     register_mem.data.address = DIMMER_REGISTER_ADDRESS;
@@ -137,11 +145,7 @@ void _dimmer_i2c_on_receive(int length)
 #if HAVE_PRINT_METRICS
                 case DIMMER_COMMAND_PRINT_METRICS:
                     print_metrics_timeout = 0;
-                    if (length-- > 0) {
-                        print_metrics_interval = Wire.read() * 100;
-                    } else {
-                        print_metrics_interval = 0;
-                    }
+                    print_metrics_interval = Wire_read_uint8_t(length, 0) * 100U;
                     break;
 #endif
 
@@ -173,14 +177,14 @@ void _dimmer_i2c_on_receive(int length)
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM:
-                    if (length-- > 0 && Wire.read() == DIMMER_COMMAND_WRITE_CONFIG) {
+                    if (Wire_read_uint8_t(length, 0) == DIMMER_COMMAND_WRITE_CONFIG) {
                         dimmer_scheduled_calls.eeprom_update_config = true;
                     }
                     conf.scheduleWriteConfig();
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM_NOW:
-                    if (length-- > 0 && Wire.read() == DIMMER_COMMAND_WRITE_CONFIG) {
+                    if (Wire_read_uint8_t(length, 0) == DIMMER_COMMAND_WRITE_CONFIG) {
                         dimmer_scheduled_calls.eeprom_update_config = true;
                     }
                     dimmer_scheduled_calls.write_eeprom = false;
@@ -207,22 +211,10 @@ void _dimmer_i2c_on_receive(int length)
                     break;
 
                 case DIMMER_COMMAND_INCR_ZC_DELAY:
-                    if (length > 0) {
-                        length--;
-                        register_mem.data.cfg.zero_crossing_delay_ticks += Wire.read();
-                    }
-                    else {
-                        register_mem.data.cfg.zero_crossing_delay_ticks++;
-                    }
+                    register_mem.data.cfg.zero_crossing_delay_ticks += Wire_read_uint8_t(length, 1);
                     goto print_zcdelay;
                 case DIMMER_COMMAND_DECR_ZC_DELAY:
-                    if (length > 0) {
-                        length--;
-                        register_mem.data.cfg.zero_crossing_delay_ticks -= Wire.read();
-                    }
-                    else {
-                        register_mem.data.cfg.zero_crossing_delay_ticks--;
-                    }
+                    register_mem.data.cfg.zero_crossing_delay_ticks -= Wire_read_uint8_t(length, 1);
                     goto print_zcdelay;
                 case DIMMER_COMMAND_SET_ZC_DELAY:
                     if (length-- >= (int)sizeof(register_mem.data.cfg.zero_crossing_delay_ticks)) {
@@ -232,16 +224,10 @@ void _dimmer_i2c_on_receive(int length)
                     Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
                 case DIMMER_COMMAND_INCR_HW_TICKS:
-                    if (length > 0) {
-                        length--;
-                        dimmer.halfwave_ticks += Wire.read();
-                    }
+                    dimmer.halfwave_ticks += Wire_read_uint8_t(length, 1);
                     goto print_ticks;
                 case DIMMER_COMMAND_DECR_HW_TICKS:
-                    if (length > 0) {
-                        length--;
-                        dimmer.halfwave_ticks -= Wire.read();
-                    }
+                    dimmer.halfwave_ticks -= Wire_read_uint8_t(length, 1);
                     print_ticks:
                     Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                     break;

@@ -8,18 +8,31 @@ import libs.config as config
 import time
 import json
 
-parser = argparse.ArgumentParser(description="Firmware Configuration Tool")
-parser.add_argument("action", help="action to execute", choices=["display", "modify", "write", "monitor", "factory", "measure_frequency"])
-parser.add_argument('-d', '--data', help="data to read or modify", required=False, default=None)
-parser.add_argument('-V', '--version', help='version of the data provided. For example 2.1.x', type=str, default=None)
-parser.add_argument('-p', '--port', help='serial port', type=str, default=None)
-parser.add_argument('-b', '--baud', help='serial port rate', type=int, default=57600)
-parser.add_argument('-a', '--address', help='dimmer address', type=int, default=None)
-parser.add_argument('-s', '--set', help='set key=value', nargs='+', default=[])
-parser.add_argument('-j', '--json', help='use JSON as output format', action="store_true", default=False)
-parser.add_argument('-v', '--verbose', help='verbose', action="store_true", default=False)
+def read_config(sp, args, cfg):
+    sp.print_config()
+    n = 0
+    while n < 5:
+        line = sp.readline()
+        try:
+            cfg.get_from_rem_command(line)
+            print('Received config version: %s' % cfg.version)
+            print('Set command: %s' % cfg.get_command())
+            n = -1
+            break
+        except Exception as e:
+            # print('Parse error: %s', str(e))
+            pass
+        n += 1
 
-args = parser.parse_args()
+    if n!=-1:
+        print('Timeout receiving configuration')
+        sys.exit(-1)
+
+def display_config(args, cfg):
+    if args.json==True:
+        print(json.dumps(cfg.get_json(), indent=2))
+    else:
+        print(cfg.get_command())
 
 def set_items(cfg, items):
     key = '?'
@@ -33,6 +46,26 @@ def set_items(cfg, items):
             print('Set %s to %s' % (key, val))
     except Exception as e:
         raise ValueError('failed to set value: %s=%s: %s' % (key, val, str(e)))
+
+def modify_config(args, cfg):
+    try:
+        set_items(cfg, args.set)
+    except Exception as e:
+        print(str(e))
+        sys.exit(-1)
+
+parser = argparse.ArgumentParser(description="Firmware Configuration Tool")
+parser.add_argument("action", help="action to execute", choices=["display", "modify", "write", "monitor", "factory", "measure_frequency"])
+parser.add_argument('-d', '--data', help="data to read or modify", required=False, default=None)
+parser.add_argument('-V', '--version', help='version of the data provided. For example 2.1.x', type=str, default=None)
+parser.add_argument('-p', '--port', help='serial port', type=str, default=None)
+parser.add_argument('-b', '--baud', help='serial port rate', type=int, default=57600)
+parser.add_argument('-a', '--address', help='dimmer address', type=int, default=None)
+parser.add_argument('-s', '--set', help='set key=value', nargs='+', default=[])
+parser.add_argument('-j', '--json', help='use JSON as output format', action="store_true", default=False)
+parser.add_argument('-v', '--verbose', help='verbose', action="store_true", default=False)
+
+args = parser.parse_args()
 
 if args.action in ('write', 'factory', 'monitor'):
     if not args.port:
@@ -112,7 +145,6 @@ if args.port:
             print("Measuring frequency...")
             sp.measure_frequency()
 
-
         # monitor or display
         if monitor:
             print("Monitoring serial port...")
@@ -120,56 +152,20 @@ if args.port:
                 line = sp.readline()
                 sp.print_data(line)
         else:
-            sp.print_config()
-            n = 0
-            while n < 5:
-                line = sp.readline()
-                try:
-                    cfg.get_from_rem_command(line)
-                    print('Received config version: %s' % cfg.version)
-                    print('Set command: %s' % cfg.get_command())
-                    n = -1
-                    break
-                except Exception as e:
-                    # print('Parse error: %s', str(e))
-                    pass
-                n += 1
-
-            if n!=-1:
-                print('Timeout receiving configuration')
-                sys.exit(-1)
-
-            try:
-                set_items(cfg, args.set)
-            except Exception as e:
-                print(str(e))
-                sys.exit(-1)
-
             if args.action=='display':
-                if args.json==True:
-                    print(json.dumps(cfg.get_json(), indent=2))
-                else:
-                    print(cfg.get_command())
+                read_config(sp, args, cfg)
+                display_config(args, cfg)
 
             elif args.action=='modify':
-                data = cfg.get_command().encode()
-                print("Sending configuration: ", data)
-                ser.write(data + b'\n')
-                print("Sending store command...")
-                sp.store_config()
 
-                n = 0
-                while n < 5:
-                    line = sp.readline()
-                    if sp.print_data(line)==0xf3:
-                        break
-                    n += 1
+                read_config(sp, args, cfg)
+                modify_config(args, cfg)
+                sp.send_config(cfg)
 
-                sp.print_config()
-                if args.json==True:
-                    print(json.dumps(cfg.get_json(), indent=2))
-                else:
-                    print(cfg.get_command())
+                sp.wait_for_eeprom()
+
+                read_config(sp, args, cfg)
+                display_config(args, cfg)
 
                 print('Closing connection...')
                 ser.close()
@@ -186,19 +182,10 @@ else:
         except Exception as e:
             parser.error('invalid data: %s' % str(e))
 
-    if len(args.set):
-        if args.json==None:
-            args.json = False
-        try:
-            set_items(cfg, args.set)
-        except Exception as e:
-            parser.error(str(e))
-
     if args.address!=None:
         cfg.set_item('i2c_address', args.address)
 
-    if args.json==True:
-        print(cfg.get_json())
-    else:
-        print(cfg.get_command())
+    modify_config(args, cfg)
+
+    display_config(args, cfg)
 

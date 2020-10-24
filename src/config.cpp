@@ -76,6 +76,7 @@ void Config::initEEPROM()
 
 void Config::restoreFactory()
 {
+    _D(5, debug_printf("restore factory settings\n"));
     resetConfig();
     dimmer_scheduled_calls.eeprom_update_config = true;
     _writeConfig(true);

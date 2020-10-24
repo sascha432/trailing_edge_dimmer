@@ -52,7 +52,23 @@ JSON output instead of the SerialTwoWire command
 
     python ./scripts/cfg_tool.py display --version 2.2 --data '+REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -j
     Detected version: 2.2.0
-    {'options': '2', 'max_temp': '75', 'fade_in_time': '4.5', 'zero_crossing_delay_ticks': '2', 'minimum_on_time_ticks': '0', 'minimum_off_time_ticks': '1200', 'range_begin': '3583', 'range_end': '512', 'internal_vref11': '1.075098', 'int_temp_offset': '-13.00', 'ntc_temp_offset': '-29.00', 'report_metrics_max_interval': '63', 'halfwave_adjust_ticks': '0', 'switch_on_minimum_ticks': '1280', 'switch_on_count': '0'}
+    {
+        "options": "2",
+        "max_temp": "75",
+        "fade_in_time": "4.5",
+        "zero_crossing_delay_ticks": "2",
+        "minimum_on_time_ticks": "0",
+        "minimum_off_time_ticks": "1200",
+        "range_begin": "3583",
+        "range_end": "512",
+        "internal_vref11": "1.075098",
+        "int_temp_offset": "-13.00",
+        "ntc_temp_offset": "-29.00",
+        "report_metrics_max_interval": "63",
+        "halfwave_adjust_ticks": "0",
+        "switch_on_minimum_ticks": "1280",
+        "switch_on_count": "0"
+    }
 
 ## DIMMER_COMMAND_FADE
 
