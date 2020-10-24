@@ -147,7 +147,7 @@ typedef struct {
 
 
 typedef struct __attribute__((__packed__)) {
-    union {
+    union __attribute__((__packed__)) {
         config_options_t bits;
         uint8_t options;
     };
@@ -166,6 +166,7 @@ typedef struct __attribute__((__packed__)) {
     uint16_t switch_on_minimum_ticks;       // "minimum_on_time_ticks" after "switching on"
     uint8_t switch_on_count;                // number of half cycles before changing to minimum_on_time_ticks
 } register_mem_cfg_t;
+
 typedef struct __attribute__((__packed__)) {
     uint8_t frequency_low;
     uint8_t frequency_high;
@@ -250,3 +251,73 @@ static constexpr uint16_t dimmer_version_to_uint16(const uint8_t major, const ui
 }
 
 extern register_mem_union_t register_mem;
+
+namespace Dimmer  {
+
+    namespace RegisterMemory {
+
+        struct raw {
+            static constexpr uint8_t *begin() {
+                return register_mem.raw;
+            }
+            static constexpr uint8_t *end() {
+                return register_mem.raw + sizeof(register_mem_t);
+            }
+            static uint8_t *fromAddress(uint8_t address) {
+                return register_mem.raw + (address - DIMMER_REGISTER_START_ADDR);
+            }
+        };
+
+        struct request {
+            request(const uint8_t address, int8_t &length) :
+                _iterator(raw::fromAddress(address)),
+                _length(length)
+            {
+                length = 0;
+            }
+
+            operator bool() const {
+                return _length > 0 && _iterator < raw::end();
+            }
+
+            request &operator++() {
+                _length--;
+                return *this;
+            }
+
+            uint8_t operator*() const {
+                return *_iterator;
+            }
+
+            const uint8_t *data() const {
+                return _iterator;
+            }
+
+            size_t size() const {
+                int8_t tmp = (raw::end() - _iterator);
+                if (tmp > _length) {
+                    return _length;
+                }
+                return tmp;
+            }
+
+            uint8_t *_iterator;
+            int8_t _length;
+        };
+
+        struct config {
+            constexpr config() {}
+
+            constexpr uint8_t *begin() const {
+                return register_mem.raw + offsetof(register_mem_t, cfg);
+            }
+            constexpr uint8_t *end() const {
+                return begin() + sizeof(register_mem_cfg_t);
+            }
+            constexpr size_t size() const {
+                return sizeof(register_mem_cfg_t);
+            }
+        };
+
+    }
+}

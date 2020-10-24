@@ -17,37 +17,48 @@ class Protocol:
         self.structs = None
         self.address = address
         self.master_address = master_address
+        self.display_rx = False
 
     def readline(self):
-        while True:
-            line = self.serial.readline()
-            line = line.decode().strip('\r\n')
+        repeat = True
+        while repeat:
+            while True:
+                line = self.serial.readline().decode(errors='replace').strip('\r\n')
+                if line!='':
+                    break
             self.raw_line = line
-            if line!='':
-                break
-        if line.lower().startswith('+rem='):
-            err = 'comment'
-        else:
-            err = 'unknown data'
-            regexp = '^\+i2c([tr])=([0-9a-f]+)'
-            m = re.match(regexp, line, re.IGNORECASE)
-            if m:
-                type = m[1].upper()
-                try:
-                    data = bytearray.fromhex(m[2])
-                    addr = int(data[0])
-                    if type=='T':
-                        if addr!=self.address and addr!=self.master_address:
-                            raise ValueError('transmission from invalid address 0x%02x' % addr)
-                    if type=='R':
-                        raise ValueError('request from slave')
-                    return data[1:]
-                except ValueError as e:
-                    err = str(e)
-                except Exception as e:
-                    err = 'invalid data: ' + str(e)
+            if line.lower().startswith('+rem='):
+                err = 'comment'
+                repeat = False
+            else:
+                err = 'unknown data'
+                regexp = '^([0-9]+) (.*)'
+                m = re.match(regexp, line, re.IGNORECASE)
+                if m:
+                    err = 'DEBUG'
+                    line = '%011.3f: %s' % (int(m[1]) / 1000.0, m[2])
+                else:
+                    repeat = False
+                    regexp = '^\+i2c([tr])=([0-9a-f]+)'
+                    m = re.match(regexp, line, re.IGNORECASE)
+                    if m:
+                        type = m[1].upper()
+                        try:
+                            data = bytearray.fromhex(m[2])
+                            addr = int(data[0])
+                            if type=='T':
+                                if addr!=self.address and addr!=self.master_address:
+                                    raise ValueError('transmission from invalid address 0x%02x' % addr)
+                            if type=='R':
+                                raise ValueError('request from slave')
+                            return data[1:]
+                        except ValueError as e:
+                            err = str(e)
+                        except Exception as e:
+                            err = 'invalid data: ' + str(e)
 
-        # print('Received %s: %s' % (err, line))
+            if self.display_rx:# and err!='unknown data':
+                print('RX %s: %s' % (err, line))
         return line
 
     def read_request(self, length, timeout=None):
@@ -94,18 +105,30 @@ class Protocol:
         self.serial.write((line + '\n').encode());
 
     def transmit(self, data):
-        self.write('Transmitting %d bytes to 0x%02x' % (len(data) / 2, self.address), '+I2CT=%02x%s' % (self.address, data))
+        self.write('TX %d bytes to 0x%02x' % (len(data) / 2, self.address), '+I2CT=%02x%s' % (self.address, data))
 
     def receive(self, length):
-        self.write('Requesting %d bytes from 0x%02x' % (length, self.address), '+I2CR=%02x%02x' % (self.address, length))
+        self.write('RQ %d bytes from 0x%02x' % (length, self.address), '+I2CR=%02x%02x' % (self.address, length))
 
     def get_version(self):
         self.transmit('8a02b9')
         self.receive(2)
         return 2
 
-    def get_config(self):
+    def print_config(self):
         self.transmit('8991')
 
     def store_config(self):
-        self.transmit('8992')
+        self.write_eeprom(True)
+
+    def write_eeprom(self, config = False):
+        if config:
+            self.transmit('899392')
+        else:
+            self.transmit('8993')
+
+    def measure_frequency(self):
+        self.transmit('8994')
+
+    def reset_factory_settings(self):
+        self.transmit('8951')

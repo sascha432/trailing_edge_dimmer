@@ -6,7 +6,7 @@ The default address is 0x17 for the slave. When sending data, the dimmer acts as
 
 The values for the registers and commands can be found in [dimmer_protocol.h](../src/dimmer_protocol.h)
 
-The examples are using the UART protocol and can send to the dimmer using any terminal software.
+The examples are using the UART protocol and can send to the dimmer using any terminal software. The commands might not be up-to-date.
 
 Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
 
@@ -22,6 +22,37 @@ Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoW
             Wire.readBytes(reinterpret_cast<const uint8_t *>(&vcc), sizeof(vcc));
         }
     }
+
+## Python tool
+
+The dimmer can be configured and monitored over the serial port or a I2C to serial converter with the python CLI tool
+
+    python ./scripts/cfg_tool.py --port COM6 -j monitor
+    TX 3 bytes to 0x17: +I2CT=178a02b9
+    RQ 2 bytes from 0x17: +I2CR=1702
+    Detected version: 2.2.0
+    Monitoring serial port...
+    Metrics: temp=26°C VCC=4840mV frequency=60.084Hz ntc=-273.15°C int=26.55°C
+    Metrics: temp=26°C VCC=4844mV frequency=60.084Hz ntc=-273.15°C int=26.71°C
+
+For more options check
+
+    python ./scripts/cfg_tool.py --help
+
+### Modifying the dimmer configuration
+
+The configuation can be modifed for a specific version without a physical connection to the dimmer.
+
+    python ./scripts/cfg_tool.py modify --version 2.2 --data '+REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -s range_begin=1
+    Detected version: 2.2.0
+    Set range_begin to 1
+    +I2CT=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500
+
+JSON output instead of the SerialTwoWire command
+
+    python ./scripts/cfg_tool.py display --version 2.2 --data '+REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -j
+    Detected version: 2.2.0
+    {'options': '2', 'max_temp': '75', 'fade_in_time': '4.5', 'zero_crossing_delay_ticks': '2', 'minimum_on_time_ticks': '0', 'minimum_off_time_ticks': '1200', 'range_begin': '3583', 'range_end': '512', 'internal_vref11': '1.075098', 'int_temp_offset': '-13.00', 'ntc_temp_offset': '-29.00', 'report_metrics_max_interval': '63', 'halfwave_adjust_ticks': '0', 'switch_on_minimum_ticks': '1280', 'switch_on_count': '0'}
 
 ## DIMMER_COMMAND_FADE
 
@@ -197,11 +228,21 @@ It is recommended to execute this command several times after the initial calibr
 
 Start frequency measurement. This turns all channels off and the dimmer will not execute any commands during measurement. After the measurement has finished, the dimmer restarts and all pending requests (including writing configuration to the EEPROM) are reset
 
+***Note:*** this command is only available if DEBUG or DEBUG_COMMANDS is set
+
     +I2CT=17,89,94
+
+## DIMMER_COMMAND_INIT_EEPROM
+
+Initialize EEPROM, restore factory defaults and set write counter to 0
+
+***Note:*** this command is only available if DEBUG or DEBUG_COMMANDS is set
+
+    +I2CT=17,89,95
 
 ## DIMMER_COMMAND_RESTORE_FS
 
-Restore factory settings and re-initialize EEPROM wear leveling
+Restore factory defaults and store in EEPROM
 
     +I2CT=17,89,51
 
@@ -234,46 +275,74 @@ Reading the firmware version is using the same transmission for all versions. Th
 
 ## Reading and writing the dimmer settings
 
-- DIMMER_REGISTER_OPTIONS (uint8)
+### DIMMER_COMMAND_GET_CFG_LEN
+
+Get address and size of configuration in register memory
+
+    +I2CT=17,89,90
+    +I2CR=17,02
+
+
+For example:
+
+    +I2CT=17a218
+    0x0a-0xc6 / 24 byte
+
+### Settings
+
+- DIMMER_REGISTER_OPTIONS (uint8, bitset, see Options)
 - DIMMER_REGISTER_MAX_TEMP (uint8, °C)
 - DIMMER_REGISTER_FADE_IN_TIME (float, seconds)
-- DIMMER_REGISTER_TEMP_CHECK_INT (uint8, seconds)
 - DIMMER_REGISTER_ZC_DELAY_TICKS (uint16)
 - DIMMER_REGISTER_MIN_ON_TIME_TICKS (uint16)
 - DIMMER_REGISTER_MIN_OFF_TIME_TICKS (uint16)
+- DIMMER_REGISTER_INT_VREF11 (int8, value * 0.488mV + 1.1V)
+- DIMMER_REGISTER_INT_TEMP_OFS (int8, 0.25°C)
+- DIMMER_REGISTER_NTC_TEMP_OFS (int8, 0.25°C)
+- DIMMER_REGISTER_METRICS_INT (uint8, seconds, 0 = disabled)
+- DIMMER_REGISTER_ADJ_HW_CYCLES (int8, clock cycles to half wave)
+- DIMMER_REGISTER_RANGE_BEGIN (int16)
+- DIMMER_REGISTER_RANGE_END (int16)
+- DIMMER_REGISTER_SWITCH_ON_MIN_TIME (uint16)
+- DIMMER_REGISTER_SWITCH_ON_COUNT (uint8)
 
-### Options
+#### Options
 
-- Bit 0: Restore last levels on power up
-- Bit 1: Report temperature and over-temperature alarm (UART or I2C in master/master mode required)
-- Bit 2: Temperature alarm indicator. Needs to be cleared manually
-- Bit 3: unused
+- Bit 0: Restore last levels on reset
+- Bit 2: Temperature alarm indicator. Needs to be cleared manually after it has been triggered
+- Bit 3: Leading edge mode
 - Bit 4: unused
-- Bit 5: Leading edge mode
+- Bit 5: unused
 - Bit 6: unused
 - Bit 7: unused
 
-To make any changes permanent, **DIMMER_COMMAND_WRITE_CFG_NOW** needs to be executed.
+To make any changes permanent, *DIMMER_COMMAND_WRITE_CFG_NOW* with *DIMMER_COMMAND_WRITE_CONFIG* needs to be executed.
 
 Read all settings
 
-    +I2CT=17,8a,10,a2
-    +I2CR=17,10
+    +I2CT=17,8a,18,a2
+    +I2CR=17,18
 
-Read temperature check interval
+Set report metrics interval to 30 seconds
 
-    +I2CT=17,8a,01,a8
+    +I2CT=17,b5,1e
+
+**Note:** The interval changes after a metrics report has been sent. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=17,89,54*) can be used to force a check without waiting. The metrics event is sent after the temperature check which is performed every 2 seconds
+
+Read report metrics interval
+
+    +I2CT=17,8a,01,b5
     +I2CR=17,01
 
-Response (0x1e, 30 seconds)
+Response for 30 seconds
 
-    +I2CT=751E
+    +I2CT=171e
 
-Set temperature check interval/metrics reporting to 30 seconds
+## DIMMER_COMMAND_SET_MODE
 
-    +I2CT=17,a8,1e
+Set dimmer mode. The following byte indicates the mode. 0 is trailing edge, 1 is leading edge. It is recommended to turn all channels off **before** switching mode
 
-**Note:** The interval changes after the next check. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=17,89,54*) can be used to force a check without waiting
+    +I2CT=17,89,56,01
 
 ## DIMMER_COMMAND_PRINT_INFO
 
@@ -281,63 +350,56 @@ Print dimmer info on serial port
 
     +I2CT=17,89,53
 
-## DIMMER_COMMAND_SET_MODE
-
-Set dimmer mode. The following byte indicates the mode. 0 is trailng edge, 1 is leading edge. It is recommended to turn all channels off **before** switching mode
-
-    +I2CT=17,89,56,01
-
-## DIMMER_COMMAND_RESET
-
-**NOTE:** Depending on the boot loader, this functionality might not be available or cause the firmware to lock up. It is recommended to pull the reset pin LOW for 10ms to reset the firmware
-
-Reset ATmega via WDT
-
-### Compile options
+### Print info details
 
 **NOTE:** This section is not up to date
 
-`+REM=options=EEPROM,NTC=19,Int.Temp,Temp.Chk,VCC,Fade,LCF,ACFrq=60,Pr=UART,CE=1,Addr=17,CPU=8,Pre=8/64,Ticks=1.000/0.125,Lvls=8333,Chs=4`
+    +REM=MOSFET Dimmer 2.2.0 Oct 23 2020 19:45:45 Author sascha_lammers@gmx.de
+    +REM=sig=1e-95-0f,fuses=l:ff,h:da,e:fd,MCU=ATmega328P@16Mhz
+    +REM=options=EEPROM=0,NTC=A6,int.temp,VCC,proto=UART,fading_events=1,addr=17,mode=T,timer1=8/2.00,lvls=8192,p=6,9,range=0-8192
+    +REM=values=restore=0,f=60.073Hz,vref11=1.100,NTC=27.15/+0.00,int.temp=26.55/+0.00,max.temp=75,metrics=5,VCC=4.844,min.on-time=5000,min.off=2000,ZC-delay=1000,sw.on-time=0/0
 
-- EEPROM = EEPROM enabled
-- NTC=19 = NTC enabled on PIN 19 (A5)
-- Int.Temp = Internal temperature sensor enabled
-- Temp.Chk = Temperature check and metrics enabled
-- VCC = Read VCC enabled
-- Fade = Fading enabled
-- LCF = Linear correction factor enabled
-- ACFrq=60 - AC frequency 60Hz
-- Pr=UART - Protocol UART
-- CE=1 - Fading completion event enabled
-- Addr=17 - Device address 0x17
-- CPU=8 - CPU 8Mhz
-- Pre=8/64 - Prescaler for timer1=8, timer2=64
-- Ticks=1.000/0.125 - Timer1/2 ticks per µs
-- Lvls=8333 - Max. brightness level 8333
-- P=6,8,9,10 - MOSFET pins / number of channels supported
+#### sig, fuses, MCU
 
-### Parameters and values
+- AVR MCU signature
+- Low, high and extended fuse bits
+- MCU name if available
 
-`+REM=values=Restore=1,ACFrq=61.871,ref11=1.100,NTC=50.30,Int.Temp=38.78,VCC=3.322,Max.Temp=75,rtime=60,LCF=1.000,Min.on=200,Adj.hw=200,ZC.delay=13`
+#### options
 
-- Restore=1 - Restore brightness after start`*`
-- ACFreq=61.871 - Measured AC frequency
-- ref11=1.100 - Reference voltage`*`
-- NTC=50.30 - NTC temperature in °C
-- Int.temp=38.78 - Atmega internal temperature in °C
-- VCC=3.322 - Supply voltage in V
-- Max.Temp=75 - Maximum temperature before emergency shutoff`*`
-- rtime=60 - Interval for metrics reporting`*`
-- LCF=1.000 - Linear correction factor`*`
-- Min.on=200 - Minimum on time in ticks (timer1)`*`
-- Adj.hw=200 - Adjust havewave time in ticks (timer1)`*`
-- ZC.delay=13 - Zero crossing delay in ticks (timer2)`*`
+- EEPROM = eeprom write counter
+- NTC = NTC pin
+- int.temp = internal temperature sensor available
+- VCC = internal VCC reading available
+- fading_events = fading completed events enabled
+- proto = UART or I2C protocol
+- addr = I2C address
+- mode = T(trailing)/L(eading) edge
+- timer1 = prescaler/ticks per µs
+- lvls = max. levels
+- pins = gate driver output pins
+- range = virtual range between 0 and max. level
 
-**Note:** `*` These parameters can be changed
+#### values
+
+- restore = restore last level on reset / power loss
+- f = measured mains frequency
+- vref11 = interval 1.1V voltage reference calibration
+- NTC = NTC temperature / +-offset correction in °C
+- int.temp = internal temperature / +-offset correction in °C
+- max.temp = max. temperature before shutting down
+- metrics = report metrics interval in seconds or 0 for disabled
+- VCC = VCC in V
+- min.on-time = minimum on time ticks (timer1)
+- min-off = minimum off time ticks
+- zcdelay = zero crossing delay in ticks
+- sw.on-time = switch on minimum time in ticks / duratiuon in half cycles (120 = 1 second for 60 Hz, 1 = 8.333ms...)
 
 ## DIMMER_COMMAND_PRINT_METRICS
 
 Print metrics on serial port in human readable form. The following byte enables or disables the output. The print interval is multiplied by 100ms.
+
+***Note:*** Only available if HAVE_PRINT_METRICS is set to 1
 
 For example 0x0a * 100ms = 1s
 
@@ -428,10 +490,7 @@ EEPROM writes might be delayed due to wear leveling. Once written, DIMMER_EEPROM
 
 ## Frequency warning (DIMMER_FREQUENCY_WARNING)
 
-If a too low or high frequency (<75% >120%) is detected, DIMMER_FREQUENCY_WARNING will be sent. The second byte indicates if it was too low (0) or high (1), followed by register_mem_errors_t.
-No zero crossing signal does not fire this event, but the frequency measurement will return NaN.
-
-The errors are stored in *cfg.bits.frequency_low* and *cfg.bits.frequency_high*, which need to be reset manually.
+Currently not implemented
 
 ## Channel on/off state (DIMMER_CHANNEL_ON_OFF)
 
@@ -477,7 +536,7 @@ For example
 
 ### Write current settings to EEPROM
 
-    +I2CT=17,89,92
+    +I2CT=17,89,93,92
 
 ### Restore factory defaults
 

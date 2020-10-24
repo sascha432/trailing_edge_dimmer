@@ -9,7 +9,7 @@ import time
 import json
 
 parser = argparse.ArgumentParser(description="Firmware Configuration Tool")
-parser.add_argument("action", help="action to execute", choices=["display", "modify", "monitor"])
+parser.add_argument("action", help="action to execute", choices=["display", "modify", "write", "monitor", "factory", "measure_frequency"])
 parser.add_argument('-d', '--data', help="data to read or modify", required=False, default=None)
 parser.add_argument('-V', '--version', help='version of the data provided. For example 2.1.x', type=str, default=None)
 parser.add_argument('-p', '--port', help='serial port', type=str, default=None)
@@ -17,27 +17,9 @@ parser.add_argument('-b', '--baud', help='serial port rate', type=int, default=5
 parser.add_argument('-a', '--address', help='dimmer address', type=int, default=None)
 parser.add_argument('-s', '--set', help='set key=value', nargs='+', default=[])
 parser.add_argument('-j', '--json', help='use JSON as output format', action="store_true", default=False)
+parser.add_argument('-v', '--verbose', help='verbose', action="store_true", default=False)
 
 args = parser.parse_args()
-
-#
-# Examples
-#
-# python.exe .\scripts\cfg_tool.py modify --version 2.2 --data '+REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -s range_begin=1
-# Detected version: 2.2.0
-# Set range_begin to 1
-# +I2CT=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000501000020001412
-#
-# python.exe .\scripts\cfg_tool.py display --version 2.2 --data '+REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -s range_begin=1 -j
-# Detected version: 2.2.0
-# Set range_begin to 1
-# {
-#   "i2c_address": "0x17",
-# ...
-#   "range_begin": 1,
-# ...
-# }
-#
 
 def set_items(cfg, items):
     key = '?'
@@ -52,25 +34,29 @@ def set_items(cfg, items):
     except Exception as e:
         raise ValueError('failed to set value: %s=%s: %s' % (key, val, str(e)))
 
-if args.action!='monitor':
+if args.action in ('write', 'factory', 'monitor'):
+    if not args.port:
+        parser.error('--port required')
+else:
     if not args.data and not args.port:
         parser.error('--data or --port required')
-    if args.data:
-        if not args.version:
-            parser.error('--data requires --version')
-        else:
-            try:
-                version = args.version.split('.')
-                if len(version)<2 or len(version)>3:
-                    raise Exception()
-                parts = []
-                for val in version:
-                    parts.append(int(val))
-                if len(parts) == 2:
-                    parts.append(None)
-                version = parts
-            except:
-                parser.error('version format: major.minor[.revision]')
+
+if args.data:
+    if not args.version:
+        parser.error('--data requires --version')
+    else:
+        try:
+            version = args.version.split('.')
+            if len(version)<2 or len(version)>3:
+                raise Exception()
+            parts = []
+            for val in version:
+                parts.append(int(val))
+            if len(parts) == 2:
+                parts.append(None)
+            version = parts
+        except:
+            parser.error('version format: major.minor[.revision]')
 
 if args.port:
     try:
@@ -84,6 +70,10 @@ if args.port:
 
     ser = serial.Serial(baudrate=args.baud, timeout=5)
     sp = protocol.Protocol(ser, args.address)
+    if args.verbose:
+        print("Verbose mode enabled...")
+        sp.display_rx = True
+
     ser.port = args.port
     ser.dtr = False
     ser.rts = True
@@ -93,6 +83,7 @@ if args.port:
         if data==False:
             if not monitor:
                 parser.error('serial read timeout')
+
         if data==None:
             print("Reboot detected, waiting 3 seconds...")
             time.sleep(3)
@@ -108,15 +99,30 @@ if args.port:
             cfg = config.Config(version[0], version[1], version[2])
             sp.structs = cfg.structs
 
+        # custom actions
+        if args.action=='factory':
+            print("Resetting factory settings...")
+            sp.reset_factory_settings()
+
+        elif args.action=='write':
+            print("Writing configuration to EEPROM...")
+            sp.write_eeprom(True)
+
+        elif args.action=='measure_frequency':
+            print("Measuring frequency...")
+            sp.measure_frequency()
+
+
+        # monitor or display
         if monitor:
             print("Monitoring serial port...")
             while monitor:
                 line = sp.readline()
                 sp.print_data(line)
         else:
-            sp.get_config()
+            sp.print_config()
             n = 0
-            while n < 10:
+            while n < 5:
                 line = sp.readline()
                 try:
                     cfg.get_from_rem_command(line)
@@ -144,6 +150,7 @@ if args.port:
                     print(json.dumps(cfg.get_json(), indent=2))
                 else:
                     print(cfg.get_command())
+
             elif args.action=='modify':
                 data = cfg.get_command().encode()
                 print("Sending configuration: ", data)
@@ -157,9 +164,15 @@ if args.port:
                     if sp.print_data(line)==0xf3:
                         break
                     n += 1
-                print('Closing connection...')
 
-            ser.close()
+                sp.print_config()
+                if args.json==True:
+                    print(json.dumps(cfg.get_json(), indent=2))
+                else:
+                    print(cfg.get_command())
+
+                print('Closing connection...')
+                ser.close()
 
 else:
     cfg = config.Config(version[0], version[1], version[2])
