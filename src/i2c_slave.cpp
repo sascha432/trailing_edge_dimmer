@@ -160,7 +160,8 @@ void _dimmer_i2c_on_receive(int length)
                         dimmer_scheduled_calls.read_int_temp = false;
                         register_mem.data.temp_bytes[0] = DIMMER_REGISTER_OPTIONS;
                         register_mem.data.temp_bytes[1] = sizeof(register_mem.data.cfg);
-                        i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp_bytes[0]) * 2);
+                        register_mem.data.temp_words[1] = Dimmer::Level::max;
+                        i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp_words));
                     }
                     break;
 
