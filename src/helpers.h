@@ -49,7 +49,7 @@ static inline void __debug_printf_i(uint16_t interval, const char *format, ...) 
 #define debug_printf_i(interval, fmt, ...)  __debug_printf_i(interval, PSTR(fmt), ##__VA_ARGS__);
 #else
 #define DEBUG_LEVEL   0
-#define _D(...) ;
+#define _D(...)
 #define debug_printf(...)
 #define debug_print_memory(ptr, size)
 #define debug_printf_i(interval, fmt, ...)

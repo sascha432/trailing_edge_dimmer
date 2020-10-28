@@ -4,9 +4,7 @@
 
 #pragma once
 
-#ifndef __attribute__packed__
-#define __attribute__packed__           __attribute__((packed))
-#endif
+#include <math.h>
 
 template<typename _Type, uint32_t _Offset, uint8_t _Shift>
 struct __attribute__((__packed__)) ShiftedFloat {
@@ -58,8 +56,6 @@ struct __attribute__((__packed__)) ShiftedFloat {
 
     _Type _value;
 };
-
-#include <math.h>
 
 template<typename _Type, uint32_t _Multiplier, uint32_t _Divider = 1>
 struct __attribute__((__packed__)) FixedPointFloat {

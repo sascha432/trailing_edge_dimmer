@@ -29,7 +29,7 @@ struct dimmer_channel_t {
     uint16_t ticks;
 };
 
-typedef struct __attribute__packed__ {
+typedef struct __attribute__((packed)) {
     dimmer_channel_id_t channel;
     dimmer_level_t level;
 } FadingCompletionEvent_t;
@@ -140,7 +140,9 @@ namespace Dimmer {
     struct dimmer_t {
         Level::type level[Channel::size()];                                     // current level
         dimmer_fade_t fading[Channel::size()];                                  // calculated fading data
+#if DIMMER_MAX_CHANNELS > 1
         Channel::type channel_ptr;
+#endif
         dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks
         dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels
         uint8_t on_counter[Channel::size()];                                    // counts halfwaves from 0 to 254 after switching on
@@ -237,7 +239,6 @@ namespace Dimmer {
             return _config.bits.leading_edge ?
                 (_get_ticks_per_halfwave() - __get_ticks(channel, level)) :
                 __get_ticks(channel, level);
-
         }
 
         inline TickType _get_min_on_ticks(Channel::type channel) const {

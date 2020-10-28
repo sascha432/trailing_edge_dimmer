@@ -301,9 +301,9 @@ void loop()
             Serial.printf_P(PSTR("%d,"), register_mem.data.level[i]);
         }
         Serial.printf_P(PSTR("hf=%u,ticks="), (unsigned)dimmer._get_ticks_per_halfwave());
-        DIMMER_CHANNEL_LOOP(i) {
-            Serial.print(dimmer._get_ticks(i, register_mem.data.level[i]));
-            if (i < Dimmer::Channel::max) {
+        DIMMER_CHANNEL_LOOP(j) {
+            Serial.print(dimmer._get_ticks(j, register_mem.data.level[j]));
+            if (j < Dimmer::Channel::max) {
                 Serial.print(',');
             }
         }

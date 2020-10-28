@@ -142,7 +142,9 @@ void DimmerBase::_start_halfwave()
 
     Channel::type i;
     toggle_state = _config.bits.leading_edge ? DIMMER_MOSFET_OFF_STATE : DIMMER_MOSFET_ON_STATE;
+#if DIMMER_MAX_CHANNELS > 1
     channel_ptr = 0;
+#endif
 #if DIMMER_OUT_OF_SYNC_LIMIT
     if (++out_of_sync_counter > DIMMER_OUT_OF_SYNC_LIMIT) {
         Timer<1>::disable();
@@ -198,8 +200,7 @@ void DimmerBase::compare_interrupt()
 {
 #if DIMMER_MAX_CHANNELS == 1
 
-    ChannelStateType *channel = &ordered_channels[channel_ptr++];
-    _set_mosfet_gate(channel->channel, toggle_state);
+    _set_mosfet_gate(ordered_channels[0].channel, toggle_state);
     Timer<1>::enable_compareB_disable_compareA();
 
 #else
@@ -283,8 +284,8 @@ void DimmerBase::_calculate_channels()
 
 void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
 {
-     _D(5, debug_printf("set_channel_level ch=%d level=%d\n", channel, level))
-   if (_get_level(channel) == 0) {
+    _D(5, debug_printf("set_channel_level ch=%d level=%d\n", channel, level))
+    if (_get_level(channel) == 0) {
         on_counter[channel] = 0;
     }
     _set_level(channel, _normalize_level(level));
