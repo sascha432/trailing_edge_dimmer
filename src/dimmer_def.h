@@ -118,6 +118,11 @@
 #define DIMMER_MAX_LEVEL                                        8192
 #endif
 
+// if set to 1, some code is being removed that is not required for more than 1 channel
+#ifndef DIMMER_MAX_CHANNELS
+#define DIMMER_MAX_CHANNELS                                     8
+#endif
+
 //
 // the prescaler should be chosen to have maximum precision while having enough range for fine tuning
 
@@ -189,6 +194,11 @@
 #define HAVE_READ_VCC                                           1
 #endif
 
+// default value for restore level
+#ifndef DIMMER_RESTORE_LEVEL
+#define DIMMER_RESTORE_LEVEL                                    1
+#endif
+
 #ifndef INTERNAL_VREF_1_1V
 // after calibration VCC readings are pretty accurate, +-2-3mV
 // default for cfg.internal_1_1v_ref
@@ -243,3 +253,9 @@
 
 #define DIMMER_VERSION                                          _STRINGIFY(DIMMER_VERSION_MAJOR) "." _STRINGIFY(DIMMER_VERSION_MINOR) "." _STRINGIFY(DIMMER_VERSION_REVISION)
 #define DIMMER_INFO                                             "Author sascha_lammers@gmx.de"
+
+#if DIMMER_MAX_CHANNELS > 1
+#define DIMMER_CHANNEL_LOOP(var)                                for(Dimmer::Channel::type var = 0; var < Dimmer::Channel::size(); var++)
+#else
+#define DIMMER_CHANNEL_LOOP(var)                                constexpr Dimmer::Channel::type var = 0;
+#endif

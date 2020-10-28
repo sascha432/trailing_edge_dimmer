@@ -28,6 +28,7 @@
 // Flash: [========  ]  78.7% (used 24168 bytes from 30720 bytes)
 // lash: [========  ]  78.7% (used 24188 bytes from 30720 bytes
 // 29888
+// 23868
 
 void rem() {
     Serial.print(F("+REM="));
@@ -163,7 +164,7 @@ void Dimmer::DimmerBase::send_fading_completion_events() {
     FadingCompletionEvent_t *ptr = buffer;
 
     cli();
-    for(Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
+    DIMMER_CHANNEL_LOOP(i) {
         if (dimmer.fading_completed[i] != Dimmer::Level::invalid) {
             *ptr++ = { i, dimmer.fading_completed[i] };
             dimmer.fading_completed[i] = Dimmer::Level::invalid;
@@ -192,7 +193,7 @@ void restore_level()
 {
     if (dimmer_config.bits.restore_level) {
         // restore levels from EEPROM configuration
-        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
+        DIMMER_CHANNEL_LOOP(i) {
             _D(5, debug_printf("restoring ch=%u level=%u time=%f\n", i, conf.level(i), dimmer_config.fade_in_time));
             if (conf.level(i) && dimmer_config.fade_in_time) {
                 dimmer.fade_channel_to(i, conf.level(i), dimmer_config.fade_in_time);
@@ -296,11 +297,11 @@ void loop()
         // Serial.printf_P(PSTR("hw=%u,diff=%d,"), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks);
         // Serial.printf_P(PSTR("frq=%.3f,mode=%c,lvl="), dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
         Serial.printf_P(PSTR("hw=%u,diff=%d,frq=%.3f,mode=%c,lvl="), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks, dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
-        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
+        DIMMER_CHANNEL_LOOP(i) {
             Serial.printf_P(PSTR("%d,"), register_mem.data.level[i]);
         }
         Serial.printf_P(PSTR("hf=%u,ticks="), (unsigned)dimmer._get_ticks_per_halfwave());
-        for(Dimmer::Channel::type i = 0; i < Dimmer::Channel::size(); i++) {
+        DIMMER_CHANNEL_LOOP(i) {
             Serial.print(dimmer._get_ticks(i, register_mem.data.level[i]));
             if (i < Dimmer::Channel::max) {
                 Serial.print(',');
