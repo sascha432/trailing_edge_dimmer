@@ -10,6 +10,7 @@
 #endif
 
 // enable debug commands
+// ~1kb extra code size
 #ifndef DEBUG_COMMANDS
 #define DEBUG_COMMANDS                                          1
 #endif
@@ -54,7 +55,7 @@
 // https://github.com/sascha432/trailing_edge_dimmer/blob/bedf1d01b5e8d3531ac5dc090c64a4bc6f67bfd3/docs/images/min_on_time.png
 //
 #ifndef DIMMER_MIN_ON_TIME_US
-#define DIMMER_MIN_ON_TIME_US                                   300 // minimum on-time in µs
+#define DIMMER_MIN_ON_TIME_US                                   300
 #endif
 
 // default for DIMMER_REGISTER_MIN_OFF_TIME_TICKS
@@ -69,10 +70,11 @@
 // https://github.com/sascha432/trailing_edge_dimmer/blob/bedf1d01b5e8d3531ac5dc090c64a4bc6f67bfd3/docs/images/min_off_time.png
 //
 #ifndef DIMMER_MIN_OFF_TIME_US
-#define DIMMER_MIN_OFF_TIME_US                                  300 // minimum off-time before the halfwave ends
+#define DIMMER_MIN_OFF_TIME_US                                  300
 #endif
 
-// adjustment for measuring clock cycles
+// adjustment for measuring clock cycles due to pushing registers on
+// the stack before reading TCNT1
 #ifndef DIMMER_MEASURE_ADJ_CYCLE_CNT
 #define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -39
 #endif
@@ -125,13 +127,14 @@
 
 //
 // the prescaler should be chosen to have maximum precision while having enough range for fine tuning
+// prescaler 1 is used for measuring time
 
-// timer1, 16 bit, used for turning MOSFETs on and off
+// timer1, 16 bit, used for the ZC delay and turning MOSFETs on and off
 #ifndef DIMMER_TIMER1_PRESCALER
 #define DIMMER_TIMER1_PRESCALER                                 8
 #endif
 
-// timer2, 8bit, used to delay the turn on after receiving the ZC signal
+// timer2, 8bit, not used
 #ifndef DIMMER_TIMER2_PRESCALER
 #define DIMMER_TIMER2_PRESCALER                                 64
 #endif

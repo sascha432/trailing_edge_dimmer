@@ -3,8 +3,9 @@
  */
 
 #include <Arduino.h>
-#include "dimmer_reg_mem.h"
+#include "dimmer_def.h"
 #include "dimmer_protocol.h"
+#include "dimmer_reg_mem.h"
 
 
 void setup()
@@ -12,8 +13,8 @@ void setup()
     Serial.begin(DEFAULT_BAUD_RATE);
     delay(500);
     Serial.println(F("Starting..."));
+    Serial.println(F("Copy output to ./src/dimmer_protocol_const.h"));
     delay(5000);
-    Serial.println(F("Make sure to run ./scripts/read_def.py before, to update the print_def.h"));
     Serial.println();
 }
 

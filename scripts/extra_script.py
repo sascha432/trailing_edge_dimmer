@@ -27,7 +27,7 @@ def disassemble(source, target, env):
 
     input_file = str(target[0])
     if input_file=='disassemble':
-        input_file=env.subst("$BUILD_DIR/${PROGNAME}.elf")
+        input_file = env.subst("$BUILD_DIR/${PROGNAME}.elf")
     input_file = path.realpath(input_file)
 
     try:
@@ -65,6 +65,22 @@ def disassemble(source, target, env):
     if return_code!=0:
         error('Failed to disassemble binary: exit code %u: %s' % (return_code, ' '.join(args)))
 
+#
+# ceate constants of the defines used in dimmer_protocol.h
+#
+
+def read_def(source, target, env):
+
+    python = env.subst("$PYTHONEXE")
+    project_dir = path.realpath(env.subst("$PROJECT_DIR"))
+    script = path.realpath(path.join(project_dir, './scripts/read_def.py'))
+    args = [ python, script ]
+    return_code = subprocess.run(args, shell=True).returncode
+    if return_code!=0:
+        error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))
+
+
+env.AddPreAction("$BUILD_DIR/scripts/print_def.cpp.o", read_def)
 
 env.AlwaysBuild(env.Alias("disassemble", None, disassemble))
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
