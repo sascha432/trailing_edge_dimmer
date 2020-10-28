@@ -215,12 +215,16 @@ In UART or I2C master/master mode, the event *DIMMER_EEPROM_WRITTEN* confirms su
 
 ## DIMMER_COMMAND_GET_CFG_LEN
 
-Get start address and length of the configuration
+Get start address, length of the configuration and max. level
 
 ***Note:*** this cancels any pending temperature measurements
 
     +I2CT=17,89,90
-    +I2CR=17,02
+    +I2CR=17,04
+
+Address 0xA2, length 0x21 (33 byte), max. levels 0x2000 (8192)
+
+    +I2CT=17a2180020
 
 ## DIMMER_COMMAND_PRINT_CONFIG
 
@@ -291,18 +295,7 @@ Reading the firmware version is using the same transmission for all versions. Th
 
 ## Reading and writing the dimmer settings
 
-### DIMMER_COMMAND_GET_CFG_LEN
-
-Get address and size of configuration in register memory
-
-    +I2CT=17,89,90
-    +I2CR=17,02
-
-
-For example:
-
-    +I2CT=17a218
-    0x0a-0xc6 / 24 byte
+See *DIMMER_COMMAND_GET_CFG_LEN* for getting address and size.
 
 ### Settings
 
