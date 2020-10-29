@@ -124,6 +124,56 @@ struct __attribute__((__packed__)) FixedPointFloat {
     _Type _value;
 };
 
+#if HAVE_UINT24 == 1
+
+using uint24_t = __uint24;
+using int24_t = __int24;
+
+static constexpr size_t sizeof_uint24_t = sizeof(uint24_t);
+static constexpr size_t sizeof_int24_t = sizeof(int24_t);
+
+#else
+
+template<size_t _Bits, typename _Type>
+struct __attribute__((__packed__,aligned(1))) custom_int_t {
+    using type = custom_int_t<_Bits, _Type>;
+    using underlying_type = _Type;
+
+    static constexpr size_t bits = _Bits;
+    static constexpr size_t size = (_Bits + 7) / 8;
+
+    custom_int_t() = default;
+    custom_int_t(const _Type value) : _value(value) {}
+
+    operator _Type() const {
+        return _value;
+    }
+    custom_int_t &operator==(const _Type value) const {
+        _value = value;
+        return *this;
+    }
+
+    union __attribute__((__packed__)) {
+        struct __attribute__((__packed__)) {
+            uint8_t _bytes[size];
+        };
+        struct __attribute__((__packed__)) {
+            _Type _value: _Bits;
+        };
+    };
+};
+
+using uint24_t = custom_int_t<24, uint32_t>;
+using int24_t = custom_int_t<24, int32_t>;
+
+static constexpr size_t sizeof_uint24_t = uint24_t::size;
+static constexpr size_t sizeof_int24_t = int24_t::size;
+
+static_assert(sizeof(uint24_t) == uint24_t::size, "check struct");
+static_assert(sizeof(int24_t) == int24_t::size, "check struct");
+
+#endif
+
 using internal_vref11_t = ShiftedFloat<int8_t, 0x3f8ccccd, 12>; // -128=1.037500, 0=1.100000, 127=1.162012, precision=0.000488 (~0.5mV)
 using fadetime_t = FixedPointFloat<uint16_t, 100, 1>; // 0.0 to 1310.699951, precision=0.02 (20ms)
 using temp_ofs_t = FixedPointFloat<int8_t, 4, 1>; // -32.0 to 31.75, precision=0.25 (1/4th°C)
@@ -265,11 +315,32 @@ typedef struct __attribute__((__packed__)) {
 static_assert(sizeof(dimmer_fading_complete_event_t) == 3, "check struct");
 
 typedef struct __attribute__((__packed__)) {
-    uint8_t channel_state;
+    union {
+        uint8_t channel_state;
+        struct {
+            uint8_t channel0: 1;
+            uint8_t channel1: 1;
+            uint8_t channel2: 1;
+            uint8_t channel3: 1;
+            uint8_t channel4: 1;
+            uint8_t channel5: 1;
+            uint8_t channel6: 1;
+            uint8_t channel7: 1;
+        };
+    };
 } dimmer_channel_state_event_t;
 
 static_assert(sizeof(dimmer_channel_state_event_t) == 1, "check struct");
 
+typedef struct __attribute__((__packed__)) {
+    uint8_t lost: 1;
+    uint8_t sync: 1;
+    uint8_t __reserved: 2;
+    uint32_t sync_difference_cycles: 28;
+    uint16_t halfwave_counter;
+} dimmer_sync_event_t;
+
+static_assert(sizeof(dimmer_sync_event_t) == 6, "check struct");
 
 static constexpr uint16_t dimmer_version_to_uint16(const uint8_t major, const uint8_t minor, const uint8_t revision) {
     return (major << 10) | ((minor & 0x1f) << 5) | (revision & 0x1f);

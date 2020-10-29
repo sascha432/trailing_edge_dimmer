@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include "dimmer.h"
+#include "dimmer_reg_mem.h"
 
 #define DEBUG_FREQUENCY_MEASUREMENT             1
 
@@ -26,25 +27,51 @@ public:
     static constexpr uint8_t kMeasurementBufferSize = 100; // 1 second @ 50hz
     static constexpr uint32_t kTimeout = (kMeasurementBufferSize * Dimmer::kMaxMicrosPerHalfWave) * 1.5; // maximum time * 1.5
 
-#if HAVE_UINT24
-    using tick_counter_t = __uint24;
     static constexpr size_t kMaxCycles_uint24 =  (1UL << 24) / Dimmer::kMaxCyclesPerHalfWave;
-    //static_assert(kMeasurementBufferSize < (kMaxCycles_uint24 * 0.85), "reduce kMeasurementBufferSize");
-#else
-    using tick_counter_t = uint32_t;
-#endif
 
     enum class StateType : uint8_t {
         INIT,
         MEASURE
     };
 
-    struct Ticks {
-        tick_counter_t _ticks;
-
-        Ticks() {}
-        Ticks(tick_counter_t ticks) : _ticks(ticks) {}
+#if HAVE_UINT24 == 1
+    class Ticks {
+    public:
+        Ticks() : _value(0) {}
+        Ticks(uint24_t value) : _value(value) {}
+        uint24_t diff(uint24_t value) const {
+            return *this - value;
+        }
+        operator uint24_t() const {
+            return _value;
+        }
+        explicit operator uint32_t() const {
+            return _value[0] | ((uint16_t)_value[1] << 8) | ((uint32_t)_value[2] << 16);
+        }
+    private:
+        uint24_t _value;
     };
+#else
+    class Ticks {
+    public:
+        Ticks() : _value{} {}
+        Ticks(uint24_t value) : _value{(uint8_t)value, (uint8_t)(value << 8), (uint8_t)(value << 16)} {}
+        Ticks(uint32_t value) : _value{(uint8_t)value, (uint8_t)(value << 8), (uint8_t)(value << 16)} {}
+        uint24_t diff(uint24_t value) const {
+            auto tmp = (uint32_t)*this;
+            tmp -= value;
+            return tmp;
+        }
+        operator uint24_t() const {
+            return _value[0] | ((uint16_t)_value[1] << 8) | ((uint32_t)_value[2] << 16);
+        }
+        explicit operator uint32_t() const {
+            return _value[0] | ((uint16_t)_value[1] << 8) | ((uint32_t)_value[2] << 16);
+        }
+    private:
+        uint8_t _value[3];
+    };
+#endif
 
     static constexpr size_t TicksSize = sizeof(Ticks);
 
@@ -61,9 +88,10 @@ public:
 
     float _frequency;
     uint16_t _errors;
-    Ticks _ticks[kMeasurementBufferSize];
     int16_t _count;
-    // StateType _state;
-    // tick_counter_t _min;
-    // tick_counter_t _max;
+    Ticks _ticks[kMeasurementBufferSize];
 };
+
+static constexpr size_t FrequencyMeasurementSize = sizeof(FrequencyMeasurement);
+
+static_assert(FrequencyMeasurement::kMeasurementBufferSize * 3 + 8 == FrequencyMeasurementSize, "invalid size");

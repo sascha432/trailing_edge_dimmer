@@ -39,14 +39,12 @@ ISR(TIMER1_OVF_vect)
     timer1_overflow++;
 }
 
-static constexpr size_t FrequencyMeasurementSize = sizeof(FrequencyMeasurement);
-
 FrequencyMeasurement *measure;
 
 void FrequencyMeasurement::calc_min_max()
 {
-    tick_counter_t _min;
-    tick_counter_t _max;
+    uint24_t _min;
+    uint24_t _max;
 
     _min = 0;
     _max = 0;
@@ -54,11 +52,11 @@ void FrequencyMeasurement::calc_min_max()
 
     _D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
     if (_count > 10) {
-        //tick_counter_t ticks_sum = _ticks[_count - 1]._ticks - _ticks[0]._ticks;
+        //uint24_t ticks_sum = _ticks[_count - 1]._ticks - _ticks[0]._ticks;
         uint32_t sum = 0;
         uint8_t num = 0;
         for(int i = 0; i < _count - 1; i++) {
-            tick_counter_t diff = _ticks[i + 1]._ticks - _ticks[i]._ticks;
+            auto diff = _ticks[i + 1].diff(_ticks[i]);
             if (diff >= Dimmer::kMinCyclesPerHalfWave && diff <= Dimmer::kMaxCyclesPerHalfWave) { // filter between 48 and 62Hz
                 //Serial.println(diff);
                 sum += diff;
@@ -70,14 +68,14 @@ void FrequencyMeasurement::calc_min_max()
             _max = _min;
             // allow up to +-0.75% deviation from the filtered avg value
             uint16_t limit = _min * 0.0075;
-            _min -= limit;
-            _max += limit;
+            _min = _min - limit;
+            _max = _max + limit;
 
             // filter again with new min/max
             sum = 0;
             num = 0;
             for(int i = 0; i < _count - 1; i++) {
-                tick_counter_t diff = _ticks[i + 1]._ticks - _ticks[i]._ticks;
+                auto diff = _ticks[i + 1].diff(_ticks[i]);
                 if (diff >= _min && diff <= _max) {
                     //Serial.println(diff);
                     sum += diff;
@@ -107,7 +105,7 @@ void FrequencyMeasurement::calc_min_max()
 // {
 //     //_D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
 //     if (_count > 4) {
-//         tick_counter_t ticks_sum = _ticks[_count - 1]._ticks - _ticks[0]._ticks;
+//         uint24_t ticks_sum = _ticks[_count - 1]._ticks - _ticks[0]._ticks;
 
 //         _count--;
 //         Serial.printf_P(PSTR("AVG %f Hz\n"), 1000000.0 / clockCyclesToMicroseconds(ticks_sum / (float)_count));
@@ -131,8 +129,7 @@ void FrequencyMeasurement::zc_measure_handler(uint16_t lo, uint16_t hi)
         _count++;
         return;
     }
-    tick_counter_t ticks = lo | ((tick_counter_t)hi << 16);
-    _ticks[_count++]._ticks = ticks;
+    _ticks[_count++] = lo | (uint24_t)hi << 16;
     if (_count == kMeasurementBufferSize) {
         cli();
         // detach handler while doing calculations
