@@ -242,7 +242,7 @@ namespace Dimmer {
         }
 
         inline TickType _get_min_on_ticks(Channel::type channel) const {
-            if (on_counter[channel] < kOnSwitchCounterMax && _config.switch_on_count && _config.switch_on_minimum_ticks && on_counter[channel] < _config.switch_on_count) {
+            if (_config.switch_on_count && _config.switch_on_minimum_ticks && (on_counter[channel] < kOnSwitchCounterMax) && (on_counter[channel] < _config.switch_on_count - 1)) {
                 return _config.switch_on_minimum_ticks;
             }
             return _config.minimum_on_time_ticks;
