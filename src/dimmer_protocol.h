@@ -54,6 +54,7 @@
 #define DIMMER_EEPROM_WRITTEN               0xf3
 #define DIMMER_FREQUENCY_WARNING            0xf4
 #define DIMMER_CHANNEL_ON_OFF               0xf5
+#define DIMMER_SYNC_EVENT                   0xf6
 
 // DIMMER_REGISTER_COMMAND
 #define DIMMER_COMMAND_SET_LEVEL            0x10
@@ -99,7 +100,6 @@
 
 // dimmer_eeprom_written_t.flags
 #define DIMMER_EEPROM_FLAGS_CONFIG_UPDATED  0x01
-
 
 // the version address is fixed and cannot be changed due to compatibility with older versions
 static_assert(DIMMER_REGISTER_VERSION == 0xb9, "Invalid offset");

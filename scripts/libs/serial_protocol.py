@@ -153,9 +153,19 @@ class Protocol:
                         event = self.structs.dimmer_eeprom_written_t.from_buffer_copy(data[1:])
                         print('EEPROM written: cycle=%u position=%u written=%u config_updated=%u' % (event.write_cycle, event.write_position, event.bytes_written, event.config_updated))
                         return data[0]
-        except Exception as e:
-            print('Invalid data: %s: %s' % (e, self.raw_line))
-            return None
+                    if data[0]=self.DIMMER.EVENT.SYNC_EVENT:
+                        event = self.structs.dimmer_sync_event_t.from_buffer_copy(data[1:])
+                        if event.type==self.DIMMER.SYNC_EVENT_TYPE_.LOST:
+                            tmp = 'type=LOST halfcycles=%u' % (event.counter)
+                        elif event.type==self.DIMMER.SYNC_EVENT_TYPE_.SYNC:
+                            tmp = 'type=SYNC difference=%u' % (event.diff)
+                        else:
+                            tmp = 'type=UNKNOWN'
+                        print('SYNC EVENT: %s' % tmp)
+                        return data[0]
+            except Exception as e:
+                print('Invalid data: %s: %s' % (e, self.raw_line))
+                return None
 
         print('Raw data: %s' % self.raw_line)
         return False

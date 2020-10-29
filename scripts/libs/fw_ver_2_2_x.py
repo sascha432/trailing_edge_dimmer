@@ -49,7 +49,6 @@ class register_mem_cfg_t(Structure):
                 ("switch_on_minimum_ticks", c_uint16),
                 ("switch_on_count", c_uint8)]
 
-
     def __dir__(self):
         parts = []
         for name, c_type in self._fields_:
@@ -109,3 +108,11 @@ class dimmer_eeprom_written_t(Structure):
                 ("bytes_written", c_uint8),
                 ("config_updated", c_uint8, 1),
                 ("__reserved", c_uint8, 7)]
+
+class dimmer_sync_event_t(Structure):
+    _pack_ = 1
+    _fields_ = [("lost", c_uint8, 1),
+                ("sync", c_uint8, 1),
+                ("__reserved", c_uint8, 2),
+                ("sync_difference_cycles", c_uint32, 28),
+                ("halfwave_counter", c_uint16)]

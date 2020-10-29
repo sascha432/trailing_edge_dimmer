@@ -34,20 +34,20 @@ with open(outfile1, 'w', newline='\n') as ofh1:
                 name = m[1].replace('DIMMER_', '')
                 np_name = name
                 if name.startswith('REGISTER_'):
-                    np_name = np_name[np_name.index('_') + 1:]
                     obj_name = 'REGISTER'
+                    np_name = np_name[len(obj_name) + 1:]
                 elif name.startswith('I2C_'):
-                    np_name = np_name[np_name.index('_') + 1:]
                     obj_name = 'I2C'
+                    np_name = np_name[len(obj_name) + 1:]
                 elif name.startswith('COMMAND_'):
-                    np_name = np_name[np_name.index('_') + 1:]
                     obj_name = 'COMMAND'
+                    np_name = np_name[len(obj_name) + 1:]
                 elif name.startswith('OPTIONS_'):
-                    np_name = np_name[np_name.index('_') + 1:]
                     obj_name = 'OPTIONS'
+                    np_name = np_name[len(obj_name) + 1:]
                 elif name.startswith('EEPROM_FLAGS_'):
-                    np_name = np_name[13:]
                     obj_name = 'EEPROM_FLAGS'
+                    np_name = np_name[len(obj_name) + 1:]
                 elif name=='EEPROM_WRITTEN':
                     name = 'EVENT_' + name
                     obj_name = 'EVENT'

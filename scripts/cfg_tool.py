@@ -74,8 +74,12 @@ actions = {
     'monitor': 'monitor dimmer connected to serial port',
     'factory': 'restore factory settings',
     'measure_frequency': 'execute measure frequency command',
+    'sync': 'enable/disable ZC sync',
     'const': 'display constants for specified version'
 }
+
+# actions that require serial connection and --port being set
+serial_actions = ('write', 'factory', 'monitor', 'sync', 'measure_frequency')
 
 actions_help = []
 for key, val in actions.items():
@@ -91,8 +95,9 @@ parser.add_argument('-b', '--baud', help='serial port rate', type=int, default=5
 parser.add_argument('-a', '--address', help='dimmer address', type=int, default=None)
 parser.add_argument('-s', '--set', help='set key=value', nargs='+', default=[])
 parser.add_argument('-j', '--json', help='use JSON as output format', action='store_true', default=False)
-parser.add_argument('-v', '--verbose', help='verbose', action='store_true', default=False)
-parser.add_argument('--store', help='execute store command after modifying configuration', action='store_true', default=False)
+parser.add_argument('--verbose', help='enable verbose output', action='store_true', default=False)
+parser.add_argument('--value', help='value for actions=[sync=bool]', type=str, default=None)
+parser.add_argument('--store', help='execute store command after modifying configuration. actions=[modify]', action='store_true', default=False)
 
 args = parser.parse_args()
 
@@ -116,7 +121,7 @@ if args.action=='const':
 
     sys.exit(0)
 
-if args.action in ('write', 'factory', 'monitor'):
+if args.action in serial_actions:
     if not args.port:
         parser.error('--port required')
 else:
