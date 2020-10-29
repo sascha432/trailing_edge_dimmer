@@ -101,37 +101,47 @@ void _dimmer_i2c_on_receive(int length)
                 case DIMMER_COMMAND_READ_NTC:
                     register_mem.data.temp = NAN;
 #if HAVE_NTC
-                    dimmer_scheduled_calls.read_int_temp = false;
-                    dimmer_scheduled_calls.read_ntc_temp = true;
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                        dimmer_scheduled_calls.read_int_temp = false;
+                        dimmer_scheduled_calls.read_ntc_temp = true;
+                    }
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
                 case DIMMER_COMMAND_READ_INT_TEMP:
                     register_mem.data.temp = NAN;
 #if HAVE_READ_INT_TEMP
-                    dimmer_scheduled_calls.read_ntc_temp = false;
-                    dimmer_scheduled_calls.read_int_temp = true;
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                        dimmer_scheduled_calls.read_ntc_temp = false;
+                        dimmer_scheduled_calls.read_int_temp = true;
+                    }
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
                 case DIMMER_COMMAND_READ_VCC:
                     register_mem.data.vcc = 0;
 #if HAVE_READ_VCC
-                    dimmer_scheduled_calls.read_vcc = true;
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                        dimmer_scheduled_calls.read_vcc = true;
+                    }
 #endif
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.vcc));
                     break;
                 case DIMMER_COMMAND_READ_AC_FREQUENCY:
-                    dimmer_scheduled_calls.read_ntc_temp = false;
-                    dimmer_scheduled_calls.read_int_temp = false;
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                        dimmer_scheduled_calls.read_ntc_temp = false;
+                        dimmer_scheduled_calls.read_int_temp = false;
+                    }
                     register_mem.data.temp = dimmer._get_frequency();
                     _D(5, debug_printf("I2C get frequency=%.3f\n", register_mem.data.temp));
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
 
                 case DIMMER_COMMAND_GET_TIMER_TICKS:
-                    dimmer_scheduled_calls.read_ntc_temp = false;
-                    dimmer_scheduled_calls.read_int_temp = false;
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                        dimmer_scheduled_calls.read_ntc_temp = false;
+                        dimmer_scheduled_calls.read_int_temp = false;
+                    }
                     register_mem.data.temp = Dimmer::Timer<1>::ticksPerMicrosecond;
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_TEMP, sizeof(register_mem.data.temp));
                     break;
@@ -156,8 +166,10 @@ void _dimmer_i2c_on_receive(int length)
                     break;
 
                 case DIMMER_COMMAND_GET_CFG_LEN: {
-                        dimmer_scheduled_calls.read_ntc_temp = false;
-                        dimmer_scheduled_calls.read_int_temp = false;
+                        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                            dimmer_scheduled_calls.read_ntc_temp = false;
+                            dimmer_scheduled_calls.read_int_temp = false;
+                        }
                         register_mem.data.temp_bytes[0] = DIMMER_REGISTER_OPTIONS;
                         register_mem.data.temp_bytes[1] = sizeof(register_mem.data.cfg);
                         register_mem.data.temp_words[1] = Dimmer::Level::max;
@@ -179,16 +191,20 @@ void _dimmer_i2c_on_receive(int length)
 
                 case DIMMER_COMMAND_WRITE_EEPROM:
                     if (Wire_read_uint8_t(length, 0) == DIMMER_COMMAND_WRITE_CONFIG) {
-                        dimmer_scheduled_calls.eeprom_update_config = true;
+                        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                            dimmer_scheduled_calls.eeprom_update_config = true;
+                        }
                     }
                     conf.scheduleWriteConfig();
                     break;
 
                 case DIMMER_COMMAND_WRITE_EEPROM_NOW:
-                    if (Wire_read_uint8_t(length, 0) == DIMMER_COMMAND_WRITE_CONFIG) {
-                        dimmer_scheduled_calls.eeprom_update_config = true;
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                        if (Wire_read_uint8_t(length, 0) == DIMMER_COMMAND_WRITE_CONFIG) {
+                            dimmer_scheduled_calls.eeprom_update_config = true;
+                        }
+                        dimmer_scheduled_calls.write_eeprom = false;
                     }
-                    dimmer_scheduled_calls.write_eeprom = false;
                     conf._writeConfig(true);
                     break;
 

@@ -155,6 +155,7 @@ namespace Dimmer {
 
 #if DIMMER_OUT_OF_SYNC_LIMIT
         uint16_t out_of_sync_counter;
+        dimmer_sync_event_t sync_event;
 #endif
 
 #if HAVE_FADE_COMPLETION_EVENT

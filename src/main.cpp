@@ -5,6 +5,7 @@
 // 1-8 Channel Dimmer with I2C interface
 
 #include <Arduino.h>
+#include <util/atomic.h>
 #include <crc16.h>
 #include "dimmer.h"
 #include "sensor.h"
@@ -163,14 +164,14 @@ void Dimmer::DimmerBase::send_fading_completion_events() {
     FadingCompletionEvent_t buffer[Dimmer::Channel::size()];
     FadingCompletionEvent_t *ptr = buffer;
 
-    cli();
-    DIMMER_CHANNEL_LOOP(i) {
-        if (dimmer.fading_completed[i] != Dimmer::Level::invalid) {
-            *ptr++ = { i, dimmer.fading_completed[i] };
-            dimmer.fading_completed[i] = Dimmer::Level::invalid;
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        DIMMER_CHANNEL_LOOP(i) {
+            if (dimmer.fading_completed[i] != Dimmer::Level::invalid) {
+                *ptr++ = { i, dimmer.fading_completed[i] };
+                dimmer.fading_completed[i] = Dimmer::Level::invalid;
+            }
         }
     }
-    sei();
 
     if (ptr != buffer) {
         _D(5, debug_printf("sending fading completion event for %u channel(s)\n", ptr - buffer));
@@ -210,16 +211,26 @@ void loop()
             dimmer.begin();
             restore_level();
 #if HIDE_DIMMER_INFO == 0
-            dimmer_scheduled_calls.print_info = true;
+            ATOMIC_BLOCK(ATOMIC_FORCEON) {
+                dimmer_scheduled_calls.print_info = true;
+            }
 #endif
         }
         return;
     }
 
 
+    // create non-volatile copy for read operations
+    // reduces code size by ~30-40 byte
+    cli();
+    dimmer_scheduled_calls_nv_t tmp_dimmer_scheduled_calls = (uint16_t)dimmer_scheduled_calls;
+    sei();
+
 #if HIDE_DIMMER_INFO == 0
-    if (dimmer_scheduled_calls.print_info) {
-        dimmer_scheduled_calls.print_info = false;
+    if (tmp_dimmer_scheduled_calls.print_info) {
+        ATOMIC_BLOCK(ATOMIC_FORCEON) {
+            dimmer_scheduled_calls.print_info = false;
+        }
         display_dimmer_info();
     }
 #endif
@@ -244,29 +255,37 @@ void loop()
 #endif
 
 #if HAVE_READ_VCC
-    if (dimmer_scheduled_calls.read_vcc) {
-        dimmer_scheduled_calls.read_vcc = false;
+    if (tmp_dimmer_scheduled_calls.read_vcc) {
+        ATOMIC_BLOCK(ATOMIC_FORCEON) {
+            dimmer_scheduled_calls.read_vcc = false;
+        }
         register_mem.data.vcc = read_vcc();
         _D(5, debug_printf("Scheduled: read vcc=%u\n", register_mem.data.vcc));
     }
 #endif
 #if HAVE_READ_INT_TEMP
-    if (dimmer_scheduled_calls.read_int_temp) {
-        dimmer_scheduled_calls.read_int_temp = false;
+    if (tmp_dimmer_scheduled_calls.read_int_temp) {
+        ATOMIC_BLOCK(ATOMIC_FORCEON) {
+            dimmer_scheduled_calls.read_int_temp = false;
+        }
         register_mem.data.temp = get_internal_temperature();
         _D(5, debug_printf("Scheduled: read int. temp=%.3f\n", register_mem.data.temp));
     }
 #endif
 #if HAVE_NTC
-    if (dimmer_scheduled_calls.read_ntc_temp) {
-        dimmer_scheduled_calls.read_ntc_temp = false;
+    if (tmp_dimmer_scheduled_calls.read_ntc_temp) {
+        ATOMIC_BLOCK(ATOMIC_FORCEON) {
+            dimmer_scheduled_calls.read_ntc_temp = false;
+        }
         register_mem.data.temp = get_ntc_temperature();
         _D(5, debug_printf("Scheduled: read ntc=%.3f\n", register_mem.data.temp));
     }
 #endif
 
-    if (dimmer_scheduled_calls.report_error) {
-        dimmer_scheduled_calls.report_error = false;
+    if (tmp_dimmer_scheduled_calls.report_error) {
+        ATOMIC_BLOCK(ATOMIC_FORCEON) {
+            dimmer_scheduled_calls.report_error = false;
+        }
 
         Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
         Wire.write(DIMMER_FREQUENCY_WARNING);
@@ -312,8 +331,8 @@ void loop()
     }
 #endif
 
-    cli();
-    if (dimmer_scheduled_calls.send_channel_state) {
+    if (tmp_dimmer_scheduled_calls.send_channel_state) {
+        cli();
         dimmer_channel_state_event_t event = { dimmer.channel_state };
         dimmer_scheduled_calls.send_channel_state = false;
         sei();
@@ -323,13 +342,12 @@ void loop()
         Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
         Wire.endTransmission();
     }
-    else {
-        sei();
-    }
 
 #if HAVE_FADE_COMPLETION_EVENT
-    if (dimmer_scheduled_calls.send_fading_events) {
-        dimmer_scheduled_calls.send_fading_events = false;
+    if (tmp_dimmer_scheduled_calls.send_fading_events) {
+        ATOMIC_BLOCK(ATOMIC_FORCEON) {
+            dimmer_scheduled_calls.send_fading_events = false;
+        }
         next_fading_event_check = millis() + 50; // delay sending events to send them in batches
     }
     if (next_fading_event_check && millis() >= next_fading_event_check) {
@@ -338,8 +356,28 @@ void loop()
     }
 #endif
 
-    if (dimmer_scheduled_calls.write_eeprom && conf.isEEPROMWriteTimerExpired()) {
+    if (tmp_dimmer_scheduled_calls.write_eeprom && conf.isEEPROMWriteTimerExpired()) {
         conf._writeConfig(false);
+    }
+
+    if (tmp_dimmer_scheduled_calls.sync_event) {
+        cli();
+        auto event = dimmer.sync_event;
+        if (event.sync) {
+            dimmer.sync_event = {}; // clear data
+        }
+        else {
+            dimmer.sync_event.lost = false; // keep data for sync event
+        }
+        dimmer_scheduled_calls.sync_event = false;
+        sei();
+
+        Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
+        Wire.write(DIMMER_SYNC_EVENT);
+        Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
+        Wire.endTransmission();
+
+        Serial.printf_P(PSTR("+REM=lost=%u,sync=%u,cnt=%u,diff=%lu\n"), event.lost, event.sync, event.halfwave_counter, (uint32_t)event.sync_difference_cycles);
     }
 
     if (millis() >= next_temp_check) {

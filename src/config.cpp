@@ -4,6 +4,7 @@
 
 #include <EEPROM.h>
 #include <crc16.h>
+#include <util/atomic.h>
 #include "config.h"
 
 // EEPROM_config_t config;
@@ -66,8 +67,10 @@ void Config::initEEPROM()
     EEPROM.put(0, _config);
     _D(5, debug_printf("init eeprom cycle=%lu pos=%u crc=%04x copies=%u\n", (uint32_t)_config.eeprom_cycle, _eeprom_position, _config.crc16, kEEPROMMaxCopies));
 
-    dimmer_scheduled_calls.write_eeprom = false;
-    dimmer_scheduled_calls.eeprom_update_config = false;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        dimmer_scheduled_calls.write_eeprom = false;
+        dimmer_scheduled_calls.eeprom_update_config = false;
+    }
 
     Serial.println(F("+REM=EEPROMR,init"));
 }
@@ -76,7 +79,9 @@ void Config::restoreFactory()
 {
     _D(5, debug_printf("restore factory settings\n"));
     resetConfig();
-    dimmer_scheduled_calls.eeprom_update_config = true;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        dimmer_scheduled_calls.eeprom_update_config = true;
+    }
     _writeConfig(true);
 }
 
@@ -140,10 +145,9 @@ void Config::readConfig()
 void Config::writeConfig()
 {
     int32_t lastWrite = millis() - _eeprom_write_timer;
-    if (!dimmer_scheduled_calls.write_eeprom) { // no write scheduled
+    if (dimmer_scheduled_calls.set_if_false_write_eeprom()) { // no write scheduled
         _D(5, debug_printf("scheduling eeprom write cycle, last write %d seconds ago\n", (int)(lastWrite / 1000U)));
         _eeprom_write_timer = millis() + ((lastWrite > EEPROM_REPEATED_WRITE_DELAY) ? EEPROM_WRITE_DELAY : EEPROM_REPEATED_WRITE_DELAY);
-        dimmer_scheduled_calls.write_eeprom = true;
     }
     else {
         _D(5, debug_printf("eeprom write cycle already scheduled in %d seconds\n", (int)(lastWrite / -1000)));
@@ -188,8 +192,10 @@ void Config::_writeConfig(bool force)
     }
     _eeprom_write_timer = millis();
 
-    dimmer_scheduled_calls.write_eeprom = false;
-    dimmer_scheduled_calls.eeprom_update_config = false;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        dimmer_scheduled_calls.write_eeprom = false;
+        dimmer_scheduled_calls.eeprom_update_config = false;
+    }
 
     event.write_cycle = _config.eeprom_cycle;
     event.write_position = _eeprom_position;
