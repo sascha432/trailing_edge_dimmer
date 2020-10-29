@@ -10,6 +10,9 @@
 #include "dimmer_def.h"
 #include "dimmer_protocol.h"
 #include "dimmer_reg_mem.h"
+#if HAVE_CHANNELS_INLINE_ASM
+#include "dimmer_inline_asm.h"
+#endif
 
 extern register_mem_union_t register_mem;
 
@@ -33,6 +36,11 @@ typedef struct __attribute__((packed)) {
     dimmer_channel_id_t channel;
     dimmer_level_t level;
 } FadingCompletionEvent_t;
+
+#if not HAVE_CHANNELS_INLINE_ASM
+extern volatile uint8_t *dimmer_pins_addr[::size_of(DIMMER_MOSFET_PINS)];
+extern uint8_t dimmer_pins_mask[::size_of(DIMMER_MOSFET_PINS)];
+#endif
 
 namespace Dimmer {
 
@@ -327,7 +335,38 @@ namespace Dimmer {
         inline float _get_frequency() const {
             return frequency;
         }
-        void _set_mosfet_gate(Channel::type channel, bool state);
+#if HAVE_CHANNELS_INLINE_ASM
+        inline void _set_all_mosfet_gates(bool state) {
+            if (state) {
+                DIMMER_SFR_ENABLE_ALL_CHANNELS();
+            }
+            else {
+                DIMMER_SFR_DISABLE_ALL_CHANNELS();
+            }
+        }
+        inline void _set_mosfet_gate(Channel::type channel, bool state) {
+            if (state) {
+                DIMMER_SFR_CHANNELS_ENABLE(channel);
+            }
+            else {
+                DIMMER_SFR_CHANNELS_DISABLE(channel);
+            }
+        }
+#else
+        inline void _set_all_mosfet_gates(bool state) {
+            DIMMER_CHANNEL_LOOP(i) {
+                _set_mosfet_gate(i, state);
+            }
+        }
+        inline void _set_mosfet_gate(Channel::type channel, bool state) {
+            if (state) {
+                *dimmer_pins_addr[channel] |= dimmer_pins_mask[channel];
+            }
+            else {
+                *dimmer_pins_addr[channel] &= ~dimmer_pins_mask[channel];
+            }
+        }
+#endif
         void _calculate_channels();
 
         register_mem_cfg_t &_config;

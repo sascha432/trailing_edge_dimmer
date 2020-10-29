@@ -6,6 +6,8 @@
 #include "dimmer.h"
 #include "i2c_slave.h"
 
+#include <string.h>
+#include <stdlib.h>
 #include <avr/io.h>
 
 #define PIN_D2_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
@@ -29,10 +31,28 @@
 
 using namespace Dimmer;
 
-volatile uint8_t *dimmer_pins_addr[Channel::size()];
-uint8_t dimmer_pins_mask[Channel::size()];
 DimmerBase dimmer(register_mem.data);
 constexpr const uint8_t Dimmer::Channel::pins[Dimmer::Channel::size()];
+
+#if not HAVE_CHANNELS_INLINE_ASM
+volatile uint8_t *dimmer_pins_addr[Channel::size()];
+uint8_t dimmer_pins_mask[Channel::size()];
+
+#else
+
+#if __AVR_ATmega328P__
+static constexpr uint8_t kDimmerSignature[] = { 0x1e, 0x95, 0x0f, DIMMER_MOSFET_PINS };
+#else
+#error signature not defined
+#endif
+
+static constexpr int __memcmp(const uint8_t a[], const uint8_t b[], size_t len) {
+    return *a != *b ? -1 : len == 1 ? 0 : __memcmp(&a[1], &b[1], len - 1);
+}
+static_assert(sizeof(kInlineAssemblerSignature) == sizeof(kDimmerSignature), "invalid signature");
+static_assert(__memcmp(kInlineAssemblerSignature, kDimmerSignature, sizeof(kDimmerSignature)) == 0, "invalid signature");
+
+#endif
 
 extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
 
@@ -81,14 +101,18 @@ void DimmerBase::begin()
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
     DIMMER_CHANNEL_LOOP(i) {
+#if not HAVE_CHANNELS_INLINE_ASM
 	    dimmer_pins_mask[i] = digitalPinToBitMask(Channel::pins[i]);
 	    dimmer_pins_addr[i] = portOutputRegister(digitalPinToPort(Channel::pins[i]));
+        _D(5, debug_printf("ch=%u pin=%u addr=%02x mask=%02x\n", i, Channel::pins[i], dimmer_pins_addr[i], dimmer_pins_mask[i]));
+#else
+        _D(5, debug_printf("ch=%u pin=%u\n", i, Channel::pins[i]));
+#endif
 #if HAVE_FADE_COMPLETION_EVENT
         fading_completed[i] = Level::invalid;
 #endif
         digitalWrite(Channel::pins[i], DIMMER_MOSFET_OFF_STATE);
         pinMode(Channel::pins[i], OUTPUT);
-        _D(5, debug_printf("ch=%u pin=%u addr=%02x mask=%02x\n", i, Channel::pins[i], dimmer_pins_addr[i], dimmer_pins_mask[i]));
     }
 
     cli();
@@ -211,9 +235,7 @@ void DimmerBase::_start_halfwave()
 #if DIMMER_OUT_OF_SYNC_LIMIT
     if (++out_of_sync_counter >= DIMMER_OUT_OF_SYNC_LIMIT) {
         Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareAB>();
-        DIMMER_CHANNEL_LOOP(i) {
-            _set_mosfet_gate(i, DIMMER_MOSFET_OFF_STATE);
-        }
+        _set_all_mosfet_gates(DIMMER_MOSFET_OFF_STATE);
         // store counter and send event
         sync_event.lost = true;
         sync_event.halfwave_counter = out_of_sync_counter;
@@ -505,12 +527,16 @@ TickType DimmerBase::__get_ticks(Channel::type channel, Level::type level) const
     return ticks;
 }
 
-void DimmerBase::_set_mosfet_gate(Channel::type channel, bool state)
-{
-	if (state) {
-		*dimmer_pins_addr[channel] |= dimmer_pins_mask[channel];
-	}
-    else {
-		*dimmer_pins_addr[channel] &= ~dimmer_pins_mask[channel];
-	}
-}
+// #if not HAVE_CHANNELS_INLINE_ASM
+
+// void DimmerBase::_set_mosfet_gate(Channel::type channel, bool state)
+// {
+// 	if (state) {
+// 		*dimmer_pins_addr[channel] |= dimmer_pins_mask[channel];
+// 	}
+//     else {
+// 		*dimmer_pins_addr[channel] &= ~dimmer_pins_mask[channel];
+// 	}
+// }
+
+// #endif

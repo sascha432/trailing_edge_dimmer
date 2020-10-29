@@ -80,7 +80,46 @@ def read_def(source, target, env):
         error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))
 
 
+def update_dimmer_inline_asm(source, target, env):
+
+    have_inline_asm = False
+    pins = []
+
+    cppdefines = env.get('CPPDEFINES')
+    for data in cppdefines:
+        if len(data)==1:
+            key = data[0]
+            val = 1
+        else:
+            key = data[0]
+            val = data[1]
+        if key=='HAVE_CHANNELS_INLINE_ASM':
+            try:
+                val = int(val)
+            except:
+                val = 0
+            if val!=0:
+                have_inline_asm = True
+        if key=='DIMMER_MOSFET_PINS':
+            for pin in val.split(','):
+                pin = pin.strip()
+                pin = int(pin, 0)
+                pins.append(str(pin))
+
+    if have_inline_asm==False:
+        return
+
+    python = env.subst("$PYTHONEXE")
+    project_dir = path.realpath(env.subst("$PROJECT_DIR"))
+    script = path.realpath(path.join(project_dir, './scripts/avr_sfr_tool.py'))
+    output = path.realpath(path.join(project_dir, './src/dimmer_inline_asm.h'))
+    args = [ python, script, '--output', output, '--pins' ] + pins
+    return_code = subprocess.run(args, shell=True).returncode
+    if return_code!=0:
+        error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))
+
 env.AddPreAction("$BUILD_DIR/scripts/print_def.cpp.o", read_def)
+env.AddPreAction("$BUILD_DIR/src/dimmer.cpp.o", update_dimmer_inline_asm)
 
 env.AlwaysBuild(env.Alias("disassemble", None, disassemble))
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
