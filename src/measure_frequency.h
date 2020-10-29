@@ -45,9 +45,6 @@ public:
         operator uint24_t() const {
             return _value;
         }
-        explicit operator uint32_t() const {
-            return _value[0] | ((uint16_t)_value[1] << 8) | ((uint32_t)_value[2] << 16);
-        }
     private:
         uint24_t _value;
     };
@@ -57,13 +54,14 @@ public:
         Ticks() : _value{} {}
         Ticks(uint24_t value) : _value{(uint8_t)value, (uint8_t)(value << 8), (uint8_t)(value << 16)} {}
         Ticks(uint32_t value) : _value{(uint8_t)value, (uint8_t)(value << 8), (uint8_t)(value << 16)} {}
+        // Ticks(uint8_t *values) : _value{values[0], values[1], values[2]} {}
         uint24_t diff(uint24_t value) const {
             auto tmp = (uint32_t)*this;
             tmp -= value;
             return tmp;
         }
         operator uint24_t() const {
-            return _value[0] | ((uint16_t)_value[1] << 8) | ((uint32_t)_value[2] << 16);
+            return *this;
         }
         explicit operator uint32_t() const {
             return _value[0] | ((uint16_t)_value[1] << 8) | ((uint32_t)_value[2] << 16);

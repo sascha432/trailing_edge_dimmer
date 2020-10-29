@@ -377,7 +377,7 @@ void loop()
         Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
         Wire.endTransmission();
 
-        Serial.printf_P(PSTR("+REM=lost=%u,sync=%u,cnt=%u,diff=%lu\n"), event.lost, event.sync, event.halfwave_counter, (uint32_t)event.sync_difference_cycles);
+        Serial.printf_P(PSTR("+REM=lost=%u,sync=%u,cnt=%u,c=%ld,t=%.1fus\n"), event.lost, event.sync, event.halfwave_counter, event.sync_difference_cycles * Dimmer::Timer<1>::prescaler, event.sync_difference_cycles / Dimmer::Timer<1>::ticksPerMicrosecond);
     }
 
     if (millis() >= next_temp_check) {

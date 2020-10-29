@@ -84,6 +84,7 @@
 #define DIMMER_COMMAND_SET_ZC_DELAY         0x84
 #define DIMMER_COMMAND_INCR_HW_TICKS        0x85
 #define DIMMER_COMMAND_DECR_HW_TICKS        0x86
+#define DIMMER_COMMAND_SET_ZC_SYNC          0xec
 #define DIMMER_COMMAND_DUMP_CHANNELS        0xed
 #define DIMMER_COMMAND_DUMP_MEM             0xee
 #endif

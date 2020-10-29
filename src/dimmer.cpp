@@ -6,6 +6,27 @@
 #include "dimmer.h"
 #include "i2c_slave.h"
 
+#include <avr/io.h>
+
+#define PIN_D2_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
+#define PIN_D2_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
+#define PIN_D2_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PIND)), "I" (2))
+#define PIN_D2_IS_SET()                                 ((_SFR_IO_ADDR(PIND) & _BV(2)) != 0)
+#define PIN_D2_IS_CLEAR()                               ((_SFR_IO_ADDR(PIND) & _BV(2)) == 0)
+
+#define PIN_D8_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
+#define PIN_D8_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
+#define PIN_D8_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (0))
+#define PIN_D8_IS_SET()                                 ((_SFR_IO_ADDR(PINB) & _BV(0)) != 0)
+#define PIN_D8_IS_CLEAR()                               ((_SFR_IO_ADDR(PINB) & _BV(0)) == 0)
+
+#define PIN_D11_SET()                                   asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
+#define PIN_D11_CLEAR()                                 asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
+#define PIN_D11_TOGGLE()                                asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (3))
+#define PIN_D11_IS_SET()                                ((_SFR_IO_ADDR(PINB) & _BV(3)) != 0)
+#define PIN_D11_IS_CLEAR()                              ((_SFR_IO_ADDR(PINB) & _BV(3)) == 0)
+
+
 using namespace Dimmer;
 
 volatile uint8_t *dimmer_pins_addr[Channel::size()];
@@ -68,8 +89,7 @@ void DimmerBase::begin()
     }, DIMMER_ZC_INTERRUPT_MODE);
 
     _D(5, debug_printf("starting timer\n"));
-    Timer<1>::begin();
-    Timer<1>::disable();
+    Timer<1>::begin<Timer<1>::kIntMaskAll, nullptr>();
     sei();
 }
 
@@ -94,22 +114,30 @@ void DimmerBase::end()
 
 void DimmerBase::zc_interrupt_handler()
 {
-    int24_t diff = 0;
+#if HAVE_DISABLE_ZC_SYNC
+    if (zc_sync_disabled) {
+        return;
+    }
+#endif
+    int24_t diff;
     if (dimmer_config.zero_crossing_delay_ticks) {
         // schedule next _start_halfwave() call
+        Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareB>();
         diff = OCR1B - TCNT1;
-        Timer<1>::enable_compareB();
         OCR1B = dimmer_config.zero_crossing_delay_ticks + TCNT1;
-        Timer<1>::clear_compareB_flag();
+        Timer<1>::clear_flags<Timer<1>::kFlagsCompareB>();
     }
     else {
+        diff = OCR1B - TCNT1;
         _start_halfwave(); // no delay
     }
+    diff -= dimmer_config.zero_crossing_delay_ticks;
+
 #if DIMMER_OUT_OF_SYNC_LIMIT
     if (!sync_event.sync && (sync_event.lost || sync_event.halfwave_counter > 1)) {
         // send in-sync event
         sync_event.sync = true;
-        sync_event.sync_difference_cycles = Timer<1>::prescaler * diff;
+        sync_event.sync_difference_cycles = diff;
         dimmer_scheduled_calls.sync_event = true;
     }
     out_of_sync_counter = 0;
@@ -142,10 +170,11 @@ void DimmerBase::zc_interrupt_handler()
 // turn mosfets for active channels on
 void DimmerBase::_start_halfwave()
 {
+    PIN_D11_SET();
     TCNT1 = 0;
     OCR1A = 0;
     OCR1B = halfwave_ticks;
-    Timer<1>::clear_compareA_B_flag();
+    Timer<1>::clear_flags<Timer<1>::kFlagsCompareAB>();
 
     Channel::type i;
     toggle_state = _config.bits.leading_edge ? DIMMER_MOSFET_OFF_STATE : DIMMER_MOSFET_ON_STATE;
@@ -156,7 +185,7 @@ void DimmerBase::_start_halfwave()
 
 #if DIMMER_OUT_OF_SYNC_LIMIT
     if (++out_of_sync_counter >= DIMMER_OUT_OF_SYNC_LIMIT) {
-        Timer<1>::disable();
+        Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareAB>();
         DIMMER_CHANNEL_LOOP(i) {
             _set_mosfet_gate(i, DIMMER_MOSFET_OFF_STATE);
         }
@@ -172,9 +201,11 @@ void DimmerBase::_start_halfwave()
 
     if (ordered_channels[0].ticks) { // any channel dimmed?
 #if DIMMER_OUT_OF_SYNC_LIMIT
-        Timer<1>::enable_compareA_disable_compareB();
+        //Timer<1>::enable_compareA_disable_compareB();
+        Timer<1>::int_mask_toggle<Timer<1>::kIntMaskCompareA, Timer<1>::kIntMaskCompareB>();
 #else
-        Timer<1>::enable_compareA();
+        //Timer<1>::enable_compareA();
+        Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareA>();
 #endif
         OCR1A = ordered_channels[0].ticks;
         for(i = 0; ordered_channels[i].ticks; i++) {
@@ -196,9 +227,11 @@ void DimmerBase::_start_halfwave()
     }
     else {
 #if DIMMER_OUT_OF_SYNC_LIMIT
-        Timer<1>::enable_compareB_disable_compareA();
+        Timer<1>::int_mask_toggle<Timer<1>::kFlagsCompareB, Timer<1>::kFlagsCompareA>();
+        //Timer<1>::enable_compareB_disable_compareA();
 #else
-        Timer<1>::disable_compareA();
+        Timer<1>::int_mask_disable<Timer<1>::kFlagsCompareA>();
+        // Timer<1>::disable_compareA();
 #endif
 
         // enable or disable channels
@@ -212,6 +245,7 @@ void DimmerBase::_start_halfwave()
         sync_event.halfwave_counter = out_of_sync_counter;
     }
 #endif
+    PIN_D11_CLEAR();
 }
 
 void DimmerBase::compare_interrupt()
@@ -219,7 +253,8 @@ void DimmerBase::compare_interrupt()
 #if DIMMER_MAX_CHANNELS == 1
 
     _set_mosfet_gate(ordered_channels[0].channel, toggle_state);
-    Timer<1>::enable_compareB_disable_compareA();
+    //Timer<1>::enable_compareB_disable_compareA();
+    Timer<1>::int_mask_toggle<Timer<1>::kFlagsCompareB, Timer<1>::kFlagsCompareA>();
 
 #else
     ChannelStateType *channel = &ordered_channels[channel_ptr++];
@@ -231,7 +266,8 @@ void DimmerBase::compare_interrupt()
 
         if (next_channel->ticks == 0) {
             // no more channels to change, disable timer
-            Timer<1>::enable_compareB_disable_compareA();
+            //Timer<1>::enable_compareB_disable_compareA();
+            Timer<1>::int_mask_toggle<Timer<1>::kFlagsCompareB, Timer<1>::kFlagsCompareA>();
             break;
         }
         else if (next_channel->ticks > channel->ticks) {

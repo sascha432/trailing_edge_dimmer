@@ -59,23 +59,25 @@ namespace Dimmer {
 
     template<>
     struct Timer<1> : Timers::TimerBase<1, DIMMER_TIMER1_PRESCALER> {
-        static constexpr uint8_t extraTicks = (64 / prescaler) + 1;
+        static constexpr uint8_t __extraTicks = 48 / prescaler;
+        static constexpr uint8_t extraTicks = __extraTicks == 0 ? 1 : __extraTicks;     // add 48 clock cycles but at least one tick
     };
 
+#ifdef DIMMER_TIMER2_PRESCALER
     template<>
     struct Timer<2> : Timers::TimerBase<2, DIMMER_TIMER2_PRESCALER> {
     };
+#endif
 
     struct FrequencyTimer : Timers::TimerBase<1, 1> {
         static inline void begin() {
-            TCCR1A = 0;
-            TCCR1B = prescalerBV;
-            TIMSK1 |= _BV(TOIE1);
+            TimerBase::begin<kIntMaskOverflow>();
         }
-        static inline void end() {
-            TIMSK1 &= ~_BV(TOIE1);
-            TCCR1A = 0;
-            TCCR1B = 0;
+    };
+
+    struct MeasureTimer : Timers::TimerBase<2, 1> {
+        static inline void begin() {
+            TimerBase::begin<kIntMaskOverflow>();
         }
     };
 
@@ -152,6 +154,9 @@ namespace Dimmer {
         float frequency;
         uint8_t channel_state;                                                  // bitset of the channel state
         bool toggle_state: 1;
+#if HAVE_DISABLE_ZC_SYNC
+        bool zc_sync_disabled: 1;
+#endif
 
 #if DIMMER_OUT_OF_SYNC_LIMIT
         uint16_t out_of_sync_counter;

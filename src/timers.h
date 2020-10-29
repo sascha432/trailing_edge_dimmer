@@ -57,62 +57,80 @@ namespace Timers {
         static_assert(prescalerBV != -1, "prescaler not defined");
         static constexpr float ticksPerMicrosecond =  (F_CPU / prescaler / 1000000.0);
 
+        static constexpr uint8_t kFlagsOverflow = _BV(TOV1);
+        static constexpr uint8_t kFlagsCompareA = _BV(OCF1A);
+        static constexpr uint8_t kFlagsCompareB = _BV(OCF1B);
+        static constexpr uint8_t kFlagsCapture = _BV(ICF1);
+        static constexpr uint8_t kFlagsCompareAB = kFlagsCompareA|kFlagsCompareB;
+        static constexpr uint8_t kFlagsCompareAOverflow = kFlagsCompareA|kFlagsOverflow;
+        static constexpr uint8_t kFlagsCompareBOverflow = kFlagsCompareB|kFlagsOverflow;
+        static constexpr uint8_t kFlagsCompareABOverflow = kFlagsCompareA|kFlagsCompareB|kFlagsOverflow;
+        static constexpr uint8_t kFlagsAll = kFlagsOverflow|kFlagsCompareA|kFlagsCompareB|kFlagsCapture;
+
+        template<uint8_t mask = kFlagsAll>
+        static inline void clear_flags() {
+            TIFR1 |= mask;
+        }
+
+        static constexpr uint8_t kIntMaskOverflow = _BV(TOIE1);
+        static constexpr uint8_t kIntMaskCompareA = _BV(OCIE1A);
+        static constexpr uint8_t kIntMaskCompareB = _BV(OCIE1B);
+        static constexpr uint8_t kIntMaskCapture = _BV(ICIE1);
+        static constexpr uint8_t kIntMaskCompareAB = kIntMaskCompareA|kIntMaskCompareB;
+        static constexpr uint8_t kIntMaskCompareAOverflow = kIntMaskCompareA|kIntMaskOverflow;
+        static constexpr uint8_t kIntMaskCompareBOverflow = kIntMaskCompareB|kIntMaskOverflow;
+        static constexpr uint8_t kIntMaskCompareABOverflow = kIntMaskCompareA|kIntMaskCompareB|kIntMaskOverflow;
+        static constexpr uint8_t kIntMaskAll = kIntMaskOverflow|kIntMaskCompareA|kIntMaskCompareB|kIntMaskCapture;
+        static constexpr uint8_t kIntMaskNone = 0;
+
+        template<uint8_t _Enable>
+        static inline void int_mask_enable() {
+            TIMSK1 |= _Enable;
+        }
+
+        template<uint8_t _Disable>
+        static inline void int_mask_disable() {
+            TIMSK1 &= ~_Disable;
+        }
+
+        template<uint8_t _Enable, uint8_t _Disable>
+        static inline void int_mask_toggle() {
+            TIMSK1 = (TIMSK1 & ~_Disable) | _Enable;
+        }
+
+        template<uint8_t _Mask>
+        static inline uint8_t int_mask_get() {
+            return TIMSK1 | _Mask;
+        }
+
+        template<uint8_t _Mask>
+        static inline bool int_mask_is_enabled() {
+            return TIMSK1 | _Mask;
+        }
+
+        template<uint8_t _Disable, nullptr_t _DoDisable>
+        static inline void begin() {
+            TCCR1A = 0;
+            TCCR1B = prescalerBV;
+            int_mask_disable<_Disable>();
+        }
+
+        template<uint8_t _Enable>
+        static inline void begin() {
+            TCCR1A = 0;
+            TCCR1B = prescalerBV;
+            int_mask_enable<_Enable>();
+        }
+
         static inline void begin() {
             TCCR1A = 0;
             TCCR1B = prescalerBV;
         }
 
+        template<uint8_t _Disable = kIntMaskAll>
         static inline void end() {
-            disable();
+            int_mask_disable<_Disable>();
             TCCR1B = 0;
-        }
-
-        static inline void clear_compareA_B_flag() {
-            TIFR1 |= _BV(OCF1A) | _BV(OCF1B);
-        }
-
-        static inline void clear_compareA_flag() {
-            TIFR1 |= _BV(OCF1A);
-        }
-
-        static inline void clear_compareB_flag() {
-            TIFR1 |= _BV(OCF1B);
-        }
-
-        static inline void enable_compareA_disable_compareB() {
-            TIMSK1 = (TIMSK1 & ~_BV(OCIE1B)) | _BV(OCIE1A);
-        }
-
-        static inline void enable_compareB_disable_compareA() {
-            TIMSK1 = (TIMSK1 & ~_BV(OCIE1A)) | _BV(OCIE1B);
-        }
-
-        static inline void enable_compareA() {
-            TIMSK1 |= _BV(OCIE1A);
-        }
-
-        static inline void enable_compareB() {
-            TIMSK1 |= _BV(OCIE1B);
-        }
-
-        static inline bool is_compareA_enabled() {
-            return TIMSK1 | _BV(OCIE1A);
-        }
-
-        static inline bool is_compareB_enabled() {
-            return TIMSK1 | _BV(OCIE1B);
-        }
-
-        static inline void disable_compareA() {
-            TIMSK1 &= ~_BV(OCIE1A);
-        }
-
-        static inline void disable_compareB() {
-            TIMSK1 &= ~_BV(OCIE1B);
-        }
-
-        static inline void disable() {
-            TIMSK1 &= ~(_BV(OCIE1A) | _BV(OCIE1B));
         }
 
         static inline uint32_t microsToTicks32(uint32_t micros) {
@@ -156,38 +174,78 @@ namespace Timers {
 
         static constexpr float ticksPerMicrosecond =  (F_CPU / prescaler / 1000000.0);
 
+        static constexpr uint8_t kFlagsOverflow = _BV(TOV2);
+        static constexpr uint8_t kFlagsCompareA = _BV(OCF2A);
+        static constexpr uint8_t kFlagsCompareB = _BV(OCF2B);
+        static constexpr uint8_t kFlagsCompareAB = kFlagsCompareA|kFlagsCompareB;
+        static constexpr uint8_t kFlagsCompareAOverflow = kFlagsCompareA|kFlagsOverflow;
+        static constexpr uint8_t kFlagsCompareBOverflow = kFlagsCompareB|kFlagsOverflow;
+        static constexpr uint8_t kFlagsCompareABOverflow = kFlagsCompareA|kFlagsCompareB|kFlagsOverflow;
+        static constexpr uint8_t kFlagsAll = kFlagsOverflow|kFlagsCompareA|kFlagsCompareB;
+
+        template<uint8_t mask = kFlagsAll>
+        static inline void clear_flags() {
+            TIFR2 |= mask;
+        }
+
+        static constexpr uint8_t kIntMaskOverflow = _BV(TOIE2);
+        static constexpr uint8_t kIntMaskCompareA = _BV(OCIE2A);
+        static constexpr uint8_t kIntMaskCompareB = _BV(OCIE2B);
+        static constexpr uint8_t kIntMaskCompareAB = kIntMaskCompareA|kIntMaskCompareB;
+        static constexpr uint8_t kIntMaskCompareAOverflow = kIntMaskCompareA|kIntMaskOverflow;
+        static constexpr uint8_t kIntMaskCompareBOverflow = kIntMaskCompareB|kIntMaskOverflow;
+        static constexpr uint8_t kIntMaskCompareABOverflow = kIntMaskCompareA|kIntMaskCompareB|kIntMaskOverflow;
+        static constexpr uint8_t kIntMaskAll = kIntMaskOverflow|kIntMaskCompareA|kIntMaskCompareB;
+        static constexpr uint8_t kIntMaskNone = 0;
+
+        template<uint8_t _Enable>
+        static inline void int_mask_enable() {
+            TIMSK2 |= _Enable;
+        }
+
+        template<uint8_t _Disable>
+        static inline void int_mask_disable() {
+            TIMSK2 &= ~_Disable;
+        }
+
+        template<uint8_t _Enable, uint8_t _Disable>
+        static inline void int_mask_toggle() {
+            TIMSK2 = (TIMSK2 & ~_Disable) | _Enable;
+        }
+
+        template<uint8_t _Mask>
+        static inline uint8_t int_mask_get() {
+            return TIMSK2 | _Mask;
+        }
+
+        template<uint8_t _Mask>
+        static inline bool int_mask_is_enabled() {
+            return TIMSK2 | _Mask;
+        }
+
+        template<uint8_t _Enable>
+        static inline void begin() {
+            TCCR2A = 0;
+            TCCR2B = prescalerBV;
+            int_mask_enable<_Enable>();
+        }
+
+        template<uint8_t _Disable, nullptr_t _DoDisable>
+        static inline void begin() {
+            TCCR2A = 0;
+            TCCR2B = prescalerBV;
+            int_mask_disable<_Disable>();
+        }
+
         static inline void begin() {
             TCCR2A = 0;
             TCCR2B = prescalerBV;
         }
 
+        template<uint8_t _Disable = kIntMaskAll>
         static inline void end() {
-            disable();
+            int_mask_disable<_Disable>();
             TCCR2B = 0;
-        }
-
-        static inline void enable_compareA() {
-            TIFR2 |= _BV(OCF2A);
-            TIMSK2 |= _BV(OCIE2A);
-        }
-
-        static inline void enable_compareB() {
-            TIFR2 |= _BV(OCF2B);
-            TIMSK2 |= _BV(OCIE2B);
-        }
-
-        static inline void disable_compareA() {
-            TIFR2 |= _BV(OCF2A);
-            TIMSK2 &= ~_BV(OCIE2A);
-        }
-
-        static inline void disable_compareB() {
-            TIFR2 |= _BV(OCF2B);
-            TIMSK2 &= ~_BV(OCIE2B);
-        }
-
-        static inline void disable() {
-            TIMSK2 &= ~(_BV(OCIE2A) | _BV(OCIE2B));
         }
 
         static inline uint32_t microsToTicks32(uint32_t micros) {

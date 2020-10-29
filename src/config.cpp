@@ -129,7 +129,7 @@ void Config::readConfig()
 #endif
         pos += sizeof(_config);
     }
-    _D(5, Serial.printf_P(PSTR("max_cycle=%lu pos=%d time=%f.3fms\n"), max_cycle, _eeprom_position, (micros() - start) / 1000.0));
+    _D(5, Serial.printf_P(PSTR("mxcy=%lu p=%d t=%.3fms\n"), max_cycle, _eeprom_position, (micros() - start) / 1000.0));
 
     if (_eeprom_position == kInvalidPosition) { // no valid entries found
         initEEPROM();

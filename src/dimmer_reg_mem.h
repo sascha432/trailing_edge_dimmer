@@ -336,7 +336,7 @@ typedef struct __attribute__((__packed__)) {
     uint8_t lost: 1;
     uint8_t sync: 1;
     uint8_t __reserved: 2;
-    uint32_t sync_difference_cycles: 28;
+    int32_t sync_difference_cycles: 28;
     uint16_t halfwave_counter;
 } dimmer_sync_event_t;
 

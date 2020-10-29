@@ -15,6 +15,17 @@
 #define DEBUG_COMMANDS                                          1
 #endif
 
+#if DEBUG || DEBUG_COMMANDS
+#ifndef HAVE_DISABLE_ZC_SYNC
+#define HAVE_DISABLE_ZC_SYNC                                    0
+#endif
+#else
+#if HAVE_DISABLE_ZC_SYNC
+#error requires DEBUG mode
+#endif
+#define HAVE_DISABLE_ZC_SYNC                                    0
+#endif
+
 // pin for the zero crossing signal
 #ifndef ZC_SIGNAL_PIN
 #define ZC_SIGNAL_PIN                                           3
@@ -76,7 +87,7 @@
 // adjustment for measuring clock cycles due to pushing registers on
 // the stack before reading TCNT1
 #ifndef DIMMER_MEASURE_ADJ_CYCLE_CNT
-#define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -39
+#define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -54
 #endif
 
 // keep dimmer enabled when loosing the ZC signal for up to
@@ -132,11 +143,6 @@
 // timer1, 16 bit, used for the ZC delay and turning MOSFETs on and off
 #ifndef DIMMER_TIMER1_PRESCALER
 #define DIMMER_TIMER1_PRESCALER                                 8
-#endif
-
-// timer2, 8bit, not used
-#ifndef DIMMER_TIMER2_PRESCALER
-#define DIMMER_TIMER2_PRESCALER                                 64
 #endif
 
 // sent event when fading has reached the target level

@@ -86,8 +86,7 @@ void FrequencyMeasurement::calc_min_max()
             if (num > 10) {
                 float ticks = (sum / (float)num) + DIMMER_MEASURE_ADJ_CYCLE_CNT;
                 _frequency = 1000000.0 / clockCyclesToMicroseconds(ticks) / 2.0;
-                // Serial.println((uint32_t)sum);
-                // Serial.println((uint32_t)num);
+                _D(5, debug_printf("measure=%lu/%u\n", (uint32_t)sum, num));
                 // Serial.println(_frequency);
             }
 
