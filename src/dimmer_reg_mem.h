@@ -138,7 +138,8 @@ typedef struct {
     uint8_t restore_level: 1;
     uint8_t leading_edge: 1;
     uint8_t over_temperature_alert_triggered: 1;
-    uint8_t ___reserved: 5;
+    uint8_t negative_zc_delay: 1;                            // currently not implemented: zc delay = halfwave length - zcdelay, effectively making zc delay negative
+    uint8_t ___reserved: 4;
 } config_options_t;
 
 #define REPORT_METRICS_INTERVAL(value)             (value)

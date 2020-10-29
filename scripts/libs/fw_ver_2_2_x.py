@@ -23,7 +23,8 @@ class config_options_t(Structure):
     _fields_ = [("restore_level", c_uint8, 1),
                 ("leading_edge", c_uint8, 1),
                 ("over_temperature_alert_triggered", c_uint8, 1),
-                ("___reserved", c_uint8, 5)]
+                ("negative_zc_delay", c_uint8, 1),
+                ("___reserved", c_uint8, 4)]
 
 class config_options_t_union(Union):
     _pack_ = 1
@@ -48,6 +49,13 @@ class register_mem_cfg_t(Structure):
                 ("switch_on_minimum_ticks", c_uint16),
                 ("switch_on_count", c_uint8)]
 
+
+    def __dir__(self):
+        parts = []
+        for name, c_type in self._fields_:
+            parts.append(name)
+        parts.append('range_end')
+        return parts
 
     def __getattribute__(self, key):
         if key=='range_end':

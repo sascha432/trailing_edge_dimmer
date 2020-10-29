@@ -13,6 +13,14 @@ class config_options_t(Structure):
                 ("frequency_high", c_uint8, 1),
                 ("___reserved", c_uint8, 3)]
 
+    def __getattribute__(self, name):
+        if name in ('leading_edge', 'negative_zc_delay'):
+            return False
+        if name=='over_temperature_alert_triggered':
+            return self.temperature_alert
+        return Structure.__getattribute__(self, name)
+
+
 class config_options_t_union(Union):
     _pack_ = 1
     _fields_ = [("byte", c_uint8),
@@ -35,6 +43,12 @@ class register_mem_cfg_t(Structure):
                 ("int8_t ntc_temp_offset", c_int8),
                 ("report_metrics_max_interval", c_uint8)]
 
+    def __dir__(self):
+        parts = []
+        for name, c_type in self._fields_:
+            parts.append(name)
+        return parts
+
 class dimmer_metrics_t(Structure):
     _fields_ = [("temp_check_value", c_uint8),
                 ("vcc", c_uint16),
@@ -53,3 +67,7 @@ class dimmer_eeprom_written_t(Structure):
                 ("write_position", c_uint16),
                 ("bytes_written", c_uint8)]
 
+    def __getattribute__(self, name):
+        if name=='config_updated':
+            return True
+        return Structure.__getattribute__(self, name)

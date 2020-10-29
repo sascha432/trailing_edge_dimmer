@@ -6,6 +6,26 @@ import re
 import time
 import struct
 
+class ProtocolError(Exception):
+    def __init__(self, msg = None):
+        Exception.__init__(self, msg)
+
+class TimeoutError(ProtocolError):
+    def __init__(self, msg = 'Serial timeout'):
+        ProtocolError.__init__(self, msg)
+
+class ResponseError(ProtocolError):
+    def __init__(self, msg = 'Invalid response'):
+        ProtocolError.__init__(self, msg)
+
+class RebootError(ProtocolError):
+    def __init__(self, msg = 'Reboot detected'):
+        ProtocolError.__init__(self, msg)
+
+class AddressError(ProtocolError):
+    def __init__(self, msg = 'Address error'):
+        ProtocolError.__init__(self, msg)
+
 class Protocol:
 
     def __init__(self, serial, address, master_address=None):
@@ -18,8 +38,14 @@ class Protocol:
         self.address = address
         self.master_address = master_address
         self.display_rx = False
+        self.raw_line = b''
+        self.last_event = None
+        self.last_address = None
 
     def readline(self):
+        self.raw_line = b''
+        self.last_event = None
+        self.last_address = None
         repeat = True
         while repeat:
             while True:
@@ -30,6 +56,7 @@ class Protocol:
             if line.lower().startswith('+rem='):
                 err = 'comment'
                 repeat = False
+                self.last_event = 'comment'
             else:
                 err = 'unknown data'
                 regexp = '^([0-9]+) (.*)'
@@ -46,11 +73,15 @@ class Protocol:
                         try:
                             data = bytearray.fromhex(m[2])
                             addr = int(data[0])
+                            self.last_address = addr
+                            self.last_event = None
                             if type=='T':
                                 if addr!=self.address and addr!=self.master_address:
-                                    raise ValueError('transmission from invalid address 0x%02x' % addr)
+                                    raise AddressError('transmission from invalid address 0x%02x' % addr)
+                                if addr==self.master_address:
+                                    self.last_event = int(data[1])
                             if type=='R':
-                                raise ValueError('request from slave')
+                                raise ProtocolError('request from slave')
                             return data[1:]
                         except ValueError as e:
                             err = str(e)
@@ -61,38 +92,67 @@ class Protocol:
                 print('RX %s: %s' % (err, line))
         return line
 
-    def read_request(self, length, timeout=None):
+    def read_request(self, length=None, event=None, regex=None, timeout=None):
         if timeout==None:
             timeout = self.serial.timeout
+        if (length or event) and regex:
+            raise Exception('length or event cannot be combined with regex')
+
         end = time.monotonic() + timeout
         while time.monotonic()<end:
             line = self.readline()
+            match = 0
+            count = 0
             if isinstance(line, str):
-                if line.startswith('+REM=BOOT'):
-                    return None
+                if re.match(regex, line, re.IGNORECASE):
+                    return line
+                if line.lower().startswith('+rem=boot'):
+                    raise RebootError()
             elif isinstance(line, bytearray):
-                if len(line)==length:
+                if length!=None:
+                    count += 1
+                    if len(line)==length:
+                        match += 1
+                if event!=None:
+                    count += 1
+                    if self.last_event==event:
+                        match += 1
+                if count>0 and count==match:
                     return line
             else:
-              raise Exception('invalid response')
-        return False
+              raise ResponseError()
+        raise TimeoutError()
 
     def print_data(self, data):
         try:
             if len(data):
                 if isinstance(data, bytearray):
-                    if data[0]==0xf0:
+                    if data[0]==self.DIMMER.EVENT.METRICS_REPORT:
                         metrics = self.structs.dimmer_metrics_t.from_buffer_copy(data[1:])
                         print('Metrics: temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%.2f°C' % (metrics.temp_check_value, metrics.vcc, metrics.frequency, metrics.ntc_temp, metrics.internal_temp))
-                        return 0xf0
-                    if data[0]==0xf1:
+                        return data[0]
+                    if data[0]==self.DIMMER.EVENT.TEMPERATURE_ALERT:
                         event = self.structs.dimmer_over_temperature_event_t.from_buffer_copy(data[1:])
                         print('OVER TEMPERATURE: temp=%u°C max=%u°C' % (event.current_temp, event.max_temp))
-                        return 0xf1
-                    if data[0]==0xf3:
+                        return data[0]
+                    if data[0]==self.DIMMER.EVENT.FADING_COMPLETE:
+                        print('FADING COMPLETE EVENT: %s' % (self.raw_line))
+                        return data[0]
+                    if data[0]==self.DIMMER.EVENT.CHANNEL_ON_OFF:
+                        parts = []
+                        for i in range(0, 9):
+                            if data[1]&(1<<i):
+                                parts.append('channel %u = on' % i)
+                        if parts:
+                            tmp = ', '.join(parts)
+                        else:
+                            tmp = 'all channels off'
+                        print('CHANNEL EVENT: %s' % tmp)
+                        return data[0]
+                    if data[0]==self.DIMMER.EVENT.EEPROM_WRITTEN:
                         event = self.structs.dimmer_eeprom_written_t.from_buffer_copy(data[1:])
-                        print('EEPROM written: cycle=%u position=%u written=%u' % (event.write_cycle, event.write_position, event.bytes_written))
-                        return 0xf3
+                        print('EEPROM written: cycle=%u position=%u written=%u config_updated=%u' % (event.write_cycle, event.write_position, event.bytes_written, event.config_updated))
+                        return data[0]
         except Exception as e:
             print('Invalid data: %s: %s' % (e, self.raw_line))
             return None
@@ -114,17 +174,9 @@ class Protocol:
         data = cfg.get_command().encode()
         print("Sending configuration: ", data)
         self.serial.write(data + b'\n')
-        self.store_config()
 
     def wait_for_eeprom(self):
-        n = 0
-        while n < 30:
-            line = self.readline()
-            if self.print_data(line)==0xf3:
-                return
-            n += 1
-        raise Exception('timeout waiting for EEPROM write event')
-
+        return self.read_request(event = self.DIMMER.EVENT.EEPROM_WRITTEN)
 
     def store_config(self):
         print("Sending write EEPROM command...")

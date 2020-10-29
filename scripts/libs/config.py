@@ -7,6 +7,7 @@ import struct
 import json
 import importlib
 from . import floats
+from . import fw_const
 
 class Config:
 
@@ -14,13 +15,15 @@ class Config:
         try:
             version_key = '%u_%u_%u' % (major, minor, revision)
             structs = importlib.import_module('libs.fw_ver_%u_%u_%u' % (major, minor, revision), package=None)
+            consts = importlib.import_module('libs.fw_const_ver_%u_%u_%u' % (major, minor, revision), package=None)
         except:
             try:
                 version_key = '%u_%u_x' % (major, minor)
                 structs = importlib.import_module('libs.fw_ver_%u_%u_x' % (major, minor), package=None)
+                consts = importlib.import_module('libs.fw_const_ver_%u_%u_x' % (major, minor), package=None)
             except:
                 raise Exception('version %u.%u.x not supported' % (major, minor))
-        return structs
+        return (structs, consts)
 
     def get_version(data):
         if isinstance(data, str):
@@ -33,7 +36,7 @@ class Config:
         return (major, minor, revision)
 
     def __init__(self, major, minor, revision):
-        self.structs = Config.is_version_supported(major, minor, revision)
+        (self.structs, self.consts, ) = Config.is_version_supported(major, minor, revision)
         self.version = 'unknown'
         self.register_mem_cfg_t = None
 
@@ -58,8 +61,7 @@ class Config:
         # print(self.register_mem_cfg_t.__getattribute__('internal_vref11').value)
 
         json = {}
-        for field in self.register_mem_cfg_t._fields_:
-            name = field[0]
+        for name in dir(self.register_mem_cfg_t):
             json[name] = self.register_mem_cfg_t.__getattribute__(name).__repr__()
         return json
 
@@ -80,11 +82,10 @@ class Config:
         m = re.match('^\+rem=v([0-9a-f]{1,4}),i2ct=([0-9a-f]+)', cmd, re.IGNORECASE)
         if m:
             (major, minor, revision) = Config.get_version(m[1])
-            self.structs = Config.is_version_supported(major, minor, revision, True)
+            (self.structs, self.consts, ) = Config.is_version_supported(major, minor, revision, True)
             self.version = '%u.%u.%u' % (major, minor, revision)
             self.set_items_fromhex(m[2])
             return True
-
         raise ValueError("could not find valid hex data")
 
     def set_item(self, key, val):

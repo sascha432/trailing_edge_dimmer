@@ -95,9 +95,10 @@
 #define DIMMER_OPTIONS_RESTORE_LEVEL        0x01
 #define DIMMER_OPTIONS_MODE_LEADING_EDGE    0x02
 #define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED 0x04
+#define DIMMER_OPTIONS_NEGATIVE_ZC_DELAY    0x08
 
 // dimmer_eeprom_written_t.flags
-#define DIMMER_EEPROM_EVT_CF_UPDATED        0x01
+#define DIMMER_EEPROM_FLAGS_CONFIG_UPDATED  0x01
 
 
 // the version address is fixed and cannot be changed due to compatibility with older versions
