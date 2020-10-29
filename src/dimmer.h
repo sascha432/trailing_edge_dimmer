@@ -76,9 +76,53 @@ namespace Dimmer {
     };
 
     struct MeasureTimer : Timers::TimerBase<2, 1> {
-        static inline void begin() {
-            TimerBase::begin<kIntMaskOverflow>();
+        inline void begin() {
+            TimerBase::begin<TimerBase::kFlagsOverflow>();
         }
+        inline void end() {
+            TimerBase::end<TimerBase::kFlagsOverflow>();
+        }
+        inline void start() {
+            TimerBase::int_mask_enable<kIntMaskOverflow>();
+        }
+        inline void stop() {
+            TimerBase::int_mask_enable<kIntMaskOverflow>();
+        }
+        inline void reset() {
+            TCNT2 = 0;
+            TimerBase::clear_flags<TimerBase::kFlagsOverflow>();
+            _overflow = 0;
+        }
+        inline uint24_t get() {
+            uint8_t oldSREG = SREG;
+            cli();
+            uint8_t tmp = TCNT2;
+            if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
+                _overflow++;
+            }
+            uint16_t tmp2 = _overflow;
+            SREG = oldSREG;
+            return ((uint24_t)tmp2 << 8) | tmp;
+        }
+        inline uint24_t get_no_cli() {
+            uint8_t tmp = TCNT2;
+            if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
+                _overflow++;
+            }
+            return ((uint24_t)_overflow << 8) | tmp;
+        }
+        inline uint24_t get_clear_no_cli() {
+            uint8_t tmp = TCNT2;
+            TCNT2 = 0;
+            if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
+                _overflow++;
+            }
+            auto tmp2 = ((uint24_t)_overflow << 8) | tmp;
+            _overflow = 0;
+            return tmp2;
+        }
+
+        uint16_t _overflow;
     };
 
     struct Channel {
@@ -166,6 +210,8 @@ namespace Dimmer {
 #if HAVE_FADE_COMPLETION_EVENT
         Level::type fading_completed[Channel::size()];
 #endif
+        float halfwave_ticks_avg;
+        float halfwave_ticks_avg2;
     };
 
     class DimmerBase : public dimmer_t {
@@ -179,7 +225,7 @@ namespace Dimmer {
 
         void begin();
         void end();
-        void zc_interrupt_handler();
+        void zc_interrupt_handler(uint24_t ticks);
 
         inline void set_frequency(float freq) {
             frequency = freq;

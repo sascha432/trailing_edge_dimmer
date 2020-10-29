@@ -48,6 +48,14 @@ ISR(TIMER1_COMPB_vect)
     dimmer._start_halfwave();
 }
 
+// measure timer overflow interrupt
+
+MeasureTimer timer2;
+
+ISR(TIMER2_OVF_vect)
+{
+    timer2._overflow++;
+}
 
 void DimmerBase::begin()
 {
@@ -84,8 +92,10 @@ void DimmerBase::begin()
     }
 
     cli();
+    timer2.begin();
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
-        dimmer.zc_interrupt_handler();
+        volatile uint24_t ticks = timer2.get_clear_no_cli();
+        dimmer.zc_interrupt_handler(ticks);
     }, DIMMER_ZC_INTERRUPT_MODE);
 
     _D(5, debug_printf("starting timer\n"));
@@ -109,10 +119,11 @@ void DimmerBase::end()
         digitalWrite(Channel::pins[i], DIMMER_MOSFET_OFF_STATE);
         pinMode(Channel::pins[i], INPUT);
     }
+    timer2.end();
     sei();
 }
 
-void DimmerBase::zc_interrupt_handler()
+void DimmerBase::zc_interrupt_handler(uint24_t ticks)
 {
 #if HAVE_DISABLE_ZC_SYNC
     if (zc_sync_disabled) {
@@ -165,6 +176,20 @@ void DimmerBase::zc_interrupt_handler()
     _apply_fading();
 
     _D(10, Serial.println(F("zc int")));
+
+#if DEBUG && 0
+    halfwave_ticks_avg = (halfwave_ticks_avg * 199 + ticks) * 0.005; // ( * 199) + ) / 200
+    halfwave_ticks_avg2 = (halfwave_ticks_avg2 * 9 + ((halfwave_ticks + diff) * 8)) * 0.1;
+    static int bla=0;
+    bla++;
+    if (bla%60==0) {
+        // uint24_t tmp2 = halfwave_ticks + diff;
+        // int16_t diff2 = ticks - (tmp2 * 8);
+        // Serial.printf_P(PSTR("%lu %lu %d\n"), (uint32_t)tmp2 * 8, (uint32_t)halfwave_ticks_avg, diff2);
+        // Serial.printf_P(PSTR("%lu %lu %f\n"), (uint32_t)halfwave_ticks_avg2, (uint32_t)halfwave_ticks_avg, halfwave_ticks_avg- halfwave_ticks_avg2);
+        Serial.printf_P(PSTR("%u %.2f %.4fus\n"), halfwave_ticks, halfwave_ticks_avg / 8.0, (halfwave_ticks_avg - halfwave_ticks_avg2) * 0.0625);
+    }
+#endif
 }
 
 // turn mosfets for active channels on

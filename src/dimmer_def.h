@@ -87,7 +87,7 @@
 // adjustment for measuring clock cycles due to pushing registers on
 // the stack before reading TCNT1
 #ifndef DIMMER_MEASURE_ADJ_CYCLE_CNT
-#define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -54
+#define DIMMER_MEASURE_ADJ_CYCLE_CNT                            -56
 #endif
 
 // keep dimmer enabled when loosing the ZC signal for up to

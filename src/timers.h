@@ -67,9 +67,16 @@ namespace Timers {
         static constexpr uint8_t kFlagsCompareABOverflow = kFlagsCompareA|kFlagsCompareB|kFlagsOverflow;
         static constexpr uint8_t kFlagsAll = kFlagsOverflow|kFlagsCompareA|kFlagsCompareB|kFlagsCapture;
 
-        template<uint8_t mask = kFlagsAll>
+        template<uint8_t _Flag = kFlagsAll>
         static inline void clear_flags() {
-            TIFR1 |= mask;
+            TIFR1 |= _Flag;
+        }
+
+        template<uint8_t _Flag>
+        static inline bool get_clear_flag() {
+            bool tmp = TIFR1 & _Flag;
+            TIFR1 |= _Flag;
+            return tmp;
         }
 
         static constexpr uint8_t kIntMaskOverflow = _BV(TOIE1);
@@ -183,9 +190,21 @@ namespace Timers {
         static constexpr uint8_t kFlagsCompareABOverflow = kFlagsCompareA|kFlagsCompareB|kFlagsOverflow;
         static constexpr uint8_t kFlagsAll = kFlagsOverflow|kFlagsCompareA|kFlagsCompareB;
 
-        template<uint8_t mask = kFlagsAll>
+        template<uint8_t _Flag = kFlagsAll>
         static inline void clear_flags() {
-            TIFR2 |= mask;
+            TIFR2 |= _Flag;
+        }
+
+        template<uint8_t _Flag>
+        static inline bool get_clear_flag() {
+            bool tmp = TIFR2 & _Flag;
+            TIFR2 |= _Flag;
+            return tmp;
+        }
+
+        template<uint8_t _Flag>
+        static inline bool get_flag() {
+            return TIFR2 & _Flag;
         }
 
         static constexpr uint8_t kIntMaskOverflow = _BV(TOIE2);
