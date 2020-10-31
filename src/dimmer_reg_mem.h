@@ -19,7 +19,11 @@ struct __attribute__((__packed__)) ShiftedFloat {
         return tmp._f;
     }
     static _Type fromFloat(float f) {
-        return (*reinterpret_cast<uint32_t *>(&f) - offset) >> shift;
+        union {
+            float _f;
+            uint32_t _i;
+        } tmp = { f };
+        return (tmp._i - offset) >> shift;
     }
 
     ShiftedFloat() = default;
@@ -57,7 +61,7 @@ struct __attribute__((__packed__)) ShiftedFloat {
     _Type _value;
 };
 
-template<typename _Type, uint32_t _Multiplier, uint32_t _Divider = 1>
+template<typename _Type, uint32_t _Multiplier, uint32_t _Divider = 1, _Type _NANValue = ~0>
 struct __attribute__((__packed__)) FixedPointFloat {
 
     static constexpr float multiplier = _Multiplier / (float)_Divider;
@@ -65,9 +69,15 @@ struct __attribute__((__packed__)) FixedPointFloat {
     // static constexpr float rounding = 1.0f / multiplier / 1.9999999f;
 
     static float toFloat(_Type value) {
+        if (value == _NANValue) {
+            return NAN;
+        }
         return value * inverted_multiplier;
     }
     static _Type fromFloat(float f) {
+        if (::isnan(f)) {
+            return _NANValue;
+        }
         return static_cast<_Type>(lround(f * multiplier));
         //29686 = same code size
         // if (f < 0.0f) {
@@ -79,6 +89,15 @@ struct __attribute__((__packed__)) FixedPointFloat {
     FixedPointFloat() = default;
     FixedPointFloat(_Type v) : _value(v) {}
     FixedPointFloat(float f) : _value(fromFloat(f)) {}
+
+    bool isnan() const {
+        return _value == _NANValue;
+    }
+
+    FixedPointFloat &operator=(const char[]) {
+        _value = _NANValue;
+        return *this;
+    }
 
     FixedPointFloat &operator=(float f) {
         _value = fromFloat(f);
@@ -106,10 +125,13 @@ struct __attribute__((__packed__)) FixedPointFloat {
     }
 
     operator bool() const {
-        return _value != 0;
+        return _value != 0 && _value != _NANValue;
     }
 
     operator float() const {
+        if (_value == _NANValue) {
+            return NAN;
+        }
         return toFloat(_value);
     }
 
@@ -117,8 +139,23 @@ struct __attribute__((__packed__)) FixedPointFloat {
         return _value;
     }
 
-    operator int() const {
+    explicit operator int() const {
         return _value;
+    }
+
+    template<typename _Cast>
+    _Cast cast() const {
+        return static_cast<_Cast>(_value);
+    }
+
+    template<typename _Cast>
+    bool is_negative() const {
+        return static_cast<_Cast>(_value) < 0;
+    }
+
+    template<typename _Cast>
+    bool is_positive() const {
+        return static_cast<_Cast>(_value) >= 0;
     }
 
     _Type _value;
@@ -129,8 +166,11 @@ struct __attribute__((__packed__)) FixedPointFloat {
 using uint24_t = __uint24;
 using int24_t = __int24;
 
-static constexpr size_t sizeof_uint24_t = sizeof(uint24_t);
-static constexpr size_t sizeof_int24_t = sizeof(int24_t);
+static constexpr size_t sizeof_uint24_t = 3; //sizeof(uint24_t);
+static constexpr size_t sizeof_int24_t = 3; //sizeof(int24_t);
+
+static_assert(sizeof_uint24_t == sizeof(uint24_t), "check size");
+static_assert(sizeof_int24_t == sizeof(int24_t), "check size");
 
 #else
 
@@ -174,9 +214,8 @@ static_assert(sizeof(int24_t) == int24_t::size, "check struct");
 
 #endif
 
-using internal_vref11_t = ShiftedFloat<int8_t, 0x3f8ccccd, 12>; // -128=1.037500, 0=1.100000, 127=1.162012, precision=0.000488 (~0.5mV)
-using fadetime_t = FixedPointFloat<uint16_t, 100, 1>; // 0.0 to 1310.699951, precision=0.02 (20ms)
-using temp_ofs_t = FixedPointFloat<int8_t, 4, 1>; // -32.0 to 31.75, precision=0.25 (1/4th°C)
+using internal_vref11_t = ShiftedFloat<int8_t, 0x3f8ccccd, 12>; // -127=1.0370212, 0=1.100000, 127=1.162012, precision=0.000488 (~0.5mV)
+using temp_ofs_t = FixedPointFloat<int8_t, 4, 1>; // -31.75 to 31.75, precision=0.25 (1/4th°C)
 
 typedef struct __attribute__((__packed__)) {
     uint8_t command;
@@ -184,7 +223,7 @@ typedef struct __attribute__((__packed__)) {
     int8_t status;
 } register_mem_command_t;
 
-typedef struct {
+typedef struct __attribute__((__packed__)) {
     uint8_t restore_level: 1;
     uint8_t leading_edge: 1;
     uint8_t over_temperature_alert_triggered: 1;
@@ -194,12 +233,17 @@ typedef struct {
 
 #define REPORT_METRICS_INTERVAL(value)             (value)
 #define REPORT_METRICS_INTERVAL_MILLIS(value)      (value * 1000UL)
+#define REPORT_METRICS_INTERVAL_MILLIS24(value)    (value << 2)
 
 // tmp = '0=disabled, '
 // for i in range(1, 8):
 //     tmp += "%u=%usec, " % (i, (1 << i))
 // print(tmp)
 
+typedef struct __attribute__((__packed__)) {
+    uint8_t ts_offset;
+    uint8_t ts_gain;
+} internal_temp_calibration_t;
 
 typedef struct __attribute__((__packed__)) {
     union __attribute__((__packed__)) {
@@ -213,6 +257,13 @@ typedef struct __attribute__((__packed__)) {
     uint16_t minimum_off_time_ticks;
     uint16_t range_begin;
     uint16_t range_divider;
+    internal_vref11_t internal_vref11;
+    internal_temp_calibration_t internal_temp_calibration;
+    temp_ofs_t ntc_temp_offset;
+    uint8_t report_metrics_interval;        // in seconds, 0=disabled
+    int8_t halfwave_adjust_cycles;          // correction for measured time in clock cycles
+    uint16_t switch_on_minimum_ticks;       // "minimum_on_time_ticks" after "switching on"
+    uint8_t switch_on_count;                // number of half cycles before changing to minimum_on_time_ticks
 
     uint16_t get_range_end() const {
         if (range_divider == 0) {
@@ -232,14 +283,6 @@ typedef struct __attribute__((__packed__)) {
             range_divider = (((uint32_t)DIMMER_MAX_LEVEL * DIMMER_MAX_LEVEL) / range_end) + range_begin;
         }
     }
-
-    internal_vref11_t internal_vref11;
-    temp_ofs_t int_temp_offset;
-    temp_ofs_t ntc_temp_offset;
-    uint8_t report_metrics_interval;        // in seconds, 0=disabled
-    int8_t halfwave_adjust_cycles;          // correction for measured time in clock cycles
-    uint16_t switch_on_minimum_ticks;       // "minimum_on_time_ticks" after "switching on"
-    uint8_t switch_on_count;                // number of half cycles before changing to minimum_on_time_ticks
 } register_mem_cfg_t;
 
 typedef struct __attribute__((__packed__)) {
@@ -249,24 +292,69 @@ typedef struct __attribute__((__packed__)) {
 } register_mem_errors_t;
 
 typedef struct __attribute__((__packed__)) {
+        uint16_t max_levels;
+        uint8_t channel_count;
+        uint8_t cfg_start_address;
+        uint8_t length;
+} dimmer_config_info_t;
+
+static_assert(sizeof(dimmer_config_info_t) == 5, "check struct");
+
+typedef struct __attribute__((__packed__)) {
+    float timer1_ticks_per_us;
+} dimmer_timmers_t;
+
+typedef struct __attribute__((__packed__)) dimmer_version_t {
+    union __attribute__((__packed__)) {
+        uint16_t _word;
+        struct __attribute__((__packed__)) {
+            uint16_t revision: 5;
+            uint16_t minor: 5;
+            uint16_t major: 5;
+            uint16_t __reserved: 1;
+        };
+    };
+    operator uint16_t() const {
+        return _word;
+    }
+    operator bool() const {
+        return _word != 0;
+    }
+} dimmer_version_t;
+
+static constexpr uint16_t dimmer_version_to_uint16(const uint8_t major, const uint8_t minor, const uint8_t revision) {
+    return ((major & 0x1f) << 10) | ((minor & 0x1f) << 5) | (revision & 0x1f);
+}
+
+static_assert(sizeof(dimmer_version_t) == 2, "check struct");
+
+typedef union __attribute__((__packed__)) {
+    dimmer_timmers_t timers;
+    struct __attribute__((__packed__)) {
+        dimmer_version_t version;
+        dimmer_config_info_t info;
+    };
+    uint64_t qword[2];
+    uint32_t dwords[4];
+    float floats[4];
+    uint16_t words[8];
+    uint8_t bytes[16];
+} register_mem_ram_t;
+
+typedef struct __attribute__((__packed__)) {
     int16_t from_level;
     int8_t channel;
     int16_t to_level;
     float time;
     register_mem_command_t cmd;
     uint16_t level[8];
-    union {
-        float temp;
-        uint32_t temp_dword;
-        uint16_t temp_words[2];
-        uint8_t temp_bytes[4];
-    };
-    union {
-        uint16_t vcc;
-        uint8_t vcc_bytes[2];
-    };
     register_mem_cfg_t cfg;
     register_mem_errors_t errors;
+    float frequency;
+    float int_temp;
+    float ntc_temp;
+    uint16_t vcc;
+    register_mem_ram_t ram;
     uint8_t address;
 } register_mem_t;
 
@@ -342,13 +430,34 @@ typedef struct __attribute__((__packed__)) {
 
 static_assert(sizeof(dimmer_sync_event_t) == 6, "check struct");
 
-static constexpr uint16_t dimmer_version_to_uint16(const uint8_t major, const uint8_t minor, const uint8_t revision) {
-    return (major << 10) | ((minor & 0x1f) << 5) | (revision & 0x1f);
-}
-
 extern register_mem_union_t register_mem;
 
+typedef struct __attribute__((__packed__)) dimmer_command_fade_t {
+    int16_t from_level;
+    int8_t channel;
+    int16_t to_level;
+    float time;
+    uint8_t command;
+
+    dimmer_command_fade_t(uint8_t p_channel, int16_t p_from_level, int16_t p_to_level, float time) :
+        from_level(p_from_level),
+        channel(p_channel),
+        to_level(p_to_level),
+        time(time),
+        command(DIMMER_COMMAND_FADE)
+    {}
+
+    static uint8_t address() {
+        return DIMMER_REGISTER_FROM_LEVEL;
+    }
+
+} dimmer_command_fade_t;
+
+static_assert(sizeof(dimmer_command_fade_t) == 10, "check struct");
+
 namespace Dimmer  {
+
+    static constexpr const uint8_t kRequestVersion[] = { 0x8a, 0x02, 0xb9 };
 
     namespace RegisterMemory {
 

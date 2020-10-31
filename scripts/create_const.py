@@ -12,7 +12,7 @@ import os
 import json
 
 filename = './src/dimmer_protocol_const.h'
-outfile1 = './scripts/libs/fw_const_ver_2_2_x.py'
+outfile1 = './scripts/libs/fw_const_ver_MAJOR_MINOR_x.py'
 version = '2.2.x'
 
 with open(outfile1, 'w', newline='\n') as ofh1:

@@ -192,7 +192,7 @@
 
 // interval in milliseconds
 #ifndef DIMMER_TEMPERATURE_CHECK_INTERVAL
-#define DIMMER_TEMPERATURE_CHECK_INTERVAL                      2000UL
+#define DIMMER_TEMPERATURE_CHECK_INTERVAL                      1024UL
 #endif
 
 #ifndef HAVE_NTC

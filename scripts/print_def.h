@@ -17,8 +17,11 @@ Serial.print(F("#define DIMMER_REGISTER_CH5_LEVEL                ")); Serial.pri
 Serial.print(F("#define DIMMER_REGISTER_CH6_LEVEL                ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_CH6_LEVEL);
 Serial.print(F("#define DIMMER_REGISTER_CH7_LEVEL                ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_CH7_LEVEL);
 Serial.print(F("#define DIMMER_REGISTER_CHANNELS_END             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_CHANNELS_END);
-Serial.print(F("#define DIMMER_REGISTER_TEMP                     ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_TEMP);
+Serial.print(F("#define DIMMER_REGISTER_FREQUENCY                ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_FREQUENCY);
+Serial.print(F("#define DIMMER_REGISTER_INT_TEMP                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_INT_TEMP);
+Serial.print(F("#define DIMMER_REGISTER_NTC_TEMP                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_NTC_TEMP);
 Serial.print(F("#define DIMMER_REGISTER_VCC                      ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_VCC);
+Serial.print(F("#define DIMMER_REGISTER_RAM                      ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_RAM);
 Serial.print(F("#define DIMMER_REGISTER_OPTIONS                  ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_OPTIONS);
 Serial.print(F("#define DIMMER_REGISTER_MAX_TEMP                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_MAX_TEMP);
 Serial.print(F("#define DIMMER_REGISTER_FADE_IN_TIME             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_FADE_IN_TIME);
@@ -28,7 +31,7 @@ Serial.print(F("#define DIMMER_REGISTER_MIN_OFF_TIME_TICKS       ")); Serial.pri
 Serial.print(F("#define DIMMER_REGISTER_RANGE_BEGIN              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_RANGE_BEGIN);
 Serial.print(F("#define DIMMER_REGISTER_RANGE_DIVIDER            ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_RANGE_DIVIDER);
 Serial.print(F("#define DIMMER_REGISTER_INT_VREF11               ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_INT_VREF11);
-Serial.print(F("#define DIMMER_REGISTER_INT_TEMP_OFS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_INT_TEMP_OFS);
+Serial.print(F("#define DIMMER_REGISTER_INT_TEMP_CAL             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_INT_TEMP_CAL);
 Serial.print(F("#define DIMMER_REGISTER_NTC_TEMP_OFS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_NTC_TEMP_OFS);
 Serial.print(F("#define DIMMER_REGISTER_METRICS_INT              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_METRICS_INT);
 Serial.print(F("#define DIMMER_REGISTER_ADJ_HW_CYCLES            ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_ADJ_HW_CYCLES);
@@ -36,13 +39,13 @@ Serial.print(F("#define DIMMER_REGISTER_SWITCH_ON_MIN_TIME       ")); Serial.pri
 Serial.print(F("#define DIMMER_REGISTER_SWITCH_ON_COUNT          ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_SWITCH_ON_COUNT);
 Serial.print(F("#define DIMMER_REGISTER_ADDRESS                  ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_ADDRESS);
 Serial.print(F("#define DIMMER_REGISTER_END_ADDR                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_END_ADDR);
-Serial.print(F("#define DIMMER_REGISTER_VERSION                  ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_VERSION);
-Serial.print(F("#define DIMMER_METRICS_REPORT                    ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_METRICS_REPORT);
-Serial.print(F("#define DIMMER_TEMPERATURE_ALERT                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_TEMPERATURE_ALERT);
-Serial.print(F("#define DIMMER_FADING_COMPLETE                   ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_FADING_COMPLETE);
-Serial.print(F("#define DIMMER_EEPROM_WRITTEN                    ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EEPROM_WRITTEN);
-Serial.print(F("#define DIMMER_FREQUENCY_WARNING                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_FREQUENCY_WARNING);
-Serial.print(F("#define DIMMER_CHANNEL_ON_OFF                    ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_CHANNEL_ON_OFF);
+Serial.print(F("#define DIMMER_EVENT_METRICS_REPORT              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EVENT_METRICS_REPORT);
+Serial.print(F("#define DIMMER_EVENT_TEMPERATURE_ALERT           ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EVENT_TEMPERATURE_ALERT);
+Serial.print(F("#define DIMMER_EVENT_FADING_COMPLETE             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EVENT_FADING_COMPLETE);
+Serial.print(F("#define DIMMER_EVENT_EEPROM_WRITTEN              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EVENT_EEPROM_WRITTEN);
+Serial.print(F("#define DIMMER_EVENT_FREQUENCY_WARNING           ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EVENT_FREQUENCY_WARNING);
+Serial.print(F("#define DIMMER_EVENT_CHANNEL_ON_OFF              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EVENT_CHANNEL_ON_OFF);
+Serial.print(F("#define DIMMER_EVENT_SYNC_EVENT                  ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EVENT_SYNC_EVENT);
 Serial.print(F("#define DIMMER_COMMAND_SET_LEVEL                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_SET_LEVEL);
 Serial.print(F("#define DIMMER_COMMAND_FADE                      ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_FADE);
 Serial.print(F("#define DIMMER_COMMAND_READ_CHANNELS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_READ_CHANNELS);
@@ -58,7 +61,6 @@ Serial.print(F("#define DIMMER_COMMAND_FORCE_TEMP_CHECK          ")); Serial.pri
 Serial.print(F("#define DIMMER_COMMAND_PRINT_METRICS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_PRINT_METRICS);
 Serial.print(F("#define DIMMER_COMMAND_SET_MODE                  ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_SET_MODE);
 Serial.print(F("#define DIMMER_COMMAND_ZC_TIMINGS_OUTPUT         ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_ZC_TIMINGS_OUTPUT);
-Serial.print(F("#define DIMMER_COMMAND_GET_CFG_LEN               ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_GET_CFG_LEN);
 Serial.print(F("#define DIMMER_COMMAND_PRINT_CONFIG              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_PRINT_CONFIG);
 Serial.print(F("#define DIMMER_COMMAND_WRITE_CONFIG              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_WRITE_CONFIG);
 Serial.print(F("#define DIMMER_COMMAND_WRITE_EEPROM_NOW          ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_WRITE_EEPROM_NOW);
@@ -69,6 +71,7 @@ Serial.print(F("#define DIMMER_COMMAND_DECR_ZC_DELAY             ")); Serial.pri
 Serial.print(F("#define DIMMER_COMMAND_SET_ZC_DELAY              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_SET_ZC_DELAY);
 Serial.print(F("#define DIMMER_COMMAND_INCR_HW_TICKS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_INCR_HW_TICKS);
 Serial.print(F("#define DIMMER_COMMAND_DECR_HW_TICKS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DECR_HW_TICKS);
+Serial.print(F("#define DIMMER_COMMAND_SET_ZC_SYNC               ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_SET_ZC_SYNC);
 Serial.print(F("#define DIMMER_COMMAND_DUMP_CHANNELS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DUMP_CHANNELS);
 Serial.print(F("#define DIMMER_COMMAND_DUMP_MEM                  ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DUMP_MEM);
 Serial.print(F("#define DIMMER_COMMAND_STATUS_OK                 ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_STATUS_OK);
@@ -76,4 +79,5 @@ Serial.print(F("#define DIMMER_COMMAND_STATUS_ERROR              ")); Serial.pri
 Serial.print(F("#define DIMMER_OPTIONS_RESTORE_LEVEL             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_OPTIONS_RESTORE_LEVEL);
 Serial.print(F("#define DIMMER_OPTIONS_MODE_LEADING_EDGE         ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_OPTIONS_MODE_LEADING_EDGE);
 Serial.print(F("#define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED      ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED);
-Serial.print(F("#define DIMMER_EEPROM_EVT_CF_UPDATED             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EEPROM_EVT_CF_UPDATED);
+Serial.print(F("#define DIMMER_OPTIONS_NEGATIVE_ZC_DELAY         ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_OPTIONS_NEGATIVE_ZC_DELAY);
+Serial.print(F("#define DIMMER_EEPROM_FLAGS_CONFIG_UPDATED       ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_EEPROM_FLAGS_CONFIG_UPDATED);

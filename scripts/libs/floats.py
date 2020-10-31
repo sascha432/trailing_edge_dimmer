@@ -103,3 +103,8 @@ class c_int8_FixedPointFloat(FixedPointFloat, _SimpleCData):
     _type_ = "b"
     def __init_subclass__(_class):
         _class.__init__(_class)
+
+class c_int16_FixedPointFloat(FixedPointFloat, _SimpleCData):
+    _type_ = "h"
+    def __init_subclass__(_class):
+        _class.__init__(_class)

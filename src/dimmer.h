@@ -84,23 +84,33 @@ namespace Dimmer {
     };
 
     struct MeasureTimer : Timers::TimerBase<2, 1> {
+
+        // MeasureTimer() : _overflow(0), _counter16(0), _counter32(0) {}
+
         inline void begin() {
             TimerBase::begin<TimerBase::kFlagsOverflow>();
         }
+
         inline void end() {
             TimerBase::end<TimerBase::kFlagsOverflow>();
         }
+
         inline void start() {
             TimerBase::int_mask_enable<kIntMaskOverflow>();
         }
+
         inline void stop() {
             TimerBase::int_mask_enable<kIntMaskOverflow>();
         }
+
         inline void reset() {
             TCNT2 = 0;
             TimerBase::clear_flags<TimerBase::kFlagsOverflow>();
             _overflow = 0;
         }
+
+        // get ticks since last reset and reset counter
+        // interrupts are being disabled and restored
         inline uint24_t get() {
             uint8_t oldSREG = SREG;
             cli();
@@ -112,6 +122,9 @@ namespace Dimmer {
             SREG = oldSREG;
             return ((uint24_t)tmp2 << 8) | tmp;
         }
+
+        // get ticks since last reset
+        // interrupts must be disabled
         inline uint24_t get_no_cli() {
             uint8_t tmp = TCNT2;
             if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
@@ -119,6 +132,9 @@ namespace Dimmer {
             }
             return ((uint24_t)_overflow << 8) | tmp;
         }
+
+        // get ticks since lasts reset and reset counter
+        // interrupts must be disabled
         inline uint24_t get_clear_no_cli() {
             uint8_t tmp = TCNT2;
             TCNT2 = 0;
@@ -203,7 +219,6 @@ namespace Dimmer {
         TickType halfwave_ticks;
         float zc_diff_ticks;
         uint8_t zc_diff_count;
-        float frequency;
         uint8_t channel_state;                                                  // bitset of the channel state
         bool toggle_state: 1;
 #if HAVE_DISABLE_ZC_SYNC
@@ -236,7 +251,7 @@ namespace Dimmer {
         void zc_interrupt_handler(uint24_t ticks);
 
         inline void set_frequency(float freq) {
-            frequency = freq;
+            register_mem.data.frequency = freq;
         }
 
         inline void set_mode(ModeType mode) {
@@ -333,7 +348,7 @@ namespace Dimmer {
         void _start_halfwave();
         void _delay_halfwave();
         inline float _get_frequency() const {
-            return frequency;
+            return register_mem.data.frequency;
         }
 #if HAVE_CHANNELS_INLINE_ASM
         inline void _set_all_mosfet_gates(bool state) {

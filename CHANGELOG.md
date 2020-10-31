@@ -5,13 +5,17 @@
 - Removed linear correction
 - Removed ZC_MAX_TIMINGS
 - Level range can be configured
-- Minimum on-time can be adjusted dynamically for devices that need a certain level to start-up
-- Trailing edge/leading edge mode
+- Minimum on-time can be adjusted dynamically for devices that need a certain voltage level to start-up
+- Configurable trailing/leading edge mode
 - Frequency auto detection (50/60Hz)
 - Increased ZC delay to 16bit / 500ns resolution
+- Support for asynchronous ZC signals
 - Filter invalid ZC signals and continue to run up to several seconds without being synchronized
 - Python tool to configure/monitor the dimmer over the serial port (for version 2.1.x and 2.2.x only)
 - EEPROM wear leveling improved and fail-safe added
+- Tool to generate inline assembler for toggling MOSFET pins
+- Support for TRIACs (leading edge only) added - tested with MOSFETs, BJTs and TRIACs
+- Improved performance and reduced code size using the ADC interrupt
 
 ## 2.1.5
 

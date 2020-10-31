@@ -32,7 +32,7 @@ void Config::resetConfig()
     register_mem.data.cfg.max_temp = 75;
     register_mem.data.cfg.bits.restore_level = DIMMER_RESTORE_LEVEL;
     register_mem.data.cfg.bits.leading_edge = (DIMMER_TRAILING_EDGE == 0);
-    register_mem.data.cfg.fade_in_time = 4.5f;
+    register_mem.data.cfg.fade_in_time = 4.5;
     register_mem.data.cfg.zero_crossing_delay_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_ZC_DELAY_US);
     register_mem.data.cfg.minimum_on_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_ON_TIME_US);
     register_mem.data.cfg.minimum_off_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_OFF_TIME_US);
@@ -43,6 +43,9 @@ void Config::resetConfig()
     register_mem.data.cfg.ntc_temp_offset = NTC_TEMP_OFS;
 #endif
     register_mem.data.cfg.report_metrics_interval = 5;
+    register_mem.data.ntc_temp = NAN;
+    register_mem.data.int_temp = NAN;
+    register_mem.data.frequency = NAN;
 
     copyFromRegisterMem(_config.cfg);
 }
@@ -68,8 +71,8 @@ void Config::initEEPROM()
     _D(5, debug_printf("init eeprom cycle=%lu pos=%u crc=%04x copies=%u\n", (uint32_t)_config.eeprom_cycle, _eeprom_position, _config.crc16, kEEPROMMaxCopies));
 
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        dimmer_scheduled_calls.write_eeprom = false;
-        dimmer_scheduled_calls.eeprom_update_config = false;
+        queues.scheduled_calls.write_eeprom = false;
+        queues.scheduled_calls.eeprom_update_config = false;
     }
 
     Serial.println(F("+REM=EEPROMR,init"));
@@ -80,7 +83,7 @@ void Config::restoreFactory()
     _D(5, debug_printf("restore factory settings\n"));
     resetConfig();
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        dimmer_scheduled_calls.eeprom_update_config = true;
+        queues.scheduled_calls.eeprom_update_config = true;
     }
     _writeConfig(true);
 }
@@ -137,6 +140,13 @@ void Config::readConfig()
         return;
     }
 
+    if (_config.cfg.max_temp < 55) {
+        _config.cfg.max_temp = 55;
+    }
+    else if (_config.cfg.max_temp > 125) {
+        _config.cfg.max_temp = 125;
+    }
+
     copyToRegisterMem(_config.cfg);
     _D(5, debug_print_memory(&_config.cfg, sizeof(_config.cfg)));
     Serial.printf_P(PSTR("+REM=EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x\n"), (uint32_t)max_cycle, _eeprom_position, get_eeprom_num_writes(max_cycle, _eeprom_position), _config.crc16);
@@ -145,7 +155,10 @@ void Config::readConfig()
 void Config::writeConfig()
 {
     int32_t lastWrite = millis() - _eeprom_write_timer;
-    if (dimmer_scheduled_calls.set_if_false_write_eeprom()) { // no write scheduled
+    if (!queues.scheduled_calls.write_eeprom) { // no write scheduled
+        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+            queues.scheduled_calls.write_eeprom = true;
+        };
         _D(5, debug_printf("scheduling eeprom write cycle, last write %d seconds ago\n", (int)(lastWrite / 1000U)));
         _eeprom_write_timer = millis() + ((lastWrite > EEPROM_REPEATED_WRITE_DELAY) ? EEPROM_WRITE_DELAY : EEPROM_REPEATED_WRITE_DELAY);
     }
@@ -159,7 +172,7 @@ void Config::_writeConfig(bool force)
     EEPROM_config_t temp_config;
     dimmer_eeprom_written_t event = {};
 
-    if (dimmer_scheduled_calls.eeprom_update_config) {
+    if (queues.scheduled_calls.eeprom_update_config) {
         event.config_updated = true;
         copyFromRegisterMem(_config.cfg);
     }
@@ -193,8 +206,8 @@ void Config::_writeConfig(bool force)
     _eeprom_write_timer = millis();
 
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        dimmer_scheduled_calls.write_eeprom = false;
-        dimmer_scheduled_calls.eeprom_update_config = false;
+        queues.scheduled_calls.write_eeprom = false;
+        queues.scheduled_calls.eeprom_update_config = false;
     }
 
     event.write_cycle = _config.eeprom_cycle;
@@ -202,7 +215,7 @@ void Config::_writeConfig(bool force)
 
     _D(5, debug_printf("eeprom written event: cycle %lu:%u, written %u\n", event.write_cycle, event.write_position, event.bytes_written));
     Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-    Wire.write(DIMMER_EEPROM_WRITTEN);
+    Wire.write(DIMMER_EVENT_EEPROM_WRITTEN);
     Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
     Wire.endTransmission();
 

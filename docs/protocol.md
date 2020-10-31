@@ -136,7 +136,7 @@ If no further data is sent after the read command, the register is set automatic
 - DIMMER_REGISTER_TEMP (float)
 - DIMMER_REGISTER_VCC (uint16)
 
-***Note:*** Reading temperature and VCC requires some time to adjust the ADC. The result might not be available for up to 100ms after issuing the command
+The temperatures and VCC are read once per second
 
 Read VCC
 
@@ -165,8 +165,6 @@ If the temperature is requested last, it is not required to set read length and 
     +I2CR=17,06
 
 Read AC frequency
-
-***Note:*** this cancels any pending temperature measurements
 
     +I2CT=17,89,23
     +I2CR=17,04
@@ -213,19 +211,6 @@ In UART or I2C master/master mode, the event *DIMMER_EEPROM_WRITTEN* confirms su
 
     +I2CT=17,89,50[,92]
 
-## DIMMER_COMMAND_GET_CFG_LEN
-
-Get start address, length of the configuration and max. level
-
-***Note:*** this cancels any pending temperature measurements
-
-    +I2CT=17,89,90
-    +I2CR=17,04
-
-Address 0xA2, length 0x21 (33 byte), max. levels 0x2000 (8192)
-
-    +I2CT=17a2180020
-
 ## DIMMER_COMMAND_PRINT_CONFIG
 
 Print version and configuration on serial port. The I2CT command in the output can be used to restore the configuration if the firmware version matches
@@ -270,32 +255,41 @@ Restore factory defaults and store in EEPROM
 
 Get ticks per microsecond for Timer 1 as float
 
-***Note:*** this cancels any pending temperature measurements
-
     +I2CT=17,89,52
     +I2CR=17,04
 
 ## DIMMER_COMMAND_READ_AC_FREQUENCY
 
-Read AC frequency
-
-***Note:*** this cancels any pending temperature measurements
+Read AC frequency as float
 
     +I2CT=17,89,23
     +I2CR=17,04
 
 ## Reading firmware version
 
-Reading the firmware version is using the same transmission for all versions. The address 0xB9 is virtual and might be shared with other data.
+Reading the firmware version is using the same transmission for all versions
 
-    +I2CT=17,8a,02,b9
-    +I2CR=17,02
+```
++I2CT=17,8a,02,b9
++I2CR=17,02
 
-    +I2CT=172608
++I2CT=172608
+```
+
+- bit 0-4 - Revision
+- bit 5-9 - Minor version
+- bit 10-14 - Major version
+- bit 15 - Reserved
+
+```
+v2.1.6
+0x0826
+[0][00010][00001][00110]
+        2      1      6
+```
+
 
 ## Reading and writing the dimmer settings
-
-See *DIMMER_COMMAND_GET_CFG_LEN* for getting address and size.
 
 ### Settings
 
@@ -306,10 +300,11 @@ See *DIMMER_COMMAND_GET_CFG_LEN* for getting address and size.
 - DIMMER_REGISTER_MIN_ON_TIME_TICKS (uint16)
 - DIMMER_REGISTER_MIN_OFF_TIME_TICKS (uint16)
 - DIMMER_REGISTER_INT_VREF11 (int8, value * 0.488mV + 1.1V)
-- DIMMER_REGISTER_INT_TEMP_OFS (int8, 0.25°C)
+- DIMMER_REGISTER_INT_TEMP_CAL_OFFSET (uint8_t)
+- DIMMER_REGISTER_INT_TEMP_CAL_GAIN (uint8_t)
 - DIMMER_REGISTER_NTC_TEMP_OFS (int8, 0.25°C)
 - DIMMER_REGISTER_METRICS_INT (uint8, seconds, 0 = disabled)
-- DIMMER_REGISTER_ADJ_HW_CYCLES (int8, clock cycles to half wave)
+- DIMMER_REGISTER_ADJ_HW_CYCLES (int8, clock cycles to adjust half wave length)
 - DIMMER_REGISTER_RANGE_BEGIN (int16)
 - DIMMER_REGISTER_RANGE_END (int16)
 - DIMMER_REGISTER_SWITCH_ON_MIN_TIME (uint16)
@@ -320,7 +315,7 @@ See *DIMMER_COMMAND_GET_CFG_LEN* for getting address and size.
 - Bit 0: Restore last levels on reset
 - Bit 2: Temperature alarm indicator. Needs to be cleared manually after it has been triggered
 - Bit 3: Leading edge mode
-- Bit 4: unused
+- Bit 4: Negative ZC delay. The delay is subtracted from the halfwave length and occurs 'n' ticks before the next signal
 - Bit 5: unused
 - Bit 6: unused
 - Bit 7: unused
@@ -336,7 +331,7 @@ Set report metrics interval to 30 seconds
 
     +I2CT=17,b5,1e
 
-**Note:** The interval changes after a metrics report has been sent. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=17,89,54*) can be used to force a check without waiting. The metrics event is sent after the temperature check which is performed every 2 seconds
+**Note:** The interval changes after a metrics report has been sent. DIMMER_COMMAND_FORCE_TEMP_CHECK (*+I2CT=17,89,54*) can be used to force a check without waiting
 
 Read report metrics interval
 
@@ -410,9 +405,9 @@ Print metrics on serial port in human readable form. The following byte enables 
 
 ***Note:*** Only available if HAVE_PRINT_METRICS is set to 1
 
-For example 0x0a * 100ms = 1s
+For example 0x04 * 256ms = ~1s
 
-    +I2CT=17,89,55,0a
+    +I2CT=17,89,55,04
 
 ## DIMMER_COMMAND_FORCE_TEMP_CHECK
 
@@ -541,7 +536,7 @@ Print current configuration. The command can be used to backup/restore the confi
 
 For example
 
-    +REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412
+    +REM=v0840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412
 
 ### Write current settings to EEPROM
 
@@ -564,10 +559,6 @@ Available only if HAVE_PRINT_METRICS is set to 1
 ### Turn print metrics off
 
     +I2CT=17,89,55,00
-
-### Print version and configuration
-
-    +I2CT=17,89,91
 
 ### Read firmware version
 

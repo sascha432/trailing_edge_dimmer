@@ -8,15 +8,27 @@ from . import floats
 class c_internal_vref11(floats.c_int8_ShiftedFloat):
     def __init__(self):
         floats.ShiftedFloat.__init__(self, 0x3f8ccccd, 12, 6)
-        # floats.c_int8_ShiftedFloat._self_ = self
     __init_subclass__ = floats.c_int8_ShiftedFloat.__init_subclass__
 
+class c_vcc_t(floats.c_int8_ShiftedFloat):
+    def __init__(self):
+        floats.ShiftedFloat.__init__(self, 0x40880000, 16, 2)
+    __init_subclass__ = floats.c_int8_ShiftedFloat.__init_subclass__
+
+class c_temperature_t(floats.c_int16_FixedPointFloat):
+    def __init__(self):
+        floats.FixedPointFloat.__init__(self, 60000, 300, 3)
+    __init_subclass__ = floats.c_int16_FixedPointFloat.__init_subclass__
 
 class c_temp_ofs_t(floats.c_int8_FixedPointFloat):
     def __init__(self):
         floats.FixedPointFloat.__init__(self, 4, 1, 2)
     __init_subclass__ = floats.c_int8_FixedPointFloat.__init_subclass__
 
+class c_internal_temp_calibration_t(Structure):
+    _pack_ = 1
+    _fields_ = [("ts_offset", c_uint8),
+                ("ts_gain", c_uint8)]
 
 class config_options_t(Structure):
     _pack_ = 1
@@ -42,7 +54,7 @@ class register_mem_cfg_t(Structure):
                 ("range_begin", c_uint16),
                 ("range_divider", c_uint16),
                 ("internal_vref11", c_internal_vref11),
-                ("int_temp_offset", c_temp_ofs_t),
+                ("internal_temp_calibration", c_internal_temp_calibration_t),
                 ("ntc_temp_offset", c_temp_ofs_t),
                 ("report_metrics_max_interval", c_uint8),
                 ("halfwave_adjust_ticks", c_int8),

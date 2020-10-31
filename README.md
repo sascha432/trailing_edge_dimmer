@@ -1,17 +1,19 @@
-# Trailing Edge MOSFET Dimmer
+# Trailing/Leading Edge MOSFET Dimmer
 
-Firmware for a trailing edge MOSFET dimmer.
+Firmware for a trailing/leading edge MOSFET dimmer.
 
-* 16666 different dimming levels
+* 16666/20000 (60/50Hz) different dimming levels
 * Up to 8 different channels
 * Trailing edge or leading edge mode
+* 50/60Hz auto detection
 * Store last levels in EEPROM and restore during startup
 * EEPROM wear level protection
 * Serial protocol to control the dimmer
 * I2C or UART interface
+* Support for 10V dimming (or any other voltage in the 0-1.1V range)
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
 * Highly configurable to match any hardware
-* 50/60Hz auto detection
+* MOSFETs, BJTs and, TRIACs can be used
 
 [I2C/UART protocol](docs/protocol.md)
 

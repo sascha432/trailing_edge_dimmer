@@ -54,8 +54,6 @@ static_assert(__memcmp(kInlineAssemblerSignature, kDimmerSignature, sizeof(kDimm
 
 #endif
 
-extern dimmer_scheduled_calls_t dimmer_scheduled_calls;
-
 // start halfwave
 ISR(TIMER1_COMPA_vect)
 {
@@ -69,20 +67,25 @@ ISR(TIMER1_COMPB_vect)
 }
 
 // measure timer overflow interrupt
-
 MeasureTimer timer2;
 
 ISR(TIMER2_OVF_vect)
 {
     timer2._overflow++;
+    if (queues.fading_completed_events.timer > 0) {
+        queues.fading_completed_events.timer--;
+    }
+    if (queues.check_temperature.timer > 0) {
+        queues.check_temperature.timer--;
+    }
 }
 
 void DimmerBase::begin()
 {
-    if (frequency == 0 || isnan(frequency)) {
+    if (register_mem.data.frequency == 0 || isnan(register_mem.data.frequency)) {
         return;
     }
-    halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / frequency) + (_config.halfwave_adjust_cycles / Timer<1>::prescaler);
+    halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / register_mem.data.frequency) + (_config.halfwave_adjust_cycles / Timer<1>::prescaler);
     zc_diff_ticks = 0;
     zc_diff_count = 0;
 
@@ -92,11 +95,11 @@ void DimmerBase::begin()
         Timer<1>::prescaler)
     );
     _D(5, debug_printf("f=%f ticks=%lu\n",
-        frequency,
+        register_mem.data.frequency,
         (uint32_t)halfwave_ticks)
     );
 
-    dimmer_scheduled_calls = {};
+    queues.scheduled_calls = {};
     sync_event = {};
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
@@ -129,12 +132,12 @@ void DimmerBase::begin()
 
 void DimmerBase::end()
 {
-    if (frequency == 0 || isnan(frequency)) {
+    if (register_mem.data.frequency == 0 || isnan(register_mem.data.frequency)) {
         return;
     }
     _D(5, debug_printf("ending timer...\n"));
 
-    dimmer_scheduled_calls = {};
+    queues.scheduled_calls = {};
 
     cli();
     detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
@@ -173,7 +176,7 @@ void DimmerBase::zc_interrupt_handler(uint24_t ticks)
         // send in-sync event
         sync_event.sync = true;
         sync_event.sync_difference_cycles = diff;
-        dimmer_scheduled_calls.sync_event = true;
+        queues.scheduled_calls.sync_event = true;
     }
     out_of_sync_counter = 0;
 #endif
@@ -239,7 +242,7 @@ void DimmerBase::_start_halfwave()
         // store counter and send event
         sync_event.lost = true;
         sync_event.halfwave_counter = out_of_sync_counter;
-        dimmer_scheduled_calls.sync_event = true;
+        queues.scheduled_calls.sync_event = true;
         return;
     }
 #else
@@ -377,7 +380,7 @@ void DimmerBase::_calculate_channels()
     cli(); // copy double buffer with interrupts disabled
     if (new_channel_state != channel_state) {
         channel_state = new_channel_state;
-        dimmer_scheduled_calls.send_channel_state = true;
+        queues.scheduled_calls.send_channel_state = true;
     }
     memcpy(ordered_channels_buffer, ordered_channels, sizeof(ordered_channels_buffer));
     sei();
@@ -385,7 +388,7 @@ void DimmerBase::_calculate_channels()
 
 void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
 {
-    _D(5, debug_printf("set_channel_level ch=%d level=%d\n", channel, level))
+    // _D(5, debug_printf("set_channel_level ch=%d level=%d\n", channel, level))
     if (_get_level(channel) == 0) {
         on_counter[channel] = 0;
     }
@@ -397,7 +400,7 @@ void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
         // send event with the new level
         fading_completed[channel] = _get_level(channel);
         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-            dimmer_scheduled_calls.send_fading_events = true;
+            queues.scheduled_calls.send_fading_events = true;
         }
     }
 #endif
@@ -409,7 +412,7 @@ void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
 
 void DimmerBase::set_level(Channel::type channel, Level::type level)
 {
-    _D(5, debug_printf("set_level ch=%d level=%d\n", channel, level))
+    // _D(5, debug_printf("set_level ch=%d level=%d\n", channel, level))
     if (channel == Channel::any) {
         DIMMER_CHANNEL_LOOP(i) {
             set_channel_level(i, level);
@@ -445,7 +448,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
         _D(5, debug_printf("Relative fading time %.3f\n", time));
     }
 
-    fade.count = frequency * time * 2;
+    fade.count = register_mem.data.frequency * time * 2;
     if (fade.count == 0) {
         _D(5, debug_printf("count=%u time=%f\n", fade.count, time));
         return;
@@ -485,7 +488,7 @@ void DimmerBase::_apply_fading()
 #if HAVE_FADE_COMPLETION_EVENT
                 fading_completed[i] = _get_level(i);
                 ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-                    dimmer_scheduled_calls.send_fading_events = true;
+                    queues.scheduled_calls.send_fading_events = true;
                 }
 #endif
             } else {
@@ -526,17 +529,3 @@ TickType DimmerBase::__get_ticks(Channel::type channel, Level::type level) const
     }
     return ticks;
 }
-
-// #if not HAVE_CHANNELS_INLINE_ASM
-
-// void DimmerBase::_set_mosfet_gate(Channel::type channel, bool state)
-// {
-// 	if (state) {
-// 		*dimmer_pins_addr[channel] |= dimmer_pins_mask[channel];
-// 	}
-//     else {
-// 		*dimmer_pins_addr[channel] &= ~dimmer_pins_mask[channel];
-// 	}
-// }
-
-// #endif
