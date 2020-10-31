@@ -3,6 +3,7 @@
  */
 
 #include "measure_frequency.h"
+#include "adc.h"
 
 // currently only single filter stage implemented
 // WORK IN PROGRESS
@@ -205,6 +206,7 @@ bool run_frequency_measurement()
     if (frequency_wait_timer == kFrequencyWaitTimerInit) {
         _D(5, debug_printf("measuring...\n"));
         dimmer.end();
+        _adc.end();
 
         // give everything some time to settle before starting the measurement
         delay(100);

@@ -36,10 +36,16 @@ static_assert(
 
 namespace Timers {
 
-    template<int _Timer, uint8_t _Prescaler>
+    constexpr uint8_t kShiftRight(int64_t value, int n = 0) {
+        return value < 0 ? 0 : value ? kShiftRight(value >> 1, n + 1) : n == 0 ? 0 : n - 1;
+    }
+
+    static constexpr uint8_t kCpuMhz = (F_CPU / 1000000.0);
+
+    template<int _Timer, uint16_t _Prescaler>
     struct TimerBase {};
 
-    template<uint8_t _Prescaler>
+    template<uint16_t _Prescaler>
     struct TimerBase<1, _Prescaler> {
         static constexpr uint16_t prescaler = _Prescaler;
         static constexpr uint8_t prescalerBV =
@@ -56,6 +62,12 @@ namespace Timers {
 
         static_assert(prescalerBV != -1, "prescaler not defined");
         static constexpr float ticksPerMicrosecond =  (F_CPU / prescaler / 1000000.0);
+        static constexpr float kMicrosPerOverflow = 0x10000 / ticksPerMicrosecond;
+        static constexpr float kMillisPerOverflow = 0x10000 / ticksPerMicrosecond / 1000.0;
+
+        static constexpr uint32_t kMillisToOverflows(const uint32_t millis) {
+            return (millis * 125U) >> kShiftRight(8192U * prescaler / kCpuMhz);
+        }
 
         static constexpr uint8_t kFlagsOverflow = _BV(TOV1);
         static constexpr uint8_t kFlagsCompareA = _BV(OCF1A);
@@ -158,7 +170,7 @@ namespace Timers {
 
     };
 
-    template<uint8_t _Prescaler>
+    template<uint16_t _Prescaler>
     struct TimerBase<2, _Prescaler> {
         static constexpr uint16_t prescaler = _Prescaler;
         static constexpr uint8_t prescalerBV =
@@ -180,6 +192,12 @@ namespace Timers {
         static_assert(prescalerBV != -1, "prescaler not defined");
 
         static constexpr float ticksPerMicrosecond =  (F_CPU / prescaler / 1000000.0);
+        static constexpr float kMicrosPerOverflow = 0x100 / ticksPerMicrosecond;
+        static constexpr float kMillisPerOverflow = 0x100 / ticksPerMicrosecond / 1000.0;
+
+        static constexpr uint32_t kMillisToOverflows(const uint32_t millis) {
+            return (millis * 125U) >> kShiftRight(32U * prescaler / kCpuMhz);
+        }
 
         static constexpr uint8_t kFlagsOverflow = _BV(TOV2);
         static constexpr uint8_t kFlagsCompareA = _BV(OCF2A);
