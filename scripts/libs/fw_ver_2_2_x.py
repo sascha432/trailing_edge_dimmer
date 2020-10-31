@@ -25,6 +25,29 @@ class c_temp_ofs_t(floats.c_int8_FixedPointFloat):
         floats.FixedPointFloat.__init__(self, 4, 1, 2)
     __init_subclass__ = floats.c_int8_FixedPointFloat.__init_subclass__
 
+class dimmer_timers_t(Structure):
+    _pack_ = 1
+    _fields_ = [("timer1_ticks_per_us", c_float)]
+
+class dimmer_version_t(Structure):
+    _pack_ = 1
+    _fields_ = [("revision", c_uint16, 5),
+                ("minor", c_uint16, 5),
+                ("major", c_uint16, 5),
+                ("___reserved", c_uint16, 1)]
+
+class dimmer_config_info_t(Structure):
+    _pack_ = 1
+    _fields_ = [("max_levels", c_uint16),
+                ("channel_count", c_uint8),
+                ("cfg_start_address", c_uint8),
+                ("length", c_uint8)]
+
+class dimmer_version_info_t(Structure):
+    _pack_ = 1
+    _fields_ = [("version", dimmer_version_t),
+                ("info", dimmer_config_info_t)]
+
 class c_internal_temp_calibration_t(Structure):
     _pack_ = 1
     _fields_ = [("ts_offset", c_uint8),
@@ -79,24 +102,24 @@ class register_mem_cfg_t(Structure):
         else:
             Structure.__setattr__(self, key, val)
 
-    def __get_range_end(self, max_level = 8192):
+    def __get_range_end(self):
         range_divider = Structure.__getattribute__(self, 'range_divider')
         if range_divider==0:
-            return max_level
-        return int((max_level * max_level) / (range_divider - Structure.__getattribute__(self, 'range_begin')))
+            return self.max_level
+        return int((self.max_level * self.max_level) / (range_divider - Structure.__getattribute__(self, 'range_begin')))
 
-    def __set_range_end(self, range_end, max_level = 8192):
+    def __set_range_end(self, range_end):
         range_begin = self.__getattribute__('range_begin')
         if range_end==0:
             range_begin = 0
             range_divider = 0
-        elif range_end==max_level:
+        elif range_end==self.max_level:
             if range_begin==0:
                 range_divider = 0
             else:
                 range_divider = range_begin
         else:
-            range_divider = int(max_level * max_level / range_end + range_begin);
+            range_divider = int(self.max_level * self.max_level / range_end + range_begin);
         Structure.__setattr__(self, 'range_begin', range_begin)
         Structure.__setattr__(self, 'range_divider', range_divider)
 

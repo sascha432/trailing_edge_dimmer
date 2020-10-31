@@ -302,7 +302,7 @@ static_assert(sizeof(dimmer_config_info_t) == 5, "check struct");
 
 typedef struct __attribute__((__packed__)) {
     float timer1_ticks_per_us;
-} dimmer_timmers_t;
+} dimmer_timers_t;
 
 typedef struct __attribute__((__packed__)) dimmer_version_t {
     union __attribute__((__packed__)) {
@@ -328,12 +328,14 @@ static constexpr uint16_t dimmer_version_to_uint16(const uint8_t major, const ui
 
 static_assert(sizeof(dimmer_version_t) == 2, "check struct");
 
+typedef struct __attribute__((__packed__)) {
+    dimmer_version_t version;
+    dimmer_config_info_t info;
+} dimmer_version_info_t;
+
 typedef union __attribute__((__packed__)) {
-    dimmer_timmers_t timers;
-    struct __attribute__((__packed__)) {
-        dimmer_version_t version;
-        dimmer_config_info_t info;
-    };
+    dimmer_timers_t timers;
+    dimmer_version_info_t v;
     uint64_t qword[2];
     uint32_t dwords[4];
     float floats[4];

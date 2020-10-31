@@ -53,6 +53,7 @@ class Protocol:
                 if line!='':
                     break
             self.raw_line = line
+            # print(self.raw_line)
             if line.lower().startswith('+rem='):
                 err = 'comment'
                 repeat = False
@@ -111,7 +112,8 @@ class Protocol:
             elif isinstance(line, bytearray):
                 if length!=None:
                     count += 1
-                    if len(line)==length:
+                    l = len(line)
+                    if (isinstance(length, list) and l in length) or l==length:
                         match += 1
                 if event!=None:
                     count += 1
@@ -194,8 +196,8 @@ class Protocol:
 
     def get_version(self):
         self.transmit('8a02b9')
-        self.receive(2)
-        return 2
+        self.receive(7)
+        return [2, 7]
 
     def print_config(self):
         self.transmit('8991')

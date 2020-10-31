@@ -39,6 +39,7 @@ class Config:
         (self.structs, self.consts, ) = Config.is_version_supported(major, minor, revision)
         self.version = 'unknown'
         self.register_mem_cfg_t = None
+        self.info = None
 
     def bytearray_to_hex(self, array):
         return ''.join('%02x' % b for b in array)
@@ -59,6 +60,8 @@ class Config:
         # print(int(self.register_mem_cfg_t.__getattribute__('internal_vref11')))
         # print(self.register_mem_cfg_t.__getattribute__('internal_vref11'))
         # print(self.register_mem_cfg_t.__getattribute__('internal_vref11').value)
+
+        self.register_mem_cfg_t.max_level = self.info.max_levels
 
         json = {}
         for name in dir(self.register_mem_cfg_t):

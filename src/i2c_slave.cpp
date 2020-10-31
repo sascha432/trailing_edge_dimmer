@@ -65,18 +65,15 @@ void _dimmer_i2c_on_receive(int length)
             // legacy version request
             //
             // +i2ct=17,8a,02,b9
-            // +i2cr=17,02
-            if (length == 0 && register_mem.data.address == 0xb9 && register_mem.data.cmd.read_length >= 2) {
+            // +i2cr=17,07
+            //
+            // older versions will respond with 2 byte for the version and the rest filled with 0xff
+            if (length == 0 && register_mem.data.address == 0xb9 && register_mem.data.cmd.read_length == 2) {
                 _D(5, debug_printf("I2C version request\n"));
-                register_mem.data.ram.version._word = Dimmer::Version::kVersion;
-                if (register_mem.data.cmd.read_length == sizeof(register_mem.data.ram.version) + sizeof(register_mem.data.ram.info)) {
-                    register_mem.data.ram.info = { Dimmer::Level::max, Dimmer::Channel::kSize, DIMMER_REGISTER_OPTIONS, sizeof(register_mem.data.cfg)};
-                    i2c_slave_set_register_address(0, DIMMER_REGISTER_RAM, register_mem.data.cmd.read_length);
-                }
-                else {
-                    register_mem.data.cmd.read_length = 2;
-                    i2c_slave_set_register_address(0, DIMMER_REGISTER_RAM, register_mem.data.cmd.read_length);
-                }
+                register_mem.data.ram.v.version._word = Dimmer::Version::kVersion;
+                register_mem.data.ram.v.info = { Dimmer::Level::max, Dimmer::Channel::kSize, DIMMER_REGISTER_OPTIONS, sizeof(register_mem.data.cfg)};
+                register_mem.data.cmd.read_length = 0;
+                i2c_slave_set_register_address(0, DIMMER_REGISTER_RAM, sizeof(register_mem.data.ram.v));
             }
         }
         else if (addr == DIMMER_REGISTER_READ_LENGTH) {

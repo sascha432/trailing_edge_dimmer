@@ -163,6 +163,7 @@ if args.port:
                 raise protocol.ProtocolError('Serial timeout')
 
             if isinstance(data, bytearray):
+
                 version = config.Config.get_version(data)
                 print('Detected version: %u.%u.%u' % (version[0], version[1], version[2]))
                 version_key = config.Config.is_version_supported(version[0], version[1], version[2], False)
@@ -172,6 +173,17 @@ if args.port:
                 sp.structs = cfg.structs
                 sp.DIMMER = cfg.consts.DimmerConst()
                 DIMMER = sp.DIMMER
+
+                version_info = sp.structs.dimmer_version_info_t.from_buffer_copy(data)
+                cfg.info = version_info.info
+                print('version=%u.%u.%u levels=%u channels=%u address=0x%02x length=%d' % (
+                    version_info.version.major, version_info.version.minor, version_info.version.revision,
+                    version_info.info.max_levels,
+                    version_info.info.channel_count,
+                    version_info.info.cfg_start_address,
+                    version_info.info.length)
+                )
+
             else:
                 raise protocol.ProtocolError('Failed to retrieve version')
 
