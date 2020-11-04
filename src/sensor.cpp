@@ -98,11 +98,24 @@ uint16_t read_vcc()
 
 #elif HAVE_READ_VCC
 
+#if 1
+
+// read VCC in mV (faster version with rounding error every 11th millivolt)
+uint16_t read_vcc()
+{
+    static_assert(internal_vref11_t::shift == 12 && internal_vref11_t::offset == 0x3f8ccccd, "values do not match");
+    return (72090000UL + dimmer_config.internal_vref11._value * 31982) / _adc.getValue(ADCHandler::kPosVCC);
+}
+
+#else
+
 // read VCC in mV
 uint16_t read_vcc()
 {
     return (uint32_t)(((1024UL * 1000) << ADCHandler::kLeftShift) * (float)dimmer_config.internal_vref11) / _adc.getValue(ADCHandler::kPosVCC);
 }
+
+#endif
 
 #endif
 
