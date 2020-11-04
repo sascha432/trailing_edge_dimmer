@@ -48,12 +48,11 @@ with open(outfile1, 'w', newline='\n') as ofh1:
                 elif name.startswith('EEPROM_FLAGS_'):
                     obj_name = 'EEPROM_FLAGS'
                     np_name = np_name[len(obj_name) + 1:]
-                elif name=='EEPROM_WRITTEN':
-                    name = 'EVENT_' + name
+                elif name.startswith('EVENT_'):
                     obj_name = 'EVENT'
+                    np_name = np_name[len(obj_name) + 1:]
                 else:
-                    obj_name = 'EVENT'
-                    name = 'EVENT_' + name
+                    raise Exception('invalid group')
 
                 value = m[2]
                 try:

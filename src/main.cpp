@@ -96,7 +96,11 @@ void display_dimmer_info() {
     Serial.printf_P(PSTR("NTC=%.2f/%+.2f,"), get_ntc_temperature(), (float)dimmer_config.ntc_temp_offset);
 #endif
 #if HAVE_READ_INT_TEMP
-    Serial.printf_P(PSTR("int.temp=%.2f/ofs=%u/gain=%u,"), get_internal_temperature(), dimmer_config.internal_temp_calibration.ts_offset, dimmer_config.internal_temp_calibration.ts_gain);
+    Serial.printf_P(PSTR("int.temp=%.1f/ofs=%u/gain=%u,"),
+        get_internal_temperature(),
+        dimmer_config.internal_temp_calibration.ts_offset,
+        dimmer_config.internal_temp_calibration.ts_gain
+    );
 #endif
     Serial.printf_P(PSTR("max.temp=%u,metrics=%u,"), dimmer_config.max_temp, REPORT_METRICS_INTERVAL(dimmer_config.report_metrics_interval));
 #if HAVE_READ_VCC
@@ -115,33 +119,6 @@ void display_dimmer_info() {
 }
 
 void setup() {
-
-    uint8_t buf[3];
-    is_Atmega328PB = memcmp_P(get_signature(buf), PSTR("\x1e\x95\x16"), 3) == 0;
-
-//     	#define TSOFFSET		5
-// #define TSGAIN			7
-
-// T_offset = boot_signature_byte_get( TSOFFSET ) ;
-// 	T_gain = boot_signature_byte_get( TSGAIN ) ;
-// 	T_mult = 32768U / T_gain ;
-
-
-//     	temp = AdcTotal ;
-// 						temp -= 298 ;
-// 						temp += T_offset ;
-// 						temp *= T_mult ;
-// 						temp >>= 8 ;
-// 						temp += 25 ;
-// 						Temperature = temp ;
-
-    Serial.begin(DEFAULT_BAUD_RATE);
-    // delay(1000);
-    // for(uint8_t i = 0; i < 0x1f; i++) {
-    //     auto tmp = boot_signature_byte_get(i);
-    //     Serial.printf("%02x(%u) ", tmp,tmp);
-    // }
-    // Serial.println();
 
     Serial.begin(DEFAULT_BAUD_RATE);
 
@@ -308,7 +285,7 @@ void loop()
 
 #if HAVE_PRINT_METRICS
 
-    if (queues.print_metrics.timer && millis24 >= queues.print_metrics.timer) {
+    if (queues.print_metrics.interval && millis24 >= queues.print_metrics.timer) {
         queues.print_metrics.timer = millis24 + queues.print_metrics.interval;
         rem();
         #if HAVE_NTC
@@ -400,16 +377,17 @@ void loop()
             queues.check_temperature.timer = Queues::kTemperatureCheckTimerOverflows;
         }
 
+        int current_temp;
 #if HAVE_NTC
 
-        int current_temp = (register_mem.data.ntc_temp = get_ntc_temperature());
+        current_temp = (register_mem.data.ntc_temp = get_ntc_temperature());
 #if HAVE_READ_INT_TEMP
         current_temp = max(current_temp, (int16_t)(register_mem.data.int_temp = get_internal_temperature()));
 #endif
 
 #elif HAVE_READ_INT_TEMP
 
-        int current_temp = (register_mem.data.int_temp = get_internal_temperature());
+        current_temp = (register_mem.data.int_temp = get_internal_temperature());
 
 #else
 
@@ -418,16 +396,27 @@ void loop()
 #endif
 
         if (dimmer_config.max_temp && current_temp > (int)dimmer_config.max_temp) {
-            _D(5, debug_printf("OVER TEMPERATURE PROTECTION temp=%d\n", current_temp));
 
-            dimmer.fade_from_to(Dimmer::Channel::any, Dimmer::Level::current, Dimmer::Level::off, 10);
-            dimmer_config.bits.over_temperature_alert_triggered = 1;
-            conf.scheduleWriteConfig();
-            Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-            Wire.write(DIMMER_EVENT_TEMPERATURE_ALERT);
-            Wire.write((uint8_t)current_temp);
-            Wire.write(dimmer_config.max_temp);
-            Wire.endTransmission();
+            if (millis24 >= queues.check_temperature.report_next) {
+
+                _D(5, debug_printf("OVER TEMPERATURE PROTECTION temp=%d\n", current_temp));
+                queues.check_temperature.report_next = millis24 + (30000U >> 8); // next alert in 30 seconds
+
+                if (!dimmer_config.bits.over_temperature_alert_triggered) {
+                    dimmer_config.bits.over_temperature_alert_triggered = 1;
+                    conf.scheduleWriteConfig();
+                }
+
+                dimmer.fade_from_to(Dimmer::Channel::any, Dimmer::Level::current, Dimmer::Level::off, 10);
+
+                Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
+                Wire.write(DIMMER_EVENT_TEMPERATURE_ALERT);
+                Wire.write((uint8_t)current_temp);
+                Wire.write(dimmer_config.max_temp);
+                Wire.endTransmission();
+
+            }
+
         }
 
         if (dimmer_config.report_metrics_interval && millis24 >= queues.report_metrics.timer) {

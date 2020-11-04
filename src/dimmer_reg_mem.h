@@ -464,11 +464,14 @@ namespace Dimmer  {
     namespace RegisterMemory {
 
         struct raw {
+            static constexpr uint8_t size() {
+                return sizeof(register_mem_t);
+            }
             static constexpr uint8_t *begin() {
                 return register_mem.raw;
             }
             static constexpr uint8_t *end() {
-                return register_mem.raw + sizeof(register_mem_t);
+                return register_mem.raw + size();
             }
             static uint8_t *fromAddress(uint8_t address) {
                 return register_mem.raw + (address - DIMMER_REGISTER_START_ADDR);
@@ -480,6 +483,18 @@ namespace Dimmer  {
                 _iterator(raw::fromAddress(address)),
                 _length(length)
             {
+                if (_length < 0) {
+                    _length = 0;
+                }
+                else  {
+                    int8_t tmp = (raw::end() - _iterator);
+                    if ((uint8_t)tmp >= raw::size()) {
+                        _length = 0;
+                    }
+                    else if (_length > tmp)  {
+                        _length = tmp;
+                    }
+                }
                 length = 0;
             }
 
@@ -501,11 +516,7 @@ namespace Dimmer  {
             }
 
             size_t size() const {
-                int8_t tmp = (raw::end() - _iterator);
-                if (tmp > _length) {
-                    return _length;
-                }
-                return tmp;
+                return _length;
             }
 
             uint8_t *_iterator;

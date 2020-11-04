@@ -59,6 +59,7 @@ struct Queues {
 
     struct {
         uint16_t timer{kTemperatureCheckTimerOverflows};
+        uint24_t report_next{0};
     } check_temperature;
 
     struct {

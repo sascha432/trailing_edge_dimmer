@@ -16,20 +16,20 @@ inline uint8_t validate_register_address()
     if (offset < (uint8_t)sizeof(register_mem_t)) {
         return offset;
     }
-    return DIMMER_REGISTER_ADDRESS;
+    return DIMMER_REGISTER_ADDRESS - DIMMER_REGISTER_START_ADDR;
 }
 
 void i2c_write_to_register(uint8_t data)
 {
     register_mem.raw[validate_register_address()] = data;
-    _D(5, debug_printf("I2C write %#02x: %#02x (%u, %d)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR , data, data, (int8_t)data));
+    _D(5, debug_printf("I2C write to %#02x: %#02x (%u, %d)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR , data, data, (int8_t)data));
     register_mem.data.address++;
 }
 
 uint8_t i2c_read_from_register()
 {
     auto data = register_mem.raw[validate_register_address()];
-    _D(5, debug_printf("I2C read %#02x: %#02x (%u, %d)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR, data, data, (int8_t)data));
+    _D(5, debug_printf("I2C read from %#02x: %#02x (%u, %d)\n", validate_register_address() + DIMMER_REGISTER_START_ADDR, data, data, (int8_t)data));
     register_mem.data.address++;
     return data;
 }
@@ -38,7 +38,7 @@ void i2c_slave_set_register_address(int length, uint8_t address, int8_t read_len
 {
     register_mem.data.cmd.read_length += read_length;
     register_mem.data.address = (length <= 1) ? /* no more data available */ address : DIMMER_REGISTER_ADDRESS;
-    _D(5, debug_printf("I2C auto=%#02x read_len=%d\n", register_mem.data.address, read_length));
+    _D(5, debug_printf("I2C auto addr=%#02x read_len=%d\n", register_mem.data.address, read_length));
 }
 
 uint8_t Wire_read_uint8_t(int &length, uint8_t default_value)
@@ -56,11 +56,11 @@ void _dimmer_i2c_on_receive(int length)
     register_mem.data.cmd.read_length = 0;
     while(length-- > 0) {
         auto addr = register_mem.data.address;
-        _D(5, debug_printf("I2C receive=%#02x left=%d\n", addr, length));
+        _D(5, debug_printf("I2C addr=%#02x data=%02x left=%d\n", addr, Wire.peek(), length));
         i2c_write_to_register(Wire.read());
         if (addr == DIMMER_REGISTER_ADDRESS) {
             register_mem.data.address--;
-            _D(5, debug_printf("I2C set=%#02x\n", register_mem.data.address));
+            _D(5, debug_printf("I2C set addr=%#02x\n", register_mem.data.address));
 
             // legacy version request
             //
@@ -241,10 +241,22 @@ void _dimmer_i2c_on_receive(int length)
                     }
                     break;
                 case DIMMER_COMMAND_DUMP_MEM: {
+                        Serial.print(F("+REM="));
                         auto ptr = Dimmer::RegisterMemory::raw::begin();
                         for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++, ptr++) {
-                            Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
+                            //1Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
+                            if (addr % 4 == 0) {
+                                Serial.printf_P(PSTR("[%02x]"), addr);
+                            }
+                            Serial.printf_P(PSTR("%02x"), *ptr);
+                            if (addr % 16 == 15) {
+                                Serial.print(F("\n+REM="));
+                            }
+                            else if (addr % 4 == 3) {
+                                Serial.print(' ');
+                            }
                         }
+                        Serial.println();
                     }
                     break;
 #endif
@@ -260,7 +272,7 @@ void _dimmer_i2c_on_request()
     auto tmp = register_mem.data.cmd.read_length;
 #endif
     Dimmer::RegisterMemory::request data(register_mem.data.address, register_mem.data.cmd.read_length);
-    _D(9, debug_printf("I2C on_request addr=%#02x len=%u avail=%u\n", register_mem.data.address, tmp, data.size()));
+    _D(5, debug_printf("I2C on_request addr=%#02x len=%u avail=%u\n", register_mem.data.address, tmp, data.size()));
     Wire.write(data.data(), data.size());
 }
 

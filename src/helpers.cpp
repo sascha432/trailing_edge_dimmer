@@ -49,7 +49,7 @@ uint8_t _debug_level = 0;
 
 void debug_print_millis()
 {
-    Serial.printf_P(PSTR("%05.5lu "), millis());
+    Serial.printf_P(PSTR("+REM=%05.5lu "), millis());
     Serial.flush();
 }
 
@@ -239,8 +239,6 @@ uint8_t *get_signature(uint8_t *sig)
     return sig;
 }
 
-extern bool is_Atmega328PB;
-
 void get_mcu_type(MCUInfo_t &info)
 {
     get_signature(info.sig);
@@ -250,20 +248,17 @@ void get_mcu_type(MCUInfo_t &info)
     *ptr++ = boot_lock_fuse_bits_get(GET_HIGH_FUSE_BITS);
     *ptr++ = boot_lock_fuse_bits_get(GET_EXTENDED_FUSE_BITS);
 
-#if __AVR_ATmega328PB__
+#if __AVR_ATmega328PB__ || (MCU_IS_ATMEGA328PB == 1)
 
     info.name = FPSTR("ATmega328PB");
-    setAtmega328PB(true);
 
 #elif __AVR_ATmega328P__
 
-    if (info.sig[2] == 0x16) {
-        info.name = FPSTR("ATmega328PB");
-        setAtmega328PB(true);
-    }
-    else {
-        info.name = FPSTR("ATmega328P");
-    }
+#if !defined(MCU_IS_ATMEGA328PB)
+#error set MCU_IS_ATMEGA328PB to 0 or 1, if the selected target MCU is ATmega328P
+#endif
+
+    info.name = FPSTR("ATmega328P");
 
 #elif __AVR_ATmega2560__
 
@@ -293,7 +288,6 @@ void get_mcu_type(MCUInfo_t &info)
                     break;
                 case 0x16:
                     info.name = FPSTR("ATmega328PB");
-                    setAtmega328PB(true);
                     break;
             }
         }
