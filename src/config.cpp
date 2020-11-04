@@ -5,7 +5,9 @@
 #include <EEPROM.h>
 #include <crc16.h>
 #include <util/atomic.h>
+#include <avr/boot.h>
 #include "config.h"
+#include "sensor.h"
 
 // EEPROM_config_t config;
 Config conf;
@@ -36,13 +38,18 @@ void Config::resetConfig()
     register_mem.data.cfg.zero_crossing_delay_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_ZC_DELAY_US);
     register_mem.data.cfg.minimum_on_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_ON_TIME_US);
     register_mem.data.cfg.minimum_off_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_OFF_TIME_US);
-#ifdef INTERNAL_TEMP_OFS
-    register_mem.data.cfg.int_temp_offset = INTERNAL_TEMP_OFS;
+
+#if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0 && DIMMER_AVR_TEMP_TS_GAIN == 0
+    register_mem.data.cfg.internal_temp_calibration = atmega328p_read_ts_values();
+#else
+    register_mem.data.cfg.internal_temp_calibration.ts_offset = DIMMER_AVR_TEMP_TS_OFFSET;
+    register_mem.data.cfg.internal_temp_calibration.ts_gain = DIMMER_AVR_TEMP_TS_GAIN;
 #endif
+
 #ifdef NTC_TEMP_OFS
     register_mem.data.cfg.ntc_temp_offset = NTC_TEMP_OFS;
 #endif
-    register_mem.data.cfg.report_metrics_interval = 5;
+    register_mem.data.cfg.report_metrics_interval = DIMMER_REPORT_METRICS_INTERVAL;
     register_mem.data.ntc_temp = NAN;
     register_mem.data.int_temp = NAN;
     register_mem.data.frequency = NAN;

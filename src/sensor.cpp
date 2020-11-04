@@ -7,18 +7,74 @@
 
 #if HAVE_READ_INT_TEMP
 
-bool is_Atmega328PB;
+// LSB are the ADC readings for 3 given temperatures
+// those are different for the type of MCU
 
-// https://playground.arduino.cc/Main/InternalTemperatureSensor/
+// avr_temp_ofs_gain.py can be used to find TS_GAIN and TS_OFFSET for different calibration points (Temperature/LSB)
+// it is recommended to calibrate each chip at 20 and 55 °C to get a precision of +-2°C
+
+// ATmega328PB
+// T°C 	    -40 	+25 	+105
+// LSB 	    205 	270 	350
+// T = (ADC - TS_OFFSET) / k
+// TS_GAIN = 128 (k = 1.0), TS_OFFSET = 103
+
+// ATmega328P
+// T 		-40 	+25 	+125
+// LSB		269		352		480
+// T = ((ADC - (273 + 100 - TS_OFFSET)) * 128) / TS_GAIN + 25
+// TS_GAIN = 164 TS_OFFSET = 21 (-40=-39.78 25=25.00 125=124.90)
+
 float get_internal_temperature()
 {
-    // return (((sum / 10.0) - (is_Atmega328PB ? 247.0f : 324.31f)) / 1.22f) + (float)dimmer_config.int_temp_offset;
-
-    return (((_adc.getValue(ADCHandler::kPosIntTemp) / 64.0) - (is_Atmega328PB ? 247.0 : 324.31)) / 1.22);
-    //TODO
-    //dimmer_config.internal_temp_calibration.ts_gain
-     //+ (float)dimmer_config.internal_temp_calibration;
+    return ((((_adc.getValue(ADCHandler::kPosIntTemp) >> ADCHandler::kLeftShift) - (273 + 100 - dimmer_config.internal_temp_calibration.ts_offset)) * 128) / dimmer_config.internal_temp_calibration.ts_gain) + 25;
 }
+
+#if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
+
+#include <avr/boot.h>
+
+internal_temp_calibration_t atmega328p_read_ts_values()
+{
+    internal_temp_calibration_t values;
+    constexpr uint16_t TS_GAIN = 0x0005;
+    constexpr uint16_t TS_OFFSET = 0x0007;
+    loop_until_bit_is_clear(SPMCSR, SPMEN);
+    SPMCSR |= (_BV(SIGRD)|_BV(SPMEN));
+    asm(
+        "lpm %0, Z\n"
+        : "=r" (values.ts_gain)
+        : "z" (TS_GAIN)
+    );
+    loop_until_bit_is_clear(SPMCSR, SPMEN);
+    SPMCSR |= (_BV(SIGRD)|_BV(SPMEN));
+    asm(
+        "lpm %0, Z\n"
+        : "=r" (values.ts_offset)
+        : "z" (TS_OFFSET)
+    );
+    return values;
+
+    // Source: http://ww1.microchip.com/downloads/en/DeviceDoc/Atmel-7810-Automotive-Microcontrollers-ATmega328P_Datasheet.pdf
+    // LDI R30,LOW(TS_GAIN)
+    // LDI R31,HIGH (TS_GAIN)
+    // RCALL Read_signature_row
+    // MOV R17,R16; Save R16 result
+    // LDI R30,LOW(TS_OFFSET)
+    // LDI R31,HIGH (TS_OFFSET)
+    // RCALL Read_signature_row
+    // ; R16 holds TS_OFFSET and R17 holds TS_GAIN
+    // Read_signature_row:
+    // IN R16,SPMCSR; Wait for SPMEN ready
+    // SBRC R16,SPMEN; Exit loop here when SPMCSR is free
+    // RJMP Read_signature_row
+    // LDI R16,((1<<SIGRD)|(1<<SPMEN)); We need to set SIGRD and SPMEN together
+    // OUT SPMCSR,R16; and execute the LPM within 3 cycles
+    // LPM R16,Z
+    // RET
+}
+
+#endif
 
 #endif
 
@@ -69,23 +125,13 @@ uint16_t read_poti()
 
 float convert_to_celsius(uint16_t value)
 {
-    // constexpr float kResistorFactor = NTC_SERIES_RESISTANCE / (float)NTC_NOMINAL_RESISTANCE;
-    // constexpr float kNominalValue = 1.0 / (NTC_NOMINAL_TEMP + 273.15);
-    // constexpr float kBetaCoEff = NTC_BETA_COEFF;
-    float steinhart;
-    // steinhart = 1023 / (float)value - 1;
-    // steinhart = (((1023U << 6) / value) - 1) * kRFactor
-    // steinhart = (((1023U << 6) / value) - 1) * kRFactor;
-    steinhart = (1023 / (value / 64.0)) - 1;
-    //steinhart = ((1023U << ADCHandler::kLeftShift) / value) - 1;
-    steinhart *= NTC_SERIES_RESISTANCE;
-    steinhart /= NTC_NOMINAL_RESISTANCE;
+    float steinhart = ((1023U << ADCHandler::kLeftShift) / (float)value) - 1;
+    steinhart *= NTC_SERIES_RESISTANCE / (float)NTC_NOMINAL_RESISTANCE;
     steinhart = log(steinhart);
     steinhart /= NTC_BETA_COEFF;
     steinhart += 1.0 / (NTC_NOMINAL_TEMP + 273.15);
     steinhart = 1.0 / steinhart;
-    steinhart -= 273.15;
-    return steinhart;
+    return steinhart - 273.15;
 }
 
 float get_ntc_temperature()

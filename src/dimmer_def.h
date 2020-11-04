@@ -208,15 +208,49 @@
 #define DIMMER_RESTORE_LEVEL                                    1
 #endif
 
+#ifndef DIMMER_REPORT_METRICS_INTERVAL
+#define DIMMER_REPORT_METRICS_INTERVAL                          5
+#endif
+
 #ifndef INTERNAL_VREF_1_1V
 // after calibration VCC readings are pretty accurate, +-2-3mV
 // default for cfg.internal_1_1v_ref
 #define INTERNAL_VREF_1_1V                                      1.1
 #endif
 
+// use internal temperature sensor
 #ifndef HAVE_READ_INT_TEMP
 #define HAVE_READ_INT_TEMP                                      1
 #endif
+
+// default values for TS_OFFSET and TS_GAIN
+//
+// see datasheet for more infomation
+//
+// The values described in the table above are typical values. However, due to process variation the
+// temperature sensor output voltage varies from one chip to another. To be capable of achieving more
+// accurate results the temperature measurement can be calibrated in the application software
+#if __AVR_ATmega328PB__ || MCU_IS_ATMEGA328PB == 1
+
+#define DIMMER_AVR_TEMP_TS_OFFSET                               103
+#define DIMMER_AVR_TEMP_TS_GAIN                                 128
+
+#elif __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
+
+// Atmega328P only: DIMMER_AVR_TEMP_TS_GAIN = 0 reads the calibration values from the signature bytes
+#ifndef DIMMER_AVR_TEMP_TS_OFFSET
+// #define DIMMER_AVR_TEMP_TS_OFFSET                               21
+// #define DIMMER_AVR_TEMP_TS_GAIN                                 164
+#define DIMMER_AVR_TEMP_TS_OFFSET                               0
+#define DIMMER_AVR_TEMP_TS_GAIN                                 0
+#endif
+
+#else
+
+#error DIMMER_AVR_TEMP_TS_GAIN and DIMMER_AVR_TEMP_TS_OFFSET must be defined
+
+#endif
+
 
 // NTC pin
 #ifndef NTC_PIN

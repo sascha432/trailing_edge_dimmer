@@ -6,13 +6,13 @@
 
 #if HAVE_READ_INT_TEMP
 
-extern bool is_Atmega328PB;
-#define setAtmega328PB(value)               is_Atmega328PB = value;
 float get_internal_temperature();
 
-#else
+#if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
 
-#define setAtmega328PB(value)               ;
+internal_temp_calibration_t atmega328p_read_ts_values();
+
+#endif
 
 #endif
 
