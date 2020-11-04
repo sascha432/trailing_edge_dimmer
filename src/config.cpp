@@ -47,7 +47,7 @@ void Config::resetConfig()
 #endif
 
 #ifdef NTC_TEMP_OFS
-    register_mem.data.cfg.ntc_temp_cal_offset = NTC_TEMP_OFS;
+    register_mem.data.cfg.ntc_temp_cal_offset = static_cast<float>(NTC_TEMP_OFS);
 #endif
     register_mem.data.cfg.report_metrics_interval = DIMMER_REPORT_METRICS_INTERVAL;
     register_mem.data.ntc_temp = NAN;

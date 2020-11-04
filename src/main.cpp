@@ -91,7 +91,7 @@ void display_dimmer_info() {
     Serial.flush();
 
     rem();
-    Serial.printf_P(PSTR("values=restore=%u,f=%.3fHz,vref11=%.3f,"), dimmer_config.bits.restore_level, dimmer._get_frequency(), (float)dimmer_config.internal_vref11);
+    Serial.printf_P(PSTR("values=restore=%u,f=%.3fHz,vref11=%.3f,"), dimmer_config.bits.restore_level, dimmer._get_frequency(), static_cast<float>(dimmer_config.internal_vref11));
 #if HAVE_NTC
     Serial.printf_P(PSTR("NTC=%.2f/%+.2f,"), get_ntc_temperature(), (float)dimmer_config.ntc_temp_cal_offset);
 #endif
@@ -289,16 +289,16 @@ void loop()
         queues.print_metrics.timer = millis24 + queues.print_metrics.interval;
         rem();
         #if HAVE_NTC
-            Serial.printf_P(PSTR("NTC=%.3f,"), get_ntc_temperature());
+            Serial.printf_P(PSTR("NTC=%.2f°C(%.1f),"), get_ntc_temperature(), _adc.getValue(ADCHandler::kPosNTC) / 64.0);
         #endif
         #if HAVE_READ_INT_TEMP
-            Serial.printf_P(PSTR("int.temp=%.3f,"), get_internal_temperature());
+            Serial.printf_P(PSTR("int.temp=%.2f°C(%.1f),"), get_internal_temperature(), _adc.getValue(ADCHandler::kPosIntTemp)  / 64.0);
         #endif
         #if HAVE_READ_VCC || HAVE_EXT_VCC
-            Serial.printf_P(PSTR("VCC=%u,"), read_vcc());
+            Serial.printf_P(PSTR("VCC=%umV (%.1f),"), read_vcc(), _adc.getValue(ADCHandler::kPosVCC)  / 64.0);
         #endif
         #if HAVE_POTI
-            Serial.printf_P(PSTR("poti=%u,"), _adc.getValue(ADCHandler::kPosPoti) >> 6);
+            Serial.printf_P(PSTR("poti=%.1f,"), _adc.getValue(ADCHandler::kPosPoti)  / 64.0);
         #endif
         // Serial.printf_P(PSTR("hw=%u,diff=%d,"), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks);
         // Serial.printf_P(PSTR("frq=%.3f,mode=%c,lvl="), dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');

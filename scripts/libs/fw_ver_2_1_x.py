@@ -56,10 +56,16 @@ class dimmer_metrics_t(Structure):
                 ("ntc_temp", c_float),
                 ("internal_temp", c_float)]
 
+    def __str__(self):
+        return 'temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%.2f°C' % (self.temp_check_value, self.vcc, self.frequency, self.ntc_temp, self.internal_temp)
+
 class dimmer_over_temperature_event_t(Structure):
     _pack_ = 1
     _fields_ = [("current_temp", c_uint8),
                 ("max_temp", c_uint8)]
+
+    def __str__(self):
+        'temp=%u°C max=%u°C' % (self.current_temp, self.max_temp)
 
 class dimmer_eeprom_written_t(Structure):
     _pack_ = 1
@@ -67,7 +73,5 @@ class dimmer_eeprom_written_t(Structure):
                 ("write_position", c_uint16),
                 ("bytes_written", c_uint8)]
 
-    def __getattribute__(self, name):
-        if name=='config_updated':
-            return True
-        return Structure.__getattribute__(self, name)
+    def __str__(self):
+        return 'EEPROM written: cycle=%u position=%u written=%u' % (self.write_cycle, self.write_position, self.bytes_written)

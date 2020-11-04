@@ -131,11 +131,11 @@ class Protocol:
                 if isinstance(data, bytearray):
                     if data[0]==self.DIMMER.EVENT.METRICS_REPORT:
                         metrics = self.structs.dimmer_metrics_t.from_buffer_copy(data[1:])
-                        print('Metrics: temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%.2f°C' % (metrics.temp_check_value, metrics.vcc, metrics.frequency, metrics.ntc_temp, metrics.internal_temp))
+                        print('Metrics: %s' % (metrics))
                         return data[0]
                     if data[0]==self.DIMMER.EVENT.TEMPERATURE_ALERT:
                         event = self.structs.dimmer_over_temperature_event_t.from_buffer_copy(data[1:])
-                        print('OVER TEMPERATURE: temp=%u°C max=%u°C' % (event.current_temp, event.max_temp))
+                        print('OVER TEMPERATURE: %s' % (event))
                         return data[0]
                     if data[0]==self.DIMMER.EVENT.FADING_COMPLETE:
                         print('FADING COMPLETE EVENT: %s' % (self.raw_line))
@@ -153,17 +153,11 @@ class Protocol:
                         return data[0]
                     if data[0]==self.DIMMER.EVENT.EEPROM_WRITTEN:
                         event = self.structs.dimmer_eeprom_written_t.from_buffer_copy(data[1:])
-                        print('EEPROM written: cycle=%u position=%u written=%u config_updated=%u' % (event.write_cycle, event.write_position, event.bytes_written, event.config_updated))
+                        print('EEPROM written: %s' % (event))
                         return data[0]
                     if data[0]==self.DIMMER.EVENT.SYNC_EVENT:
                         event = self.structs.dimmer_sync_event_t.from_buffer_copy(data[1:])
-                        if event.type==self.DIMMER.SYNC_EVENT_TYPE_.LOST:
-                            tmp = 'type=LOST halfcycles=%u' % (event.counter)
-                        elif event.type==self.DIMMER.SYNC_EVENT_TYPE_.SYNC:
-                            tmp = 'type=SYNC difference=%u' % (event.diff)
-                        else:
-                            tmp = 'type=UNKNOWN'
-                        print('SYNC EVENT: %s' % tmp)
+                        print('SYNC EVENT: %s' % event)
                         return data[0]
         except Exception as e:
             print('Invalid data: %s: %s' % (e, self.raw_line))

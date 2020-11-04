@@ -186,10 +186,16 @@ class dimmer_metrics_t(Structure):
                 ("ntc_temp", c_float),
                 ("internal_temp", c_float)]
 
+    def __str__(self):
+        return 'temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%.2f°C' % (self.temp_check_value, self.vcc, self.frequency, self.ntc_temp, self.internal_temp)
+
 class dimmer_over_temperature_event_t(Structure):
     _pack_ = 1
     _fields_ = [("current_temp", c_uint8),
                 ("max_temp", c_uint8)]
+
+    def __str__(self):
+        return 'temp=%u°C max=%u°C' % (self.current_temp, self.max_temp)
 
 class dimmer_eeprom_written_t(Structure):
     _pack_ = 1
@@ -199,6 +205,9 @@ class dimmer_eeprom_written_t(Structure):
                 ("config_updated", c_uint8, 1),
                 ("__reserved", c_uint8, 7)]
 
+    def __str__(self):
+        return 'EEPROM written: cycle=%u position=%u written=%u config_updated=%u' % (self.write_cycle, self.write_position, self.bytes_written, self.config_updated)
+
 class dimmer_sync_event_t(Structure):
     _pack_ = 1
     _fields_ = [("lost", c_uint8, 1),
@@ -206,3 +215,11 @@ class dimmer_sync_event_t(Structure):
                 ("__reserved", c_uint8, 2),
                 ("sync_difference_cycles", c_uint32, 28),
                 ("halfwave_counter", c_uint16)]
+
+    def __str__(self):
+        global DIMMER
+        if self.type==DIMMER.SYNC_EVENT_TYPE_.LOST:
+            return 'type=LOST halfcycles=%u' % (self.halfwave_counter)
+        elif self.type==DIMMER.SYNC_EVENT_TYPE_.SYNC:
+            return 'type=SYNC difference=%u' % (self.sync_difference_cycles)
+        return 'type=UNKNOWN'
