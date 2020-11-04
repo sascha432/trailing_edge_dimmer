@@ -93,7 +93,7 @@ void display_dimmer_info() {
     rem();
     Serial.printf_P(PSTR("values=restore=%u,f=%.3fHz,vref11=%.3f,"), dimmer_config.bits.restore_level, dimmer._get_frequency(), (float)dimmer_config.internal_vref11);
 #if HAVE_NTC
-    Serial.printf_P(PSTR("NTC=%.2f/%+.2f,"), get_ntc_temperature(), (float)dimmer_config.ntc_temp_offset);
+    Serial.printf_P(PSTR("NTC=%.2f/%+.2f,"), get_ntc_temperature(), (float)dimmer_config.ntc_temp_cal_offset);
 #endif
 #if HAVE_READ_INT_TEMP
     Serial.printf_P(PSTR("int.temp=%.1f/ofs=%u/gain=%u,"),

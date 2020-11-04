@@ -40,7 +40,7 @@ class register_mem_cfg_t(Structure):
                 ("minimum_off_time_ticks", c_uint16),
                 ("internal_1_1v_ref", c_float),
                 ("int_temp_offset", c_int8),
-                ("int8_t ntc_temp_offset", c_int8),
+                ("int8_t ntc_temp_cal_offset", c_int8),
                 ("report_metrics_max_interval", c_uint8)]
 
     def __dir__(self):

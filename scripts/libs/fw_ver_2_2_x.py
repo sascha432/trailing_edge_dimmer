@@ -36,6 +36,9 @@ class dimmer_version_t(Structure):
                 ("major", c_uint16, 5),
                 ("___reserved", c_uint16, 1)]
 
+    def __repr__(self):
+        return '%u.%u.%u' % (self.major, self.minor, self.revision)
+
 class dimmer_config_info_t(Structure):
     _pack_ = 1
     _fields_ = [("max_levels", c_uint16),
@@ -43,15 +46,32 @@ class dimmer_config_info_t(Structure):
                 ("cfg_start_address", c_uint8),
                 ("length", c_uint8)]
 
+    def __repr__(self):
+        return {
+            'max_levels': self.max_levels,
+            'channel_count': self.channel_count,
+            'cfg_start_address': self.cfg_start_address,
+            'length': self.length,
+        }
+
 class dimmer_version_info_t(Structure):
     _pack_ = 1
     _fields_ = [("version", dimmer_version_t),
                 ("info", dimmer_config_info_t)]
 
+    def __repr__(self):
+        return {
+            'version': self.version,
+            'info': self.info,
+        }
+
 class c_internal_temp_calibration_t(Structure):
     _pack_ = 1
     _fields_ = [("ts_offset", c_uint8),
                 ("ts_gain", c_uint8)]
+
+    def __repr__(self):
+        return {"ts_offset": self.ts_offset, "ts_gain": self.ts_gain}
 
 class config_options_t(Structure):
     _pack_ = 1
@@ -61,14 +81,49 @@ class config_options_t(Structure):
                 ("negative_zc_delay", c_uint8, 1),
                 ("___reserved", c_uint8, 4)]
 
+    def __repr__(self):
+        return {
+            "restore_level": self.restore_level,
+            "leading_edge": self.leading_edge,
+            "over_temperature_alert_triggered": self.over_temperature_alert_triggered,
+            "negative_zc_delay": self.negative_zc_delay,
+        }
+
 class config_options_t_union(Union):
     _pack_ = 1
     _fields_ = [("byte", c_uint8),
                 ("bits", config_options_t)]
 
+    def __getattribute__(self, key):
+        if key=='options':
+            return Union.__getattribute__(self, 'byte')
+        elif key in('bits', 'byte'):
+            return Union.__getattribute__(self, key)
+        else:
+            bits = Union.__getattribute__(self, 'bits')
+            return Structure.__getattribute__(bits, key)
+
+    def __setattr__(self, key, val):
+        if key=='options':
+            return Union.__setattr__(self, 'byte', val)
+        elif key in('bits', 'byte'):
+            return Union.__getattribute__(self, key, val)
+        else:
+            bits = Union.__getattribute__(self, 'bits')
+            return Structure.__getattribute__(bits, key, val)
+
+    # def __repr__(self):
+    #     bits = Union.__getattribute__(self, 'bits')
+    #     return {
+    #         "restore_level": bits.restore_level,
+    #         "leading_edge": bits.leading_edge,
+    #         "over_temperature_alert_triggered": bits.over_temperature_alert_triggered,
+    #         "negative_zc_delay": bits.negative_zc_delay,
+    #     }
+
 class register_mem_cfg_t(Structure):
     _pack_ = 1
-    _fields_ = [("options", c_uint8),
+    _fields_ = [("options", config_options_t_union),
                 ("max_temp", c_uint8),
                 ("fade_in_time", c_float),
                 ("zero_crossing_delay_ticks", c_uint16),
@@ -78,7 +133,7 @@ class register_mem_cfg_t(Structure):
                 ("range_divider", c_uint16),
                 ("internal_vref11", c_internal_vref11),
                 ("internal_temp_calibration", c_internal_temp_calibration_t),
-                ("ntc_temp_offset", c_temp_ofs_t),
+                ("ntc_temp_cal_offset", c_temp_ofs_t),
                 ("report_metrics_max_interval", c_uint8),
                 ("halfwave_adjust_ticks", c_int8),
                 ("switch_on_minimum_ticks", c_uint16),

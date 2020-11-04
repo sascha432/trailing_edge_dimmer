@@ -105,7 +105,7 @@ class Protocol:
             match = 0
             count = 0
             if isinstance(line, str):
-                if re.match(regex, line, re.IGNORECASE):
+                if regex!= None and re.match(regex, line, re.IGNORECASE):
                     return line
                 if line.lower().startswith('+rem=boot'):
                     raise RebootError()

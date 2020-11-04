@@ -31,8 +31,9 @@ Serial.print(F("#define DIMMER_REGISTER_MIN_OFF_TIME_TICKS       ")); Serial.pri
 Serial.print(F("#define DIMMER_REGISTER_RANGE_BEGIN              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_RANGE_BEGIN);
 Serial.print(F("#define DIMMER_REGISTER_RANGE_DIVIDER            ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_RANGE_DIVIDER);
 Serial.print(F("#define DIMMER_REGISTER_INT_VREF11               ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_INT_VREF11);
-Serial.print(F("#define DIMMER_REGISTER_INT_TEMP_CAL             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_INT_TEMP_CAL);
-Serial.print(F("#define DIMMER_REGISTER_NTC_TEMP_OFS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_NTC_TEMP_OFS);
+Serial.print(F("#define DIMMER_REGISTER_CAL_TS_OFFSET            ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_CAL_TS_OFFSET);
+Serial.print(F("#define DIMMER_REGISTER_CAL_TS_GAIN              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_CAL_TS_GAIN);
+Serial.print(F("#define DIMMER_REGISTER_CAL_NTC_OFS              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_CAL_NTC_OFS);
 Serial.print(F("#define DIMMER_REGISTER_METRICS_INT              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_METRICS_INT);
 Serial.print(F("#define DIMMER_REGISTER_ADJ_HW_CYCLES            ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_ADJ_HW_CYCLES);
 Serial.print(F("#define DIMMER_REGISTER_SWITCH_ON_MIN_TIME       ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_REGISTER_SWITCH_ON_MIN_TIME);

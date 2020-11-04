@@ -118,8 +118,12 @@ def update_dimmer_inline_asm(source, target, env):
     if return_code!=0:
         error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))
 
+
 env.AddPreAction("$BUILD_DIR/scripts/print_def.cpp.o", read_def)
 env.AddPreAction("$BUILD_DIR/src/dimmer.cpp.o", update_dimmer_inline_asm)
 
 env.AlwaysBuild(env.Alias("disassemble", None, disassemble))
-env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
+
+if env.subst("$PIOENV") not in ("printdef"):
+    env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
+

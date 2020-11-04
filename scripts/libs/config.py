@@ -38,40 +38,43 @@ class Config:
     def __init__(self, major, minor, revision):
         (self.structs, self.consts, ) = Config.is_version_supported(major, minor, revision)
         self.version = 'unknown'
-        self.register_mem_cfg_t = None
+        self.register_mem_cfg = None
         self.info = None
+        self.i2c_address = 0x17
 
     def bytearray_to_hex(self, array):
         return ''.join('%02x' % b for b in array)
 
     def get_command(self):
-        if self.register_mem_cfg_t==None:
-            raise Exception('register_mem_cfg_t not set')
-        return '+I2CT=17a2' + self.bytearray_to_hex(bytearray(self.register_mem_cfg_t))
+        if self.register_mem_cfg==None:
+            raise Exception('register_mem_cfg not set')
+        return '+I2CT=17%02x%s' % (self.info.cfg_start_address, self.bytearray_to_hex(bytearray(self.register_mem_cfg)))
 
     def set_items_fromhex(self, data):
         data = bytearray.fromhex(data)
-        self.register_mem_cfg_t = self.structs.register_mem_cfg_t.from_buffer_copy(data[2:])
+        self.i2c_address = data[0]
+        self.length = len(data) - 1
+        self.register_mem_cfg = self.structs.register_mem_cfg_t.from_buffer_copy(data[2:])
 
-    def get_json(self):
-        # self.register_mem_cfg_t.__getattribute__('internal_vref11').value = 1.12
-        # self.register_mem_cfg_t.int_temp_offset.value = 1.25
-        # print(self.register_mem_cfg_t.__getattribute__('internal_vref11'))
-        # print(int(self.register_mem_cfg_t.__getattribute__('internal_vref11')))
-        # print(self.register_mem_cfg_t.__getattribute__('internal_vref11'))
-        # print(self.register_mem_cfg_t.__getattribute__('internal_vref11').value)
+    def get_config(self):
+        return self.register_mem_cfg
 
-        self.register_mem_cfg_t.max_level = self.info.max_levels
+    def __repr__(self):
+        self.register_mem_cfg.max_level = self.info.max_levels
+        dct = {}
+        for name in dir(self.register_mem_cfg):
+            dct[name] = self.register_mem_cfg.__getattribute__(name).__repr__()
+        return dct
 
-        json = {}
-        for name in dir(self.register_mem_cfg_t):
-            json[name] = self.register_mem_cfg_t.__getattribute__(name).__repr__()
-        return json
+    def reset(self):
+        self.version = 'unknown'
+        self.i2c_address = 0x17
+        self.info = None
 
     def get_from_command(self, cmd):
         m = re.match('^\+i2ct=([0-9a-f]+)', cmd, re.IGNORECASE)
         if m:
-            self.version = 'unknown'
+            self.reset()
             self.set_items_fromhex(m[1])
             return True
         else:
@@ -92,15 +95,26 @@ class Config:
         raise ValueError("could not find valid hex data")
 
     def set_item(self, key, val):
-        if self.register_mem_cfg_t==None:
-            raise Exception('register_mem_cfg_t not set')
+        if self.register_mem_cfg==None:
+            raise ValueError('register_mem_cfg not set')
 
-        attr = self.register_mem_cfg_t.__getattribute__(key)
+        conf = self.register_mem_cfg
+
+        if '.' in key:
+            pair = key.split('.', 2)
+            sub = pair[0]
+            attr = conf.__getattribute__(sub)
+            if not isinstance(attr, object):
+                raise ValueError('Invalid type: %s: %s' % (type(attr), sub))
+            key = pair[1]
+            conf = attr
+
+        attr = conf.__getattribute__(key)
         if isinstance(attr, int):
-            self.register_mem_cfg_t.__setattr__(key, int(val))
+            conf.__setattr__(key, int(val))
         elif isinstance(attr, float):
-            self.register_mem_cfg_t.__setattr__(key, float(val))
+            conf.__setattr__(key, float(val))
         elif isinstance(attr, floats.ShiftedFloat) or isinstance(attr, floats.FixedPointFloat):
             attr.value = float(val)
         else:
-            raise Exception('Invalid type: %s: %s' % (type(attr), key))
+            raise ValueError('Invalid type: %s: %s' % (type(attr), key))

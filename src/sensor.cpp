@@ -137,9 +137,9 @@ float convert_to_celsius(uint16_t value)
 float get_ntc_temperature()
 {
 #ifdef FAKE_NTC_VALUE
-    return FAKE_NTC_VALUE + (float)dimmer_config.ntc_temp_offset;
+    return FAKE_NTC_VALUE + (float)dimmer_config.ntc_temp_cal_offset;
 #else
-    return convert_to_celsius(_adc.getValue(ADCHandler::kPosNTC)) + (float)dimmer_config.ntc_temp_offset;
+    return convert_to_celsius(_adc.getValue(ADCHandler::kPosNTC)) + (float)dimmer_config.ntc_temp_cal_offset;
 #endif
 }
 

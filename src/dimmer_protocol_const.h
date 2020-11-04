@@ -21,9 +21,9 @@
 #define DIMMER_REGISTER_CHANNELS_END             0x9c
 #define DIMMER_REGISTER_FREQUENCY                0xb8
 #define DIMMER_REGISTER_INT_TEMP                 0xbc
-#define DIMMER_REGISTER_NTC_TEMP                 0xbe
-#define DIMMER_REGISTER_VCC                      0xc0
-#define DIMMER_REGISTER_RAM                      0xc2
+#define DIMMER_REGISTER_NTC_TEMP                 0xc0
+#define DIMMER_REGISTER_VCC                      0xc4
+#define DIMMER_REGISTER_RAM                      0xc6
 #define DIMMER_REGISTER_OPTIONS                  0x9c
 #define DIMMER_REGISTER_MAX_TEMP                 0x9d
 #define DIMMER_REGISTER_FADE_IN_TIME             0x9e
@@ -33,15 +33,15 @@
 #define DIMMER_REGISTER_RANGE_BEGIN              0xa8
 #define DIMMER_REGISTER_RANGE_DIVIDER            0xaa
 #define DIMMER_REGISTER_INT_VREF11               0xac
-#define DIMMER_REGISTER_INT_TEMP_CAL             0xad
-#define DIMMER_REGISTER_NTC_TEMP_OFS             0xaf
+#define DIMMER_REGISTER_CAL_TS_OFFSET            0xad
+#define DIMMER_REGISTER_CAL_TS_GAIN              0xae
+#define DIMMER_REGISTER_CAL_NTC_OFS              0xaf
 #define DIMMER_REGISTER_METRICS_INT              0xb0
 #define DIMMER_REGISTER_ADJ_HW_CYCLES            0xb1
 #define DIMMER_REGISTER_SWITCH_ON_MIN_TIME       0xb2
 #define DIMMER_REGISTER_SWITCH_ON_COUNT          0xb4
-#define DIMMER_REGISTER_ADDRESS                  0xca
-#define DIMMER_REGISTER_END_ADDR                 0xcb
-#define DIMMER_REGISTER_VERSION                  0xb9
+#define DIMMER_REGISTER_ADDRESS                  0xd6
+#define DIMMER_REGISTER_END_ADDR                 0xd7
 #define DIMMER_EVENT_METRICS_REPORT              0xf0
 #define DIMMER_EVENT_TEMPERATURE_ALERT           0xf1
 #define DIMMER_EVENT_FADING_COMPLETE             0xf2
@@ -84,3 +84,5 @@
 #define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED      0x04
 #define DIMMER_OPTIONS_NEGATIVE_ZC_DELAY         0x08
 #define DIMMER_EEPROM_FLAGS_CONFIG_UPDATED       0x01
+
+

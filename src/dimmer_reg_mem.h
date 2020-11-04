@@ -259,7 +259,7 @@ typedef struct __attribute__((__packed__)) {
     uint16_t range_divider;
     internal_vref11_t internal_vref11;
     internal_temp_calibration_t internal_temp_calibration;
-    temp_ofs_t ntc_temp_offset;
+    temp_ofs_t ntc_temp_cal_offset;
     uint8_t report_metrics_interval;        // in seconds, 0=disabled
     int8_t halfwave_adjust_cycles;          // correction for measured time in clock cycles
     uint16_t switch_on_minimum_ticks;       // "minimum_on_time_ticks" after "switching on"

@@ -63,7 +63,7 @@ JSON output instead of the SerialTwoWire command
         "range_end": "512",
         "internal_vref11": "1.075098",
         "int_temp_offset": "-13.00",
-        "ntc_temp_offset": "-29.00",
+        "ntc_temp_cal_offset": "-29.00",
         "report_metrics_max_interval": "63",
         "halfwave_adjust_ticks": "0",
         "switch_on_minimum_ticks": "1280",
