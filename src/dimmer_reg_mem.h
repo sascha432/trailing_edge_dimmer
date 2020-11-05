@@ -353,7 +353,7 @@ typedef struct __attribute__((__packed__)) {
     register_mem_cfg_t cfg;
     register_mem_errors_t errors;
     float frequency;
-    float int_temp;
+    int16_t int_temp;
     float ntc_temp;
     uint16_t vcc;
     register_mem_ram_t ram;
@@ -370,10 +370,10 @@ typedef struct __attribute__((__packed__)) {
     uint16_t vcc;
     float frequency;
     float ntc_temp;
-    float internal_temp;
+    int16_t internal_temp;
 } dimmer_metrics_t;
 
-static_assert(sizeof(dimmer_metrics_t) == 15, "check struct");
+static_assert(sizeof(dimmer_metrics_t) == 13, "check struct");
 
 typedef struct __attribute__((__packed__)) {
     uint8_t current_temp;

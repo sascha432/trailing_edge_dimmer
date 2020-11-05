@@ -25,7 +25,7 @@
 // T = ((ADC - (273 + 100 - TS_OFFSET)) * 128) / TS_GAIN + 25
 // TS_GAIN = 164 TS_OFFSET = 21 (-40=-39.78 25=25.00 125=124.90)
 
-float get_internal_temperature()
+int16_t get_internal_temperature()
 {
     return ((((_adc.getValue(ADCHandler::kPosIntTemp) >> ADCHandler::kLeftShift) - (273 + 100 - dimmer_config.internal_temp_calibration.ts_offset)) * 128) / dimmer_config.internal_temp_calibration.ts_gain) + 25;
 }

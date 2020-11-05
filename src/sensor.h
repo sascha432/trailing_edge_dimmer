@@ -6,7 +6,7 @@
 
 #if HAVE_READ_INT_TEMP
 
-float get_internal_temperature();
+int16_t get_internal_temperature();
 
 #if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
 

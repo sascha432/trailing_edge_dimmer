@@ -51,7 +51,7 @@ void Config::resetConfig()
 #endif
     register_mem.data.cfg.report_metrics_interval = DIMMER_REPORT_METRICS_INTERVAL;
     register_mem.data.ntc_temp = NAN;
-    register_mem.data.int_temp = NAN;
+    register_mem.data.int_temp = 32767;
     register_mem.data.frequency = NAN;
 
     copyFromRegisterMem(_config.cfg);

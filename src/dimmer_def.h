@@ -277,7 +277,7 @@
 #define SERIAL_MAX_ARGUMENTS                                    10
 
 #ifndef HAVE_PRINT_METRICS
-#define HAVE_PRINT_METRICS                                      1
+#define HAVE_PRINT_METRICS                                      0
 #endif
 
 #ifndef EEPROM_WRITE_DELAY

@@ -96,7 +96,7 @@ void display_dimmer_info() {
     Serial.printf_P(PSTR("NTC=%.2f/%+.2f,"), get_ntc_temperature(), (float)dimmer_config.ntc_temp_cal_offset);
 #endif
 #if HAVE_READ_INT_TEMP
-    Serial.printf_P(PSTR("int.temp=%.1f/ofs=%u/gain=%u,"),
+    Serial.printf_P(PSTR("int.temp=%d/ofs=%u/gain=%u,"),
         get_internal_temperature(),
         dimmer_config.internal_temp_calibration.ts_offset,
         dimmer_config.internal_temp_calibration.ts_gain
@@ -292,7 +292,7 @@ void loop()
             Serial.printf_P(PSTR("NTC=%.2f°C(%.1f),"), get_ntc_temperature(), _adc.getValue(ADCHandler::kPosNTC) / 64.0);
         #endif
         #if HAVE_READ_INT_TEMP
-            Serial.printf_P(PSTR("int.temp=%.2f°C(%.1f),"), get_internal_temperature(), _adc.getValue(ADCHandler::kPosIntTemp)  / 64.0);
+            Serial.printf_P(PSTR("int.temp=%d°C(%.1f),"), get_internal_temperature(), _adc.getValue(ADCHandler::kPosIntTemp)  / 64.0);
         #endif
         #if HAVE_READ_VCC || HAVE_EXT_VCC
             Serial.printf_P(PSTR("VCC=%umV (%.1f),"), read_vcc(), _adc.getValue(ADCHandler::kPosVCC)  / 64.0);
@@ -377,12 +377,12 @@ void loop()
             queues.check_temperature.timer = Queues::kTemperatureCheckTimerOverflows;
         }
 
-        int current_temp;
+        int16_t current_temp;
 #if HAVE_NTC
 
         current_temp = (register_mem.data.ntc_temp = get_ntc_temperature());
 #if HAVE_READ_INT_TEMP
-        current_temp = max(current_temp, (int16_t)(register_mem.data.int_temp = get_internal_temperature()));
+        current_temp = max(current_temp, register_mem.data.int_temp = get_internal_temperature());
 #endif
 
 #elif HAVE_READ_INT_TEMP

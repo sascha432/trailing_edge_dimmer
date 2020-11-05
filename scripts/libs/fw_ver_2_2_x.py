@@ -184,10 +184,10 @@ class dimmer_metrics_t(Structure):
                 ("vcc", c_uint16),
                 ("frequency", c_float),
                 ("ntc_temp", c_float),
-                ("internal_temp", c_float)]
+                ("internal_temp", c_int16)]
 
     def __str__(self):
-        return 'temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%.2f°C' % (self.temp_check_value, self.vcc, self.frequency, self.ntc_temp, self.internal_temp)
+        return 'temp=%u°C VCC=%umV frequency=%.3fHz ntc=%.2f°C int=%d°C' % (self.temp_check_value, self.vcc, self.frequency, self.ntc_temp, self.internal_temp)
 
 class dimmer_over_temperature_event_t(Structure):
     _pack_ = 1
