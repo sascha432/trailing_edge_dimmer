@@ -8,6 +8,8 @@ import shlex
 import click
 from SCons.Script import ARGUMENTS
 import tempfile
+import hashlib
+import click
 
 verbose_flag = int(ARGUMENTS.get("PIOVERBOSE", 0)) and True or False
 
@@ -101,29 +103,54 @@ def update_dimmer_inline_asm(source, target, env):
             if val!=0:
                 have_inline_asm = True
         if key=='DIMMER_MOSFET_PINS':
-            for pin in val.split(','):
-                pin = pin.strip()
-                pin = int(pin, 0)
-                pins.append(str(pin))
+            if ',' in str(val):
+                for pin in val.split(','):
+                    pin = pin.strip()
+                    pin = int(pin, 0)
+                    pins.append(str(pin))
+            else:
+                pins.append(str(int(val)))
 
     if have_inline_asm==False:
         return
 
     python = env.subst("$PYTHONEXE")
-    project_dir = path.realpath(env.subst("$PROJECT_DIR"))
-    script = path.realpath(path.join(project_dir, './scripts/avr_sfr_tool.py'))
-    output = path.realpath(path.join(project_dir, './src/dimmer_inline_asm.h'))
+    project_dir = path.abspath(env.subst("$PROJECT_DIR"))
+    script = path.abspath(path.join(project_dir, 'scripts/avr_sfr_tool.py'))
+    output = path.abspath(path.join(env.subst('$BUILD_DIR'), 'dimmer_inline_asm.h'))
+    header = path.abspath(path.join(env.subst("$PROJECT_SRC_DIR"), 'dimmer_inline_asm.h'))
+
+    print_created = False
+    if not path.isfile(header):
+        output = header
+        print_created = True
+
     args = [ python, script, '--output', output, '--pins' ] + pins
     return_code = subprocess.run(args, shell=True).returncode
     if return_code!=0:
         error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))
 
+    if output!=header:
+        with open(output, 'rb') as file:
+            contents = file.read()
+            hash1 = hashlib.sha1(contents)
+        with open(header, 'rb') as file:
+            hash2 = hashlib.sha1(file.read())
+        if hash1.hexdigest()!=hash2.hexdigest():
+            with open(header, 'wb') as file:
+                file.write(contents)
+                print_created = True
 
-env.AddPreAction("$BUILD_DIR/scripts/print_def.cpp.o", read_def)
-env.AddPreAction("$BUILD_DIR/src/dimmer.cpp.o", update_dimmer_inline_asm)
+    if print_created:
+        click.secho('Header %s updated' % header, fg='yellow')
+        # click.secho('Run build process again...', fg='yellow')
+        # env.Exit(1)
+
+
+env.AddPreAction('$BUILD_DIR/scripts/print_def.cpp.o', read_def)
+env.AddPreAction('$BUILD_DIR/src/dimmer.cpp.o', update_dimmer_inline_asm)
 
 env.AlwaysBuild(env.Alias("disassemble", None, disassemble))
 
 if env.subst("$PIOENV") not in ("printdef"):
-    env.AddPostAction("$BUILD_DIR/${PROGNAME}.elf", disassemble)
-
+    env.AddPostAction(env.subst('$PIOMAINPROG'), disassemble)

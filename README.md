@@ -23,6 +23,18 @@ Firmware for a trailing/leading edge MOSFET dimmer.
 
 Version 3.0.x has been cancelled and the most useful features will go into 2.2.x. That also means that the serial protocol won't change and only new features require changes on the master side.
 
+## Patching the Arduino libary
+
+The Arduino library requires a small patch. While building, an error will show up
+
+```bash
+File not patched. Run following command:
+
+patch -i ./scripts/Print.diff ~/.platformio/packages/framework-arduino-avr/cores/arduino/Print.h
+```
+
+Execute the command or patch the file by hand, then run the build process again.
+
 ## WiFi Firmware update
 
 The recent version of the KFC firmware supports programming the ATmega over the STK500v1 protocol directly from the ESP8266. I am using the Arduino bootloader for the ATmega328P mini PRO board@8MHz (ATmegaBOOT_168_atmega328_pro_8MHz.hex)

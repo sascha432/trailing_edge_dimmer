@@ -16,6 +16,8 @@
 - Tool to generate inline assembler for toggling MOSFET pins
 - Support for TRIACs (leading edge only) added - tested with MOSFETs, BJTs and TRIACs
 - Improved performance and reduced code size using the ADC interrupt
+- Reboot notification event after the frequency measurement has been completed
+- Patch for Arduino library
 
 ## 2.1.5
 

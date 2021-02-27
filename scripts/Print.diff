@@ -1,0 +1,19 @@
+*** Print.h.orig	2021-02-27 04:23:06.086258700 -0800
+--- Print.h	2021-02-27 03:55:36.413137300 -0800
+***************
+*** 88,93 ****
+--- 88,101 ----
+      size_t println(void);
+  
+      virtual void flush() { /* Empty implementation for backward compatibility */ }
++ 
++ private:
++     friend void __debug_printf(const char *format, ...);
++     typedef int (* vsnprint_t)(char *, size_t, const char *, va_list ap);
++     size_t __printf(vsnprint_t func, const char *format, va_list arg);
++ public:
++     size_t printf(const char *format, ...);
++     size_t printf_P(PGM_P format, ...);
+  };
+  
+  #endif
