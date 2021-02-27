@@ -92,8 +92,8 @@
 
 // keep dimmer enabled when loosing the ZC signal for up to
 // DIMMER_OUT_OF_SYNC_LIMIT halfwaves. 250 @ 60Hz ~ 2seconds
-// once the signal is lost, it will start to drift and get out of sync. adjust the
-// limit to keep the drift below 200µs
+// once the signal is lost, it will start to drift and get out of sync. adjust
+// the time limit to keep the drift below 100-200µs
 #ifndef DIMMER_OUT_OF_SYNC_LIMIT
 #define DIMMER_OUT_OF_SYNC_LIMIT                                2500
 #endif
@@ -125,6 +125,11 @@
 #define DIMMER_MOSFET_PINS                                      6, 8, 9, 10
 #endif
 
+// number of channels
+#ifndef DIMMER_CHANNEL_COUNT
+#define DIMMER_CHANNEL_COUNT                                    4
+#endif
+
 // maximum number of different dimming levels
 // the range can be adjusted with range_begin and range_end
 #ifndef DIMMER_MAX_LEVEL
@@ -151,23 +156,13 @@
 #endif
 
 // do not display info during boot and disable DIMMER_COMMAND_PRINT_INFO
+// ~1642 byte code size
 #ifndef HIDE_DIMMER_INFO
 #define HIDE_DIMMER_INFO                                        0
 #endif
 
-// voltage divider on analog port
-#ifndef HAVE_EXT_VCC
-#define HAVE_EXT_VCC                                            0
-#endif
-
-// pin to read VCC from. the value is compared against the internal VREF11
-// the voltage divider for measuring 5V is R1=12K, R2=3K, R1=VCC to analog pin, R2=GND to analog pin
-// for getting a stable/average voltage, add C1=10nF-1uF analog pin to GND
-#ifndef VCC_PIN
-#define VCC_PIN                                                 A0
-#endif
-
 // potentiometer for testing purposes
+// the ADC is read 256x in a row continuously unless other readings are performed (VCC, NTC, ...)
 #ifndef HAVE_POTI
 #define HAVE_POTI                                               0
 #endif
@@ -212,10 +207,27 @@
 #define DIMMER_REPORT_METRICS_INTERVAL                          5
 #endif
 
-#ifndef INTERNAL_VREF_1_1V
-// after calibration VCC readings are pretty accurate, +-2-3mV
+// after calibration VCC readings are pretty accurate, ±1-2mV
+// NOTE: VCC is read 64x in a row, once per second and the capacitence of the ADC is very low,
+// which can lead to jumping values if the VCC is not stable
 // default for cfg.internal_1_1v_ref
+#ifndef INTERNAL_VREF_1_1V
 #define INTERNAL_VREF_1_1V                                      1.1
+#endif
+
+// to get more stable (average) VCC readings, an additonal circuit with more capacitance can be
+// added to an analog port
+
+// voltage divider on analog port
+#ifndef HAVE_EXT_VCC
+#define HAVE_EXT_VCC                                            0
+#endif
+
+// pin to read VCC from. the value is compared against the internal VREF11
+// the voltage divider for measuring 5V is R1=12K, R2=3K, R1=VCC to analog pin, R2=GND to analog pin
+// for getting stable average voltage readings, add C1=1-10uF from analog pin to GND
+#ifndef VCC_PIN
+#define VCC_PIN                                                 A0
 #endif
 
 // use internal temperature sensor
@@ -301,4 +313,30 @@
 #define DIMMER_CHANNEL_LOOP(var)                                for(Dimmer::Channel::type var = 0; var < Dimmer::Channel::size(); var++)
 #else
 #define DIMMER_CHANNEL_LOOP(var)                                constexpr Dimmer::Channel::type var = 0;
+#endif
+
+#if __GNUC__ > 3
+#define __GNUC_STR__                                            ",gcc=" _STRINGIFY(__GNUC__) "." _STRINGIFY(__GNUC_MINOR__) "." _STRINGIFY(__GNUC_PATCHLEVEL__)
+#else
+#define __GNUC_STR__                                            ""
+#endif
+
+#if F_CPU == 160000000UL
+#define F_CPU_MHZ 160
+#elif F_CPU == 80000000UL
+#define F_CPU_MHZ 80
+#elif F_CPU == 20000000UL
+#define F_CPU_MHZ 20
+#elif F_CPU == 16000000UL
+#define F_CPU_MHZ 16
+#elif F_CPU == 8000000UL
+#define F_CPU_MHZ 8
+#elif F_CPU == 4000000UL
+#define F_CPU_MHZ 4
+#elif F_CPU == 2000000UL
+#define F_CPU_MHZ 2
+#elif F_CPU == 1000000UL
+#define F_CPU_MHZ 1
+#else
+#error define F_CPU_MHZ
 #endif

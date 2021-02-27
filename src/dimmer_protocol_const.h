@@ -1,6 +1,7 @@
 // created with environment "printdef"
 // run python ./scripts/create_const.py to convert this file to ./scripts/libs/fw_const_ver_MAJOR_MINOR_x.py
 #define DIMMER_I2C_ADDRESS                       0x17
+#define DIMMER_I2C_MASTER_ADDRESS                0x18
 #define DIMMER_REGISTER_START_ADDR               0x80
 #define DIMMER_REGISTER_FROM_LEVEL               0x80
 #define DIMMER_REGISTER_CHANNEL                  0x82
@@ -19,11 +20,6 @@
 #define DIMMER_REGISTER_CH6_LEVEL                0x98
 #define DIMMER_REGISTER_CH7_LEVEL                0x9a
 #define DIMMER_REGISTER_CHANNELS_END             0x9c
-#define DIMMER_REGISTER_FREQUENCY                0xb8
-#define DIMMER_REGISTER_INT_TEMP                 0xbc
-#define DIMMER_REGISTER_NTC_TEMP                 0xbe
-#define DIMMER_REGISTER_VCC                      0xc2
-#define DIMMER_REGISTER_RAM                      0xc4
 #define DIMMER_REGISTER_OPTIONS                  0x9c
 #define DIMMER_REGISTER_MAX_TEMP                 0x9d
 #define DIMMER_REGISTER_FADE_IN_TIME             0x9e
@@ -40,6 +36,12 @@
 #define DIMMER_REGISTER_ADJ_HW_CYCLES            0xb1
 #define DIMMER_REGISTER_SWITCH_ON_MIN_TIME       0xb2
 #define DIMMER_REGISTER_SWITCH_ON_COUNT          0xb4
+#define DIMMER_REGISTER_ERRORS                   0xb5
+#define DIMMER_REGISTER_FREQUENCY                0xb8
+#define DIMMER_REGISTER_NTC_TEMP                 0xbc
+#define DIMMER_REGISTER_INT_TEMP                 0xc0
+#define DIMMER_REGISTER_VCC                      0xc2
+#define DIMMER_REGISTER_RAM                      0xc4
 #define DIMMER_REGISTER_ADDRESS                  0xd4
 #define DIMMER_REGISTER_END_ADDR                 0xd5
 #define DIMMER_EVENT_METRICS_REPORT              0xf0

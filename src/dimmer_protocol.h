@@ -8,6 +8,10 @@
 #define DIMMER_I2C_ADDRESS                  0x17
 #endif
 
+#ifndef DIMMER_I2C_MASTER_ADDRESS
+#define DIMMER_I2C_MASTER_ADDRESS           (DIMMER_I2C_ADDRESS + 1)
+#endif
+
 #define DIMMER_REGISTER_START_ADDR          0x80
 #define DIMMER_REGISTER_FROM_LEVEL          (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, from_level))
 #define DIMMER_REGISTER_CHANNEL             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, channel))
@@ -16,21 +20,16 @@
 #define DIMMER_REGISTER_COMMAND             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cmd) + offsetof(register_mem_command_t, command))
 #define DIMMER_REGISTER_READ_LENGTH         (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cmd) + offsetof(register_mem_command_t, read_length))
 #define DIMMER_REGISTER_COMMAND_STATUS      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cmd) + offsetof(register_mem_command_t, status))
-#define DIMMER_REGISTER_CHANNELS_START      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, level))
-#define DIMMER_REGISTER_CH0_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 0)
-#define DIMMER_REGISTER_CH1_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 1)
-#define DIMMER_REGISTER_CH2_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 2)
-#define DIMMER_REGISTER_CH3_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 3)
-#define DIMMER_REGISTER_CH4_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 4)
-#define DIMMER_REGISTER_CH5_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 5)
-#define DIMMER_REGISTER_CH6_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 6)
-#define DIMMER_REGISTER_CH7_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level[0]) * 7)
-#define DIMMER_REGISTER_CHANNELS_END        (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().level))
-#define DIMMER_REGISTER_FREQUENCY           (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, frequency))
-#define DIMMER_REGISTER_INT_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, int_temp))
-#define DIMMER_REGISTER_NTC_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, ntc_temp))
-#define DIMMER_REGISTER_VCC                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, vcc))
-#define DIMMER_REGISTER_RAM                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, ram))
+#define DIMMER_REGISTER_CHANNELS_START      (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, channels))
+#define DIMMER_REGISTER_CH0_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 0)
+#define DIMMER_REGISTER_CH1_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 1)
+#define DIMMER_REGISTER_CH2_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 2)
+#define DIMMER_REGISTER_CH3_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 3)
+#define DIMMER_REGISTER_CH4_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 4)
+#define DIMMER_REGISTER_CH5_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 5)
+#define DIMMER_REGISTER_CH6_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 6)
+#define DIMMER_REGISTER_CH7_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 7)
+#define DIMMER_REGISTER_CHANNELS_END        (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().channels))
 #define DIMMER_REGISTER_OPTIONS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, options))
 #define DIMMER_REGISTER_MAX_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, max_temp))
 #define DIMMER_REGISTER_FADE_IN_TIME        (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, fade_in_time))
@@ -47,6 +46,12 @@
 #define DIMMER_REGISTER_ADJ_HW_CYCLES       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, halfwave_adjust_cycles))
 #define DIMMER_REGISTER_SWITCH_ON_MIN_TIME  (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, switch_on_minimum_ticks))
 #define DIMMER_REGISTER_SWITCH_ON_COUNT     (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, switch_on_count))
+#define DIMMER_REGISTER_ERRORS              (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, errors))
+#define DIMMER_REGISTER_FREQUENCY           (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, metrics) + offsetof(register_mem_metrics_t, frequency))
+#define DIMMER_REGISTER_NTC_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, metrics) + offsetof(register_mem_metrics_t, ntc_temp))
+#define DIMMER_REGISTER_INT_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, metrics) + offsetof(register_mem_metrics_t, int_temp))
+#define DIMMER_REGISTER_VCC                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, metrics) + offsetof(register_mem_metrics_t, vcc))
+#define DIMMER_REGISTER_RAM                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, ram))
 #define DIMMER_REGISTER_ADDRESS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, address))
 #define DIMMER_REGISTER_END_ADDR            (DIMMER_REGISTER_START_ADDR + sizeof(register_mem_t))
 
@@ -58,6 +63,7 @@
 #define DIMMER_EVENT_FREQUENCY_WARNING      0xf4
 #define DIMMER_EVENT_CHANNEL_ON_OFF         0xf5
 #define DIMMER_EVENT_SYNC_EVENT             0xf6
+#define DIMMER_EVENT_RESTART                0xf7
 
 // DIMMER_REGISTER_COMMAND
 #define DIMMER_COMMAND_SET_LEVEL            0x10
