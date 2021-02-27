@@ -71,7 +71,7 @@ void _dimmer_i2c_on_receive(int length)
             if (length == 0 && register_mem.data.address == 0xb9 && register_mem.data.cmd.read_length == 2) {
                 _D(5, debug_printf("I2C version request\n"));
                 register_mem.data.ram.v.version._word = Dimmer::Version::kVersion;
-                register_mem.data.ram.v.info = { Dimmer::Level::max, Dimmer::Channel::kSize, DIMMER_REGISTER_OPTIONS, sizeof(register_mem.data.cfg)};
+                register_mem.data.ram.v.info = { Dimmer::Level::max, Dimmer::Channel::kSize, DIMMER_REGISTER_OPTIONS, sizeof(register_mem.data.cfg) };
                 register_mem.data.cmd.read_length = 0;
                 i2c_slave_set_register_address(0, DIMMER_REGISTER_RAM, sizeof(register_mem.data.ram.v));
             }
@@ -92,7 +92,7 @@ void _dimmer_i2c_on_receive(int length)
                             numChannels >>= 4;
                         }
                         _D(5, debug_printf("I2C read channels %u:%u\n", start, Dimmer::Channel::size));
-                        i2c_slave_set_register_address(0, DIMMER_REGISTER_CH0_LEVEL + (start * sizeof(register_mem.data.level[0])), numChannels * sizeof(register_mem.data.level[0]));
+                        i2c_slave_set_register_address(0, DIMMER_REGISTER_CH0_LEVEL + (start * sizeof(register_mem.data.channels.level[0])), numChannels * sizeof(register_mem.data.channels.level[0]));
                     }
                     break;
                 case DIMMER_COMMAND_SET_LEVEL:
@@ -104,17 +104,17 @@ void _dimmer_i2c_on_receive(int length)
                     dimmer.fade_from_to(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
                     break;
                 case DIMMER_COMMAND_READ_NTC:
-                    i2c_slave_set_register_address(length, DIMMER_REGISTER_NTC_TEMP, sizeof(register_mem.data.ntc_temp));
+                    i2c_slave_set_register_address(length, DIMMER_REGISTER_NTC_TEMP, sizeof(register_mem.data.metrics.ntc_temp));
                     break;
                 case DIMMER_COMMAND_READ_INT_TEMP:
-                    i2c_slave_set_register_address(length, DIMMER_REGISTER_INT_TEMP, sizeof(register_mem.data.int_temp));
+                    i2c_slave_set_register_address(length, DIMMER_REGISTER_INT_TEMP, sizeof(register_mem.data.metrics.int_temp));
                     break;
                 case DIMMER_COMMAND_READ_VCC:
-                    i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.vcc));
+                    i2c_slave_set_register_address(length, DIMMER_REGISTER_VCC, sizeof(register_mem.data.metrics.vcc));
                     break;
                 case DIMMER_COMMAND_READ_AC_FREQUENCY:
-                    _D(5, debug_printf("I2C get frequency=%.3f\n", register_mem.data.frequency));
-                    i2c_slave_set_register_address(length, DIMMER_REGISTER_FREQUENCY, sizeof(register_mem.data.frequency));
+                    _D(5, debug_printf("I2C get frequency=%.3f\n", register_mem.data.metrics.frequency));
+                    i2c_slave_set_register_address(length, DIMMER_REGISTER_FREQUENCY, sizeof(register_mem.data.metrics.frequency));
                     break;
 
                 case DIMMER_COMMAND_GET_TIMER_TICKS:

@@ -72,9 +72,11 @@ MeasureTimer timer2;
 ISR(TIMER2_OVF_vect)
 {
     timer2._overflow++;
+#if HAVE_FADE_COMPLETION_EVENT
     if (queues.fading_completed_events.timer > 0) {
         queues.fading_completed_events.timer--;
     }
+#endif
     if (queues.check_temperature.timer > 0) {
         queues.check_temperature.timer--;
     }
@@ -82,10 +84,10 @@ ISR(TIMER2_OVF_vect)
 
 void DimmerBase::begin()
 {
-    if (register_mem.data.frequency == 0 || isnan(register_mem.data.frequency)) {
+    if (!Dimmer::isValidFrequency(register_mem.data.metrics.frequency)) {
         return;
     }
-    halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / register_mem.data.frequency) + (_config.halfwave_adjust_cycles / Timer<1>::prescaler);
+    halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / register_mem.data.metrics.frequency) + (_config.halfwave_adjust_cycles / Timer<1>::prescaler);
     zc_diff_ticks = 0;
     zc_diff_count = 0;
 
@@ -95,7 +97,7 @@ void DimmerBase::begin()
         Timer<1>::prescaler)
     );
     _D(5, debug_printf("f=%f ticks=%lu\n",
-        register_mem.data.frequency,
+        register_mem.data.metrics.frequency,
         (uint32_t)halfwave_ticks)
     );
 
@@ -121,7 +123,9 @@ void DimmerBase::begin()
     cli();
     timer2.begin();
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
-        volatile uint24_t ticks = timer2.get_clear_no_cli();
+        //volatile
+        uint24_t ticks = timer2.get_clear_no_cli();
+        //dimmer.zc_interrupt_handler(const_cast<const uint24_t &>(ticks));
         dimmer.zc_interrupt_handler(ticks);
     }, DIMMER_ZC_INTERRUPT_MODE);
 
@@ -132,7 +136,7 @@ void DimmerBase::begin()
 
 void DimmerBase::end()
 {
-    if (register_mem.data.frequency == 0 || isnan(register_mem.data.frequency)) {
+    if (register_mem.data.metrics.frequency == 0 || isnan(register_mem.data.metrics.frequency)) {
         return;
     }
     _D(5, debug_printf("ending timer...\n"));
@@ -448,7 +452,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
         _D(5, debug_printf("Relative fading time %.3f\n", time));
     }
 
-    fade.count = register_mem.data.frequency * time * 2;
+    fade.count = register_mem.data.metrics.frequency * time * 2;
     if (fade.count == 0) {
         _D(5, debug_printf("count=%u time=%f\n", fade.count, time));
         return;

@@ -6,17 +6,6 @@
 #pragma once
 
 #include "main.h"
-
-#if SERIAL_I2C_BRDIGE
-
-#include "SerialTwoWire.h"
-
-#else
-
-#include <Wire.h>
-
-#endif
-
 #include "config.h"
 
 void dimmer_i2c_slave_setup();

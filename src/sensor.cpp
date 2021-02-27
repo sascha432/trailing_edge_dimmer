@@ -27,7 +27,7 @@
 
 int16_t get_internal_temperature()
 {
-    return ((((_adc.getValue(ADCHandler::kPosIntTemp) >> ADCHandler::kLeftShift) - (273 + 100 - dimmer_config.internal_temp_calibration.ts_offset)) * 128) / dimmer_config.internal_temp_calibration.ts_gain) + 25;
+    return ((((_adc.getIntTempValue() >> ADCHandler::kAveragePrecisionBits) - (273 + 100 - dimmer_config.internal_temp_calibration.ts_offset)) * 128) / dimmer_config.internal_temp_calibration.ts_gain) + 25;
 }
 
 #if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
@@ -93,7 +93,8 @@ uint16_t read_vcc()
     // Vs = (625 * ADCValue * Vref) / 8192
 
 
-    return (625U * _adc.getValue(ADCHandler::kPosVCC) * (float)dimmer_config.internal_vref11) / 8192U;
+    register_mem.data.metrics.vcc = (625U * _adc.getValue(ADCHandler::kPosVCC) * (float)dimmer_config.internal_vref11) / 8192U;
+    return register_mem.data.metrics.vcc;
 }
 
 #elif HAVE_READ_VCC
@@ -104,7 +105,8 @@ uint16_t read_vcc()
 uint16_t read_vcc()
 {
     static_assert(internal_vref11_t::shift == 12 && internal_vref11_t::offset == 0x3f8ccccd, "values do not match");
-    return (72090000UL + dimmer_config.internal_vref11._value * 31982) / _adc.getValue(ADCHandler::kPosVCC);
+    register_mem.data.metrics.vcc = (72090000UL + dimmer_config.internal_vref11._value * 31982) / _adc.getVCCValue();
+    return register_mem.data.metrics.vcc;
 }
 
 #else
@@ -112,7 +114,8 @@ uint16_t read_vcc()
 // read VCC in mV
 uint16_t read_vcc()
 {
-    return (uint32_t)(((1024UL * 1000) << ADCHandler::kLeftShift) * (float)dimmer_config.internal_vref11) / _adc.getValue(ADCHandler::kPosVCC);
+    register_mem.data.metrics.vcc = (uint32_t)(((1024UL * 1000) << ADCHandler::kAveragePrecisionBits) * (float)dimmer_config.internal_vref11) / _adc.getValue(ADCHandler::kPosVCC);
+    return register_mem.data.metrics.vcc;
 }
 
 #endif
@@ -124,8 +127,8 @@ uint16_t read_vcc()
 uint16_t read_poti()
 {
     constexpr uint16_t dead_zone = 50 << 6;
-    constexpr uint16_t max_value = (1023U << ADCHandler::kLeftShift) - (dead_zone * 2) + (1 << ADCHandler::kLeftShift);
-    auto value = _adc.getValue(ADCHandler::kPosPoti);
+    constexpr uint16_t max_value = (1023U << ADCHandler::kAveragePrecisionBits) - (dead_zone * 2) + (1 << ADCHandler::kAveragePrecisionBits);
+    auto value = _adc.getPotiValue();
     if (value <= dead_zone) {
         return 0;
     }
@@ -138,7 +141,7 @@ uint16_t read_poti()
 
 float convert_to_celsius(uint16_t value)
 {
-    float steinhart = ((1023U << ADCHandler::kLeftShift) / (float)value) - 1;
+    float steinhart = ((1023U << ADCHandler::kAveragePrecisionBits) / (float)value) - 1;
     steinhart *= NTC_SERIES_RESISTANCE / (float)NTC_NOMINAL_RESISTANCE;
     steinhart = log(steinhart);
     steinhart /= NTC_BETA_COEFF;
@@ -152,7 +155,7 @@ float get_ntc_temperature()
 #ifdef FAKE_NTC_VALUE
     return FAKE_NTC_VALUE + (float)dimmer_config.ntc_temp_cal_offset;
 #else
-    return convert_to_celsius(_adc.getValue(ADCHandler::kPosNTC)) + (float)dimmer_config.ntc_temp_cal_offset;
+    return convert_to_celsius(_adc.getNTCValue()) + (float)dimmer_config.ntc_temp_cal_offset;
 #endif
 }
 

@@ -24,7 +24,7 @@ typedef struct __attribute__((__packed__)) EEPROM_config_t {
         EEPROM_config_header_t header;
     };
     register_mem_cfg_t cfg;
-    int16_t level[Dimmer::Channel::size()];
+    register_mem_channels_t channels;
 
     bool operator==(const EEPROM_config_t &config) const {
         return memcmp(this, &config, sizeof(*this)) == 0;
@@ -109,10 +109,10 @@ public:
     }
 
     dimmer_level_t &level(dimmer_channel_id_t channel) {
-        return _config.level[channel];
+        return _config.channels.level[channel];
     }
     dimmer_level_t level(dimmer_channel_id_t channel) const {
-        return _config.level[channel];
+        return _config.channels.level[channel];
     }
 
 private:

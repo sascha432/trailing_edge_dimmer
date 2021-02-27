@@ -50,7 +50,7 @@ The configuation can be modifed for a specific version without a physical connec
 
 JSON output instead of the SerialTwoWire command
 
-    python ./scripts/cfg_tool.py display --version 2.2 --data '+REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -j
+    python ./scripts/cfg_tool.py display --version 2.2 --data '+REM=v840,i2ca=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -j
     Detected version: 2.2.0
     {
         "options": "2",
@@ -145,24 +145,12 @@ Read VCC
 
 Response (0x3613 = 4.918V)
 
-    +I2CT=753613
+    +I2CA=173613
 
 Read internal temperature
 
     +I2CT=17,89,21
-    +I2CR=17,04
-
-Read int. temp and VCC
-
-In this example, *DIMMER_REGISTER_READ_LENGTH* is set manually to 6 byte, followed by the start address *DIMMER_REGISTER_TEMP*
-
-    +I2CT=17,89,21,89,22,8a,06,9c
-    +I2CR=17,06
-
-If the temperature is requested last, it is not required to set read length and register address
-
-    +I2CT=17,89,22,89,21
-    +I2CR=17,06
+    +I2CR=17,02
 
 Read AC frequency
 
@@ -273,7 +261,7 @@ Reading the firmware version is using the same transmission for all versions
 +I2CT=17,8a,02,b9
 +I2CR=17,02
 
-+I2CT=172608
++I2CA=172608
 ```
 
 - bit 0-4 - Revision
@@ -340,7 +328,7 @@ Read report metrics interval
 
 Response for 30 seconds
 
-    +I2CT=171e
+    +I2CA=171e
 
 ## DIMMER_COMMAND_SET_MODE
 
@@ -390,7 +378,7 @@ Print dimmer info on serial port
 - f = measured mains frequency
 - vref11 = interval 1.1V voltage reference calibration
 - NTC = NTC temperature / +-offset correction in °C
-- int.temp = internal temperature / +-offset correction in °C
+- int.temp = internal temperature / offset / gain
 - max.temp = max. temperature before shutting down
 - metrics = report metrics interval in seconds or 0 for disabled
 - VCC = VCC in V
@@ -459,24 +447,21 @@ Print the contents of the register memory
 
     +I2CT=17,89,ee
 
-## Temperature, VCC status and AC Frequency (DIMMER_METRICS_REPORT)
+## Temperature, VCC status and AC Frequency (DIMMER_EVENT_METRICS_REPORT)
 
-If metrics reporting is enabled, the dimmer sends dimmer_metrics_t with DIMMER_TEMPERATURE_REPORT to it's own I2C address + 1.
-This can also be trigger with the command DIMMER_COMMAND_FORCE_TEMP_CHECK. The maximum interval is set with cfg.report_metrics_max_interval, the minimum is cfg.temp_check_interval. The event is sent either when the maximum time has been reached, or if any values has changed significantly.
-
-If data is not available, 0 (for VCC) or NaN (for any float) is returned.
+If metrics reporting is enabled (cfg.report_metrics_interval > 0), the event DIMMER_EVENT_METRICS_REPORT is fired in regular intervals with data structure dimmer_metrics_t. The event can be triggered with the command DIMMER_COMMAND_FORCE_TEMP_CHECK. Each data field has a method that indicates if there is valid data available.
 
     +I2CT=18F02...
 
-## Temperature Alarm (DIMMER_TEMPERATURE_ALERT)
+## Temperature Alarm (DIMMER_EVENT_TEMPERATURE_ALERT)
 
-If the max. temperature was exceeded, it sends one alarm with register address DIMMER_TEMPERATURE_ALERT, the current temperature (uint8) and the temperature threshold (uint8)
+If the max. temperature was exceeded, the event DIMMER_EVENT_TEMPERATURE_ALERT is fired with data structure dimmer_over_temperature_event_t containing max. temperature and current temperature
 
     +I2CT=18F16A64
 
-## Fading completed (DIMMER_FADING_COMPLETE)
+## Fading completed (DIMMER_EVENT_FADING_COMPLETE)
 
-When fading to a new level has been completed, the dimmer sends DIMMER_FADING_COMPLETE, with channel (int8) and level (int16). Channel and level can occur multiple times in the case 2 channels finished at the same time.
+When fading to a new level has been completed, the event DIMMER_EVENT_FADING_COMPLETE is fired, the data structure is an array of dimmer_fading_complete_event_t with 1 to 8 elements
 
 Channel 0 and 1 reached 0x1234 and fading is complete:
 
@@ -486,20 +471,19 @@ Channel 0 reached level 0:
 
     +I2CT=18F2000000
 
-## EEPROM written event (DIMMER_EEPROM_WRITTEN)
+## EEPROM written event (DIMMER_EVENT_EEPROM_WRITTEN)
 
-EEPROM writes might be delayed due to wear leveling. Once written, DIMMER_EEPROM_WRITTEN with structure dimmer_eeprom_written_t is sent.
+EEPROM writes might be delayed due to wear leveling. Once written, the event DIMMER_EVENT_EEPROM_WRITTEN is fired with data structure dimmer_eeprom_written_t
 
     +I2CT=18F301000000000000
 
-## Frequency warning (DIMMER_FREQUENCY_WARNING)
+## Frequency warning (DIMMER_EVENT_FREQUENCY_WARNING)
 
 Currently not implemented
 
-## Channel on/off state (DIMMER_CHANNEL_ON_OFF)
+## Channel on/off state (DIMMER_EVENT_CHANNEL_ON_OFF)
 
-When a channel is turned on or off, this event is fired. If fading is used, the event is fired immediately before fading reaches the final state. The event data is one byte containing a bitset of the channel states.
-
+When a channel is turned on or off, this event is fired. If fading is used, the event is fired immediately before fading reaches the final state. The event data structure is dimmer_channel_state_event_t
 For example channel 0 and 2 are on
 
     +I2CT=18F505
@@ -507,6 +491,10 @@ For example channel 0 and 2 are on
 All channels off
 
     +I2CT=18F500
+
+## Restart completed (DIMMER_EVENT_RESTART)
+
+This event is fired after a reboot when the frequency detection has been finished. The event data structure is register_mem_metrics_t
 
 ## Commands cheatsheet
 

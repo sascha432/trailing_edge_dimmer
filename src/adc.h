@@ -8,9 +8,10 @@
 #include "helpers.h"
 #include "dimmer.h"
 
-#if !defined(__AVR_ATmega328P__)
+#if !defined(__AVR_ATmega328P__) && !defined(__AVR_ATmega328PB__)
 #error check if compatible with MCU
 #endif
+
 
 constexpr int kNumBitsRequired(uint32_t value, int n = 0) {
     return value ? kNumBitsRequired(value >> 1, n + 1) : n;
@@ -18,24 +19,43 @@ constexpr int kNumBitsRequired(uint32_t value, int n = 0) {
 
 class ADCHandler {
 public:
+    // storage for the sum of the readings
+    using sum_t = uint24_t;
+
+    // max. bits of the ADC readings
+    static constexpr size_t kADCBits = 10;
+    // the sum of all ADC readings is right shifted to fit into an
+    // uint16_t adding a precision of 6 bit or 1/64th for the average
+    // value
+    static constexpr uint8_t kAveragePrecisionBits = (sizeof(uint16_t) << 3) - kADCBits;
+    // max. ADC readings that fit into sum_t
+    static constexpr size_t kMaxReadings = (sizeof(sum_t) << 3) - kADCBits;
 
 #if HAVE_NTC
     static constexpr uint8_t kHaveNtc = 1;
+    static constexpr uint8_t kNumReadNtc = 6;       // total readings per cycle = (1 << kNumReadNtc)
+    static_assert(kNumReadNtc >= kAveragePrecisionBits && kNumReadNtc <= kMaxReadings, "invalid value");
 #else
     static constexpr uint8_t kHaveNtc = 0;
 #endif
 #if HAVE_EXT_VCC || HAVE_READ_VCC
     static constexpr uint8_t kHaveReadVcc = 1;
+    static constexpr uint8_t kNumReadVcc = 6;       // total readings per cycle = (1 << kNumReadVcc)
+    static_assert(kNumReadVcc >= kAveragePrecisionBits && kNumReadVcc <= kMaxReadings, "invalid value");
 #else
     static constexpr uint8_t kHaveReadVcc = 0;
 #endif
 #if HAVE_READ_INT_TEMP
     static constexpr uint8_t kReadIntTemp = 1;
+    static constexpr uint8_t kNumReadTemp = 6;      // total readings per cycle = (1 << kNumReadTemp)
+    static_assert(kNumReadTemp >= kAveragePrecisionBits && kNumReadTemp <= kMaxReadings, "invalid value");
 #else
     static constexpr uint8_t kReadIntTemp = 0;
 #endif
 #if HAVE_POTI
     static constexpr uint8_t kHavePoti = 1;
+    static constexpr uint8_t kNumReadPoti = 8;      // total readings per cycle = (1 << kNumReadPoti)
+    static_assert(kNumReadPoti >= kAveragePrecisionBits && kNumReadPoti <= kMaxReadings, "invalid value");
 #else
     static constexpr uint8_t kHavePoti = 0;
 #endif
@@ -56,20 +76,14 @@ public:
     static_assert(kMaxPositon > 0, "nothing to do for the ADC");
 
 
-    using sum_t = uint24_t;
-    static constexpr size_t kSumTypeSize = sizeof_uint24_t; // sizeof(sum_t) <- intelli(non)sense doesnt like avr-gcc extensions
-
     static constexpr int kCpuMhz = F_CPU / 1000000UL;
 
     // max. number of ADC values that fit into out variable
-    static constexpr uint32_t kMaxValues = (1UL << (kSumTypeSize * 8)) / 1024 - 1;
+    static constexpr uint32_t kMaxValues = (1UL << (sizeof(sum_t) << 3)) / 1024 - 1;
     static constexpr int kMaxShift = kNumBitsRequired(kMaxValues);
 
     // discard first reading... to use the first reading, the ADC / interrupt flags must be cleared etc...
     static constexpr uint8_t kDefaultDiscard = 1;
-
-    // the average value is multiplied by 64 or left shifted 6
-    static constexpr uint8_t kLeftShift = 6;
 
     static constexpr uint8_t kADCSRA_Enable = _BV(ADEN);
     static constexpr uint8_t kADCSRA_StartConversion = _BV(ADSC);
@@ -152,15 +166,14 @@ public:
     // maxCount=6/readings=64 up to maxCount=14/readings=16384
     // discard = number of readings to discard before counting
     inline void start(const uint8_t maxCount = kMaxShift, const uint16_t discard = kDefaultDiscard) {
-        _ASSERTE(maxCount >= kLeftShift && maxCount <= kMaxShift);
+        _ASSERTE(maxCount >= kAveragePrecisionBits && maxCount <= kMaxShift);
 #if DEBUG
         _start = micros();
         _intCounter = 0;
         _count[_pos] = 0;
 #endif
-//30628
         _maxCount = 1U << maxCount;
-        _shiftSum = maxCount - kLeftShift;
+        _shiftSum = maxCount - kAveragePrecisionBits;
         _counter = discard;
         _counter = -_counter;
         _sum = 0;
@@ -196,7 +209,7 @@ public:
         if (++_counter <= 0) {
             return;
         }
-        _sum += value;
+        _sum = _sum + value;
         if ((uint16_t)_counter >= _maxCount) {
 #if DEBUG
             _duration[_pos] = micros() - _start;
@@ -215,9 +228,45 @@ public:
 
     // returns average ADC reading multiplied by 64 (or left shifted by 6)
     // values 0 - 65472
-    uint16_t getValue(uint8_t pos) const {
+    uint16_t __getValue(uint8_t pos) const {
         return _values[pos];
     }
+
+#if HAVE_NTC
+    uint16_t getNTCValue() const {
+        return _values[kPosNTC];
+    }
+    float getNTC_ADCValueAsFloat() const {
+        return getNTCValue() / 64.0;
+    }
+#endif
+
+#if HAVE_READ_INT_TEMP
+    uint16_t getIntTempValue() const {
+        return _values[kPosIntTemp];
+    }
+    float getIntTemp_ADCValueAsFloat() const {
+        return getIntTempValue() / 64.0;
+    }
+#endif
+
+#if HAVE_POTI
+    uint16_t getPotiValue() const {
+        return _values[kPosPoti];
+    }
+    float getPoti_ADCValueAsFloat() const {
+        return getPotiValue() / 64.0;
+    }
+#endif
+
+#if HAVE_EXT_VCC || HAVE_READ_VCC
+    uint16_t getVCCValue() const {
+        return _values[kPosVCC];
+    }
+    float getVCC_ADCValueAsFloat() const {
+        return getVCCValue() / 64.0;
+    }
+#endif
 
 #if DEBUG
     void dump();

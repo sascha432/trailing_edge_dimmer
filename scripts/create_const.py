@@ -16,12 +16,12 @@ outfile1 = './scripts/libs/fw_const_ver_MAJOR_MINOR_x.py'
 version = '2.2.x'
 
 with open(outfile1, 'w', newline='\n') as ofh1:
-    ofh1.write('from . import fw_const\n');
-    ofh1.write('class DimmerConst(fw_const.DimmerConstBase):\n');
-    ofh1.write('    def __init__(self):\n');
-    ofh1.write('        fw_const.DimmerConstBase.__init__(self)\n');
-    ofh1.write('        self.is_complete = True\n');
-    ofh1.write('        self.VERSION = \'%s\'\n' % version);
+    ofh1.write('from . import fw_const\n')
+    ofh1.write('class DimmerConst(fw_const.DimmerConstBase):\n')
+    ofh1.write('    def __init__(self):\n')
+    ofh1.write('        fw_const.DimmerConstBase.__init__(self)\n')
+    ofh1.write('        self.is_complete = True\n')
+    ofh1.write('        self.VERSION = \'%s\'\n' % version)
 
     attr = {}
     objs = {}
@@ -29,7 +29,7 @@ with open(outfile1, 'w', newline='\n') as ofh1:
         for line in ifh.read().split('\n'):
             line = line.strip()
             # get name and integral or float value
-            m = re.match('^#define\s+([^\s]*)\s+([0-9a-fA-Fx\-\.]+)', line)
+            m = re.match(r'^#define\s+([^\s]*)\s+([0-9a-fA-Fx\-\.]+)', line)
             if m:
                 name = m[1].replace('DIMMER_', '')
                 np_name = name
@@ -76,7 +76,7 @@ with open(outfile1, 'w', newline='\n') as ofh1:
                         objs[obj_name] = {}
                     objs[obj_name][np_name] = ovalue
 
-    ofh1.write('        self.attr = {\n');
+    ofh1.write('        self.attr = {\n')
     lines = json.dumps(attr, indent=4, sort_keys=str).split('\n')
     fc = None
     for line in lines:

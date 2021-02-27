@@ -101,18 +101,24 @@ uint8_t *get_signature(uint8_t *sig);
 void get_mcu_type(MCUInfo_t &info);
 
 
+/*
+// it is required to add the declarations below to the Print class
 // framework-arduino-avr\cores\arduino\Print.h
-// add
-// class Print {
-//...
-// private:
-//     friend void __debug_printf(const char *format, ...);
-//     typedef int (* vsnprint_t)(char *, size_t, const char *, va_list ap);
-//     size_t __printf(vsnprint_t func, const char *format, va_list arg);
-// public:
-//     size_t printf(const char *format, ...);
-//     size_t printf_P(PGM_P format, ...);
-// };
+//
+class Print {
+...
+
+private:
+    friend void __debug_printf(const char *format, ...);
+    typedef int (* vsnprint_t)(char *, size_t, const char *, va_list ap);
+    size_t __printf(vsnprint_t func, const char *format, va_list arg);
+
+public:
+    size_t printf(const char *format, ...);
+    size_t printf_P(PGM_P format, ...);
+};
+
+*/
 
 template <typename T>
 inline void swap(T &a, T &b) {

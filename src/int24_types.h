@@ -20,11 +20,19 @@
 #endif
 
 #if __GNUC__
+#ifndef __attribute_always_inline__
 #define __attribute_always_inline__         __attribute__((always_inline))
+#endif
+#ifndef __attribute_packed__
 #define __attribute_packed__                __attribute__((__packed__))
+#endif
 #else
+#ifndef __attribute_always_inline__
 #define __attribute_always_inline__
+#endif
+#ifndef __attribute_packed__
 #define __attribute_packed__
+#endif
 #endif
 
 // NOTE: the custom uint24_t implementation is used for intellisense since it does not support the avr-gcc 24bit integer extension
@@ -55,8 +63,13 @@ static uint24_t __uint24_from_ui16_ui8(const uint16_t hi, const uint8_t lo);
 // equivalent of uint24_t value = uint32_value >> 8;
 static uint24_t __uint24_from_shr8_ui32(const uint32_t value);
 
+#if _MSC_VER
+#pragma message("uint24_t/int24_t is experimental/not tested")
+#pragma message("set HAVE_UINT24=1 to use avr-gccs native __int24/__uint24 type")
+#else
 #warning uint24_t/int24_t is experimental/not tested
 #warning set HAVE_UINT24=1 to use avr-gccs native __int24/__uint24 type
+#endif
 
 #if _MSC_VER
 #pragma pack(push, 1)

@@ -7,6 +7,7 @@
 #include <Arduino.h>
 #include "timers.h"
 #include "helpers.h"
+#include "int24_types.h"
 #include "dimmer_def.h"
 #include "dimmer_protocol.h"
 #include "dimmer_reg_mem.h"
@@ -130,7 +131,8 @@ namespace Dimmer {
             if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
                 _overflow++;
             }
-            return ((uint24_t)_overflow << 8) | tmp;
+            //return ((uint24_t)_overflow << 8) | tmp;
+            return __uint24_from_ui16_ui8(_overflow, tmp);
         }
 
         // get ticks since lasts reset and reset counter
@@ -141,17 +143,20 @@ namespace Dimmer {
             if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
                 _overflow++;
             }
-            auto tmp2 = ((uint24_t)_overflow << 8) | tmp;
+            auto tmp2 = __uint24_from_ui16_ui8(_overflow, tmp);
+            //auto tmp2 = ((uint24_t)_overflow << 8) | tmp;
             _overflow = 0;
             return tmp2;
         }
 
-        uint16_t _overflow;
+        volatile uint16_t _overflow;
     };
+
+    static_assert(DIMMER_CHANNEL_COUNT == ::size_of(DIMMER_MOSFET_PINS), "channel count mismatch");
 
     struct Channel {
         using type = ChannelType;
-        static constexpr type kSize = ::size_of(DIMMER_MOSFET_PINS);
+        static constexpr type kSize = DIMMER_CHANNEL_COUNT;
         static constexpr type min = 0;
         static constexpr type max = kSize - 1;
         static constexpr type any = -1;
@@ -251,7 +256,7 @@ namespace Dimmer {
         void zc_interrupt_handler(uint24_t ticks);
 
         inline void set_frequency(float freq) {
-            register_mem.data.frequency = freq;
+            register_mem.data.metrics.frequency = freq;
         }
 
         inline void set_mode(ModeType mode) {
@@ -324,11 +329,11 @@ namespace Dimmer {
         }
 
         inline uint16_t _get_level(Channel::type channel) const {
-            return _register_mem.level[channel];
+            return _register_mem.channels.level[channel];
         }
 
         inline void _set_level(Channel::type channel, Level::type level) {
-            _register_mem.level[channel] = level;
+            _register_mem.channels.level[channel] = level;
         }
 
         inline Level::type _normalize_level(Level::type level) const {
@@ -348,11 +353,12 @@ namespace Dimmer {
         void _start_halfwave();
         void _delay_halfwave();
         inline float _get_frequency() const {
-            return register_mem.data.frequency;
+            return register_mem.data.metrics.frequency;
         }
 #if HAVE_CHANNELS_INLINE_ASM
         inline void _set_all_mosfet_gates(bool state) {
             if (state) {
+                // if it fails to build here, run the build process again. the required include file is created automatically
                 DIMMER_SFR_ENABLE_ALL_CHANNELS();
             }
             else {
@@ -386,6 +392,33 @@ namespace Dimmer {
 
         register_mem_cfg_t &_config;
         register_mem_t &_register_mem;
+    };
+
+    template<uint8_t _Event>
+    struct DimmerEvent {
+
+        inline static void send(const uint8_t *buffer, uint8_t length)
+        {
+            Wire.write(buffer, length);
+            Wire.endTransmission();
+        }
+
+        template<typename _Type>
+        static void send(const _Type &data)
+        {
+            Wire.beginTransmission(DIMMER_I2C_MASTER_ADDRESS);
+            Wire.write(_Event);
+            send(reinterpret_cast<const uint8_t *>(&data), (uint8_t)sizeof(data));
+        }
+
+        template<typename _Type>
+        static void send(const uint8_t extraByte, const _Type &data)
+        {
+            Wire.beginTransmission(DIMMER_I2C_MASTER_ADDRESS);
+            Wire.write(_Event);
+            Wire.write(extraByte);
+            send(reinterpret_cast<const uint8_t *>(&data), (uint8_t)sizeof(data));
+        }
     };
 
 }

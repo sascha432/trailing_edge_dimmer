@@ -50,9 +50,9 @@ void Config::resetConfig()
     register_mem.data.cfg.ntc_temp_cal_offset = static_cast<float>(NTC_TEMP_OFS);
 #endif
     register_mem.data.cfg.report_metrics_interval = DIMMER_REPORT_METRICS_INTERVAL;
-    register_mem.data.ntc_temp = NAN;
-    register_mem.data.int_temp = 32767;
-    register_mem.data.frequency = NAN;
+    register_mem.data.metrics.ntc_temp = NAN;
+    register_mem.data.metrics.int_temp = Dimmer::kInvalidTemperature;
+    register_mem.data.metrics.frequency = NAN;
 
     copyFromRegisterMem(_config.cfg);
 }
@@ -156,6 +156,7 @@ void Config::readConfig()
 
     copyToRegisterMem(_config.cfg);
     _D(5, debug_print_memory(&_config.cfg, sizeof(_config.cfg)));
+    // if this does not compile check RREADME.md "Patching the Arduino libary"
     Serial.printf_P(PSTR("+REM=EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x\n"), (uint32_t)max_cycle, _eeprom_position, get_eeprom_num_writes(max_cycle, _eeprom_position), _config.crc16);
 }
 
@@ -184,7 +185,7 @@ void Config::_writeConfig(bool force)
         copyFromRegisterMem(_config.cfg);
     }
 
-    memcpy(_config.level, register_mem.data.level, sizeof(_config.level));
+    _config.channels = register_mem.data.channels;
     EEPROMConfig::updateCrc16(_config);
 
     EEPROM.get(_eeprom_position, temp_config);
@@ -221,7 +222,7 @@ void Config::_writeConfig(bool force)
     event.write_position = _eeprom_position;
 
     _D(5, debug_printf("eeprom written event: cycle %lu:%u, written %u\n", event.write_cycle, event.write_position, event.bytes_written));
-    Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
+    Wire.beginTransmission(DIMMER_I2C_MASTER_ADDRESS);
     Wire.write(DIMMER_EVENT_EEPROM_WRITTEN);
     Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
     Wire.endTransmission();

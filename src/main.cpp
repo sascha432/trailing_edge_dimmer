@@ -6,6 +6,7 @@
 
 #include <Arduino.h>
 #include <util/atomic.h>
+#include <avr/io.h>
 #include <crc16.h>
 #include "dimmer.h"
 #include "sensor.h"
@@ -33,17 +34,22 @@
 // 23868
 //30268
 //30294
+//Flash: [========  ]  84.9% (used 26068 bytes from 30720 bytes)
+// Flash: [========  ]  81.6% (used 25066 bytes from 30720 bytes)
+//Flash: [========  ]  78.8% (used 24212 bytes from 30720 bytes)
+// 24212-22570
 
 Queues queues;
 
-void rem() {
+void rem()
+{
     Serial.print(F("+REM="));
 }
 
 #if HIDE_DIMMER_INFO == 0
 
-void display_dimmer_info() {
-
+void display_dimmer_info()
+{
     rem();
     Serial.println(F("MOSFET Dimmer " DIMMER_VERSION " " __DATE__ " " __TIME__ " " DIMMER_INFO));
     Serial.flush();
@@ -54,9 +60,10 @@ void display_dimmer_info() {
 
     Serial.printf_P(PSTR("sig=%02x-%02x-%02x,fuses=l:%02x,h:%02x,e:%02x"), mcu.sig[0], mcu.sig[1], mcu.sig[2], mcu.fuses[0], mcu.fuses[1], mcu.fuses[2]);
     if (mcu.name) {
-        Serial.printf_P(PSTR(",MCU=%S"), mcu.name);
+        Serial.print(F(",MCU="));
+        Serial.print(mcu.name);
     }
-    Serial.printf_P(PSTR("@%uMhz\n"), (unsigned)(F_CPU / 1000000UL));
+    Serial.println(F("@" _STRINGIFY(F_CPU_MHZ) "Mhz" __GNUC_STR__));
     Serial.flush();
 
     rem();
@@ -118,8 +125,10 @@ void display_dimmer_info() {
     Serial.flush();
 }
 
-void setup() {
+#endif
 
+void setup()
+{
     Serial.begin(DEFAULT_BAUD_RATE);
 
 #if SERIAL_I2C_BRDIGE && DEBUG
@@ -151,8 +160,8 @@ void setup() {
 
 #if HAVE_FADE_COMPLETION_EVENT
 
-void Dimmer::DimmerBase::send_fading_completion_events() {
-
+void Dimmer::DimmerBase::send_fading_completion_events()
+{
     FadingCompletionEvent_t buffer[Dimmer::Channel::size()];
     FadingCompletionEvent_t *ptr = buffer;
 
@@ -167,13 +176,8 @@ void Dimmer::DimmerBase::send_fading_completion_events() {
 
     if (ptr != buffer) {
         // _D(5, debug_printf("sending fading completion event for %u channel(s)\n", ptr - buffer));
-
-        Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-        Wire.write(DIMMER_EVENT_FADING_COMPLETE);
-        Wire.write(reinterpret_cast<const uint8_t *>(buffer), (reinterpret_cast<const uint8_t *>(ptr) - reinterpret_cast<const uint8_t *>(buffer)));
-        Wire.endTransmission();
+        Dimmer::DimmerEvent<DIMMER_EVENT_FADING_COMPLETE>::send(reinterpret_cast<const uint8_t *>(buffer), (uint8_t)(reinterpret_cast<const uint8_t *>(ptr) - reinterpret_cast<const uint8_t *>(buffer)));
     }
-
 }
 
 #endif
@@ -222,6 +226,12 @@ void loop()
             dimmer.begin();
             restore_level();
 
+            register_mem.data.metrics.int_temp = get_internal_temperature();
+            register_mem.data.metrics.ntc_temp = get_ntc_temperature();
+            register_mem.data.metrics.vcc = read_vcc();
+
+            Dimmer::DimmerEvent<DIMMER_EVENT_RESTART>::send(register_mem.data.metrics);
+            // Dimmer::DimmerEvent<DIMMER_EVENT_RESTART>::send(register_mem_metrics_t{dimmer._get_frequency(), get_ntc_temperature(), get_internal_temperature(), read_vcc() });
 
 #if HIDE_DIMMER_INFO == 0
             ATOMIC_BLOCK(ATOMIC_FORCEON) {
@@ -252,7 +262,7 @@ void loop()
     }
 #endif
 
-    uint24_t millis24 = (millis() >> 8);
+    auto millis24 = __uint24_from_shr8_ui32(millis());
 
 #if HAVE_POTI
     {
@@ -274,12 +284,7 @@ void loop()
         ATOMIC_BLOCK(ATOMIC_FORCEON) {
             queues.scheduled_calls.report_error = false;
         }
-
-        Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-        Wire.write(DIMMER_EVENT_FREQUENCY_WARNING);
-        Wire.write(0xff);
-        Wire.write(reinterpret_cast<const uint8_t *>(&register_mem.data.errors), sizeof(register_mem.data.errors));
-        Wire.endTransmission();
+        Dimmer::DimmerEvent<DIMMER_EVENT_FREQUENCY_WARNING>::send(0xff, register_mem.data.errors);
         _D(5, debug_printf("Report error\n"));
     }
 
@@ -289,26 +294,26 @@ void loop()
         queues.print_metrics.timer = millis24 + queues.print_metrics.interval;
         rem();
         #if HAVE_NTC
-            Serial.printf_P(PSTR("NTC=%.2f°C(%.1f),"), get_ntc_temperature(), _adc.getValue(ADCHandler::kPosNTC) / 64.0);
+            Serial.printf_P(PSTR("NTC=%.2f°C(%.1f),"), get_ntc_temperature(), _adc.getNTC_ADCValueAsFloat());
         #endif
         #if HAVE_READ_INT_TEMP
-            Serial.printf_P(PSTR("int.temp=%d°C(%.1f),"), get_internal_temperature(), _adc.getValue(ADCHandler::kPosIntTemp)  / 64.0);
+            Serial.printf_P(PSTR("int.temp=%d°C(%.1f),"), get_internal_temperature(), _adc.getIntTemp_ADCValueAsFloat());
         #endif
         #if HAVE_READ_VCC || HAVE_EXT_VCC
-            Serial.printf_P(PSTR("VCC=%umV (%.1f),"), read_vcc(), _adc.getValue(ADCHandler::kPosVCC)  / 64.0);
+            Serial.printf_P(PSTR("VCC=%umV (%.1f),"), read_vcc(), _adc.getVCC_ADCValueAsFloat());
         #endif
         #if HAVE_POTI
-            Serial.printf_P(PSTR("poti=%.1f,"), _adc.getValue(ADCHandler::kPosPoti)  / 64.0);
+            Serial.printf_P(PSTR("poti=%.1f,"), _adc.getPoti_ADCValueAsFloat());
         #endif
         // Serial.printf_P(PSTR("hw=%u,diff=%d,"), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks);
         // Serial.printf_P(PSTR("frq=%.3f,mode=%c,lvl="), dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
         Serial.printf_P(PSTR("hw=%u,diff=%d,frq=%.3f,mode=%c,lvl="), dimmer.halfwave_ticks, (int)dimmer.zc_diff_ticks, dimmer._get_frequency(), (dimmer_config.bits.leading_edge) ? 'L' : 'T');
         DIMMER_CHANNEL_LOOP(i) {
-            Serial.printf_P(PSTR("%d,"), register_mem.data.level[i]);
+            Serial.printf_P(PSTR("%d,"), register_mem.data.channels.level[i]);
         }
         Serial.printf_P(PSTR("hf=%u,ticks="), (unsigned)dimmer._get_ticks_per_halfwave());
         DIMMER_CHANNEL_LOOP(j) {
-            Serial.print(dimmer._get_ticks(j, register_mem.data.level[j]));
+            Serial.print(dimmer._get_ticks(j, register_mem.data.channels.level[j]));
             if (j < Dimmer::Channel::max) {
                 Serial.print(',');
             }
@@ -327,10 +332,7 @@ void loop()
         queues.scheduled_calls.send_channel_state = false;
         sei();
 
-        Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-        Wire.write(DIMMER_EVENT_CHANNEL_ON_OFF);
-        Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
-        Wire.endTransmission();
+        Dimmer::DimmerEvent<DIMMER_EVENT_CHANNEL_ON_OFF>::send(event);
     }
 
 #if HAVE_FADE_COMPLETION_EVENT
@@ -363,10 +365,7 @@ void loop()
         queues.scheduled_calls.sync_event = false;
         sei();
 
-        Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-        Wire.write(DIMMER_EVENT_SYNC_EVENT);
-        Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
-        Wire.endTransmission();
+        Dimmer::DimmerEvent<DIMMER_EVENT_SYNC_EVENT>::send(event);
 
         Serial.printf_P(PSTR("+REM=lost=%u,sync=%u,cnt=%u,c=%ld,t=%.1fus\n"), event.lost, event.sync, event.halfwave_counter, event.sync_difference_cycles * Dimmer::Timer<1>::prescaler, event.sync_difference_cycles / Dimmer::Timer<1>::ticksPerMicrosecond);
     }
@@ -377,17 +376,26 @@ void loop()
             queues.check_temperature.timer = Queues::kTemperatureCheckTimerOverflows;
         }
 
+        read_vcc();
+
         int16_t current_temp;
 #if HAVE_NTC
 
-        current_temp = (register_mem.data.ntc_temp = get_ntc_temperature());
+        register_mem.data.metrics.ntc_temp = get_ntc_temperature();
+        if (!isnan(register_mem.data.metrics.ntc_temp)) {
+            current_temp = register_mem.data.metrics.ntc_temp;
+        }
 #if HAVE_READ_INT_TEMP
-        current_temp = max(current_temp, register_mem.data.int_temp = get_internal_temperature());
+        register_mem.data.metrics.int_temp = get_internal_temperature();
+        if (!isnan(register_mem.data.metrics.int_temp)) {
+            current_temp = max(current_temp, register_mem.data.metrics.int_temp);
+        }
 #endif
 
 #elif HAVE_READ_INT_TEMP
 
-        current_temp = (register_mem.data.int_temp = get_internal_temperature());
+        register_mem.data.metrics.int_temp = get_internal_temperature();
+        current_temp = isnan(register_mem.data.metrics.int_temp) ? 0 : register_mem.data.metrics.int_temp;
 
 #else
 
@@ -395,7 +403,7 @@ void loop()
 
 #endif
 
-        if (dimmer_config.max_temp && current_temp > (int)dimmer_config.max_temp) {
+        if (dimmer_config.max_temp && current_temp > (int16_t)dimmer_config.max_temp) {
 
             if (millis24 >= queues.check_temperature.report_next) {
 
@@ -409,29 +417,15 @@ void loop()
 
                 dimmer.fade_from_to(Dimmer::Channel::any, Dimmer::Level::current, Dimmer::Level::off, 10);
 
-                Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-                Wire.write(DIMMER_EVENT_TEMPERATURE_ALERT);
-                Wire.write((uint8_t)current_temp);
-                Wire.write(dimmer_config.max_temp);
-                Wire.endTransmission();
-
+                Dimmer::DimmerEvent<DIMMER_EVENT_TEMPERATURE_ALERT>::send(dimmer_over_temperature_event_t{ (uint8_t)current_temp, dimmer_config.max_temp });
             }
 
         }
 
         if (dimmer_config.report_metrics_interval && millis24 >= queues.report_metrics.timer) {
             queues.report_metrics.timer = millis24 + REPORT_METRICS_INTERVAL_MILLIS24(dimmer_config.report_metrics_interval);
-            dimmer_metrics_t event = {
-                (uint8_t)current_temp,
-                read_vcc(),
-                dimmer._get_frequency(),
-                register_mem.data.ntc_temp,
-                register_mem.data.int_temp
-            };
-            Wire.beginTransmission(DIMMER_I2C_ADDRESS + 1);
-            Wire.write(DIMMER_EVENT_METRICS_REPORT);
-            Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
-            Wire.endTransmission();
+            // Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT, dimmer_metrics_t>(dimmer_metrics_t{(uint8_t)current_temp, register_mem.data.metrics});
+            Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT>::send((uint8_t)current_temp, register_mem.data.metrics);
         }
 
         // restart reading adc values
@@ -440,5 +434,4 @@ void loop()
             _adc.restart();
         }
     }
-#endif
 }

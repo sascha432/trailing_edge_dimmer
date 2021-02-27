@@ -134,7 +134,7 @@ void setup() {
 #endif
 
     // receive incoming data as slave
-    Wire.begin(DIMMER_I2C_ADDRESS + 1);
+    Wire.begin(DIMMER_I2C_MASTER_ADDRESS);
     Wire.onReceive([](int length) {
         // Serial.printf_P(PSTR("Wire.onReceive(): length %u, type %#02x\n"), length, Wire.peek());
         switch((uint8_t)Wire.read()) {

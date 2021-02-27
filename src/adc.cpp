@@ -2,10 +2,6 @@
  * Author: sascha_lammers@gmx.de
  */
 
-// #include <avr/io.h>
-// #include <util/delay.h>
-// #include <avr/interrupt.h>
-
 #include "adc.h"
 
 ADCHandler _adc;
@@ -55,7 +51,7 @@ void ADCHandler::restart()
     // reading a value with prescaler 128 takes ~105µs, giving it ~6.6ms time to discharge when discarding the first 64 cycles
     // testing with an arduino nano @5V shows ~2.4ms to discharge to 1.1V. Adding additional 120nF capacity increased the time to ~5.9ms
     constexpr uint8_t kDiscardVRef11 = kCpuMhz * 4;
-    constexpr float kDischargeTimeMillis = kDiscardVRef11 * 0.104;
+    constexpr float kDischargeTimeMillis = kDiscardVRef11 * 0.104 * (16000000UL / F_CPU);
     static_assert(kDischargeTimeMillis > 5.0 && kADCSRA_PrescalerDefault == kADCSRA_Prescaler128, "check discharge cycles");
 
     _scheduleNext = false;
@@ -63,30 +59,30 @@ void ADCHandler::restart()
 #if HAVE_NTC
         case kPosNTC:
             setPinAndAVCC<NTC_PIN>();
-            start(6, kDiscard);
+            start(kNumReadNtc, kDiscard);
             break;
 #endif
 #if HAVE_EXT_VCC
         case kPosVCC:
             setPinAndVRef11<VCC_PIN>();
-            start(6, kDiscardVRef11);
+            start(kNumReadVcc, kDiscardVRef11);
             break;
 #elif HAVE_READ_VCC
         case kPosVCC:
             setInternalVCC();
-            start(6, kDiscard);
+            start(kNumReadVcc, kDiscard);
             break;
 #endif
 #if HAVE_READ_INT_TEMP
         case kPosIntTemp:
             setInternalTemp();
-            start(6, kDiscardVRef11);
+            start(kNumReadTemp, kDiscardVRef11);
             break;
 #endif
 #if HAVE_POTI
         case kPosPoti:
             setPinAndAVCC<POTI_PIN>();
-            start(8, kDiscard);
+            start(kNumReadPoti, kDiscard);
             break;
 #endif
 #if DEBUG && 0
