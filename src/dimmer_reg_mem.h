@@ -290,7 +290,7 @@ struct __attribute_packed__ dimmer_timers_t
     float timer1_ticks_per_us;
 };
 
-struct __attribute_packed__ _dimmer_version_t {
+struct __attribute_packed__ dimmer_version_t {
     union __attribute_packed__ {
         uint16_t _word;
         struct __attribute_packed__ {
@@ -300,9 +300,7 @@ struct __attribute_packed__ _dimmer_version_t {
             uint16_t __reserved: 1;
         };
     };
-};
 
-struct __attribute_packed__ dimmer_version_t : public _dimmer_version_t {
     operator uint16_t() const {
         return _word;
     }
@@ -310,16 +308,16 @@ struct __attribute_packed__ dimmer_version_t : public _dimmer_version_t {
         return _word != 0;
     }
 
-    dimmer_version_t() : _dimmer_version_t({0}) {}
-    dimmer_version_t(uint16_t version) : _dimmer_version_t({version}) {}
-    dimmer_version_t(const uint8_t _major, const uint8_t _minor, const uint8_t _revision) : _dimmer_version_t({ (revision | static_cast<uint16_t>(minor << 5) | static_cast<uint16_t>(major << 10)) }) {}
+    dimmer_version_t() = default;
+    dimmer_version_t(uint16_t version) : _word(version) {}
+    dimmer_version_t(const uint8_t _major, const uint8_t _minor, const uint8_t _revision) : revision(_revision), minor(_minor), major(_major), __reserved(0) {}
 };
 
 static_assert(sizeof(dimmer_version_t) == sizeof(uint16_t), "check struct");
 
 struct __attribute_packed__ dimmer_version_info_t
 {
-    _dimmer_version_t version;
+    dimmer_version_t version;
     dimmer_config_info_t info;
 };
 
@@ -343,6 +341,10 @@ struct __attribute_packed__ register_mem_metrics_t {
     bool has_int_temp() const;
     bool has_ntc_temp() const;
     bool has_frequency() const;
+    float get_vcc() const;
+    float get_int_temp() const;
+    float get_ntc_temp() const;
+    float get_freqency() const;
 };
 
 struct __attribute_packed__ register_mem_channels_t
@@ -445,6 +447,7 @@ static_assert(sizeof(dimmer_sync_event_t) == 6, "check struct");
 extern register_mem_union_t register_mem;
 
 struct __attribute_packed__ dimmer_command_fade_t {
+    uint8_t register_address;
     int16_t from_level;
     int8_t channel;
     int16_t to_level;
@@ -454,37 +457,45 @@ struct __attribute_packed__ dimmer_command_fade_t {
     dimmer_command_fade_t() = default;
 
     dimmer_command_fade_t(uint8_t p_channel, int16_t p_from_level, int16_t p_to_level, float time) :
+        register_address(DIMMER_REGISTER_FROM_LEVEL),
         from_level(p_from_level),
         channel(p_channel),
         to_level(p_to_level),
         time(time),
         command(DIMMER_COMMAND_FADE)
     {}
-
-    static uint8_t address() {
-        return DIMMER_REGISTER_FROM_LEVEL;
-    }
-
 };
 
-static_assert(sizeof(dimmer_command_fade_t) == 10, "check struct");
+static_assert(sizeof(dimmer_command_fade_t) == 11, "check struct");
 
 namespace Dimmer  {
 
+    using VersionType = dimmer_version_t;
+
+    struct MetricsType : dimmer_metrics_t {
+        MetricsType() : dimmer_metrics_t({}) {
+            invalidate();
+        }
+        operator bool() const {
+            return temp_check_value == 0;
+        }
+        void invalidate() {
+            temp_check_value = 0xff;
+        }
+        void validate() {
+            temp_check_value = 0;
+        }
+    };
+
     struct __attribute_packed__ Config
     {
-        union {
-            dimmer_version_info_t _version_info;
-            struct __attribute_packed__ {
-                _dimmer_version_t version;
-                dimmer_config_info_t info;
-            };
-        };
+        dimmer_version_t version;
+        dimmer_config_info_t info;
         register_mem_cfg_t config;
 
         static constexpr size_t kVersionSize = sizeof(dimmer_version_info_t);
 
-        Config() : _version_info({}), config({}) {}
+        Config() : version(), info(), config() {}
     };
 
     static constexpr const uint8_t kRequestVersion[] = { 0x8a, 0x02, 0xb9 };
@@ -592,17 +603,46 @@ namespace Dimmer  {
 }
 
 inline bool register_mem_metrics_t::has_vcc() const {
-    return vcc != 0;
+    return Dimmer::isValidVoltage(vcc);
 }
 
 inline bool register_mem_metrics_t::has_int_temp() const {
-    return int_temp != Dimmer::kInvalidTemperature;
+    return Dimmer::isValidTemperature(int_temp);
 }
 
 inline bool register_mem_metrics_t::has_ntc_temp() const {
-    return !isnan(ntc_temp);
+    return Dimmer::isValidTemperature(ntc_temp);
 }
 
 inline bool register_mem_metrics_t::has_frequency() const {
     return Dimmer::isValidFrequency(frequency);
+}
+
+inline float register_mem_metrics_t::get_vcc() const {
+    if (has_vcc()) {
+        return vcc / 1000.0;
+    }
+    return NAN;
+}
+
+inline float register_mem_metrics_t::get_int_temp() const {
+    if (has_int_temp()) {
+        return int_temp;
+    }
+    return NAN;
+}
+
+inline float register_mem_metrics_t::get_ntc_temp() const {
+    if (has_ntc_temp()) {
+        return ntc_temp;
+    }
+    return NAN;
+}
+
+inline float register_mem_metrics_t::get_freqency() const {
+    if (has_frequency()) {
+        return frequency;
+    }
+    return NAN;
+
 }
