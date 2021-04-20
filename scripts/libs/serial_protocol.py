@@ -67,7 +67,7 @@ class Protocol:
                     line = '%011.3f: %s' % (int(m[1]) / 1000.0, m[2])
                 else:
                     repeat = False
-                    regexp = '^\+i2c([tr])=([0-9a-f]+)'
+                    regexp = '^\+i2c([tra])=([0-9a-f]+)'
                     m = re.match(regexp, line, re.IGNORECASE)
                     if m:
                         type = m[1].upper()
