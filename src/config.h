@@ -8,14 +8,14 @@
 #include <crc16.h>
 #include "main.h"
 
-typedef struct __attribute__((__packed__)) EEPROM_config_header_t {
+struct __attribute__((__packed__)) EEPROM_config_header_t {
     uint16_t crc16;
     uint32_t eeprom_cycle;
     EEPROM_config_header_t() = default;
     EEPROM_config_header_t(uint16_t _crc) : crc16(_crc), eeprom_cycle(0) {}
-} EEPROM_config_header_t;
+};
 
-typedef struct __attribute__((__packed__)) EEPROM_config_t {
+struct __attribute__((__packed__)) EEPROM_config_t {
     union __attribute__((__packed__)) {
         struct __attribute__((__packed__)) {
             uint16_t crc16;
@@ -34,7 +34,7 @@ typedef struct __attribute__((__packed__)) EEPROM_config_t {
         return memcmp(this, &config, sizeof(*this)) != 0;
     }
 
-} EEPROM_config_t;
+};
 
 struct __attribute__((__packed__)) EEPROMConfig {
     struct __attribute__((__packed__)) {

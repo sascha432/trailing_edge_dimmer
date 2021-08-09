@@ -16,28 +16,6 @@
 #include "measure_frequency.h"
 #include "adc.h"
 
-// size reduction
-//23704 - 2.1.3
-//23492 - helpers.cpp / get_signature
-//Flash: [=======   ]  73.5% (used 22570 bytes from 30720,22824
-// lash: [========  ]  76.2% (used 23416 bytes from 30720 byt
-//ash: [========  ]  76.2% (used 23398 bytes from 30720 bytes)
-//ash: [========  ]  76.8% (used 23588 bytes from 30720 byte
-//Flash: [========  ]  76.6% (used 23530 bytes from 30720 byte
-//Flash: [========  ]  76.6% (used 23518 bytes from 30720 bytes)
-//Flash: [=======   ]  73.1% (used 22468 bytes from 30720 bytes)
-// Flash: [=======   ]  73.2% (used 22480 bytes from 30720 bytes
-// frequency detection and continue without zc signal
-// Flash: [========  ]  78.7% (used 24168 bytes from 30720 bytes)
-// lash: [========  ]  78.7% (used 24188 bytes from 30720 bytes
-// 29888
-// 23868
-//30268
-//30294
-//Flash: [========  ]  84.9% (used 26068 bytes from 30720 bytes)
-// Flash: [========  ]  81.6% (used 25066 bytes from 30720 bytes)
-//Flash: [========  ]  78.8% (used 24212 bytes from 30720 bytes)
-// 24212-22570
 
 Queues queues;
 

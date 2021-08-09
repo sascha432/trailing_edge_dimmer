@@ -8,7 +8,7 @@
 #include "dimmer.h"
 #include "dimmer_reg_mem.h"
 
-#define DEBUG_FREQUENCY_MEASUREMENT             1
+#define DEBUG_FREQUENCY_MEASUREMENT 1
 
 class FrequencyMeasurement;
 

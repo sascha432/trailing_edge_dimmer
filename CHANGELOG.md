@@ -18,6 +18,8 @@
 - Improved performance and reduced code size using the ADC interrupt
 - Reboot notification event after the frequency measurement has been completed
 - Patch for Arduino library
+- Structure updates
+- Fix issue in serial protocol of the python config tool
 
 ## 2.1.5
 

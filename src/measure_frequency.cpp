@@ -44,11 +44,9 @@ FrequencyMeasurement *measure;
 
 void FrequencyMeasurement::calc_min_max()
 {
-    uint24_t _min;
-    uint24_t _max;
+    uint24_t _min = 0;
+    uint24_t _max = 0;
 
-    _min = 0;
-    _max = 0;
     _frequency = NAN;
 
     _D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
