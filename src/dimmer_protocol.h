@@ -5,13 +5,13 @@
 #pragma once
 
 #ifndef DIMMER_I2C_ADDRESS
-#define DIMMER_I2C_ADDRESS                  0x17
+#    define DIMMER_I2C_ADDRESS              0x17
 #endif
-
+//
 #ifndef DIMMER_I2C_MASTER_ADDRESS
-#define DIMMER_I2C_MASTER_ADDRESS           (DIMMER_I2C_ADDRESS + 1)
+#    define DIMMER_I2C_MASTER_ADDRESS       (DIMMER_I2C_ADDRESS + 1)
 #endif
-
+//
 #define DIMMER_REGISTER_START_ADDR          0x80
 #define DIMMER_REGISTER_FROM_LEVEL          (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, from_level))
 #define DIMMER_REGISTER_CHANNEL             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, channel))
@@ -54,7 +54,7 @@
 #define DIMMER_REGISTER_RAM                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, ram))
 #define DIMMER_REGISTER_ADDRESS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, address))
 #define DIMMER_REGISTER_END_ADDR            (DIMMER_REGISTER_START_ADDR + sizeof(register_mem_t))
-
+//
 // first byte in master mode indicates the data that was sent
 #define DIMMER_EVENT_METRICS_REPORT         0xf0
 #define DIMMER_EVENT_TEMPERATURE_ALERT      0xf1
@@ -64,7 +64,7 @@
 #define DIMMER_EVENT_CHANNEL_ON_OFF         0xf5
 #define DIMMER_EVENT_SYNC_EVENT             0xf6
 #define DIMMER_EVENT_RESTART                0xf7
-
+//
 // DIMMER_REGISTER_COMMAND
 #define DIMMER_COMMAND_SET_LEVEL            0x10
 #define DIMMER_COMMAND_FADE                 0x11
@@ -84,6 +84,7 @@
 #define DIMMER_COMMAND_PRINT_CONFIG         0x91
 #define DIMMER_COMMAND_WRITE_CONFIG         0x92 // this byte must be send after DIMMER_COMMAND_WRITE_EEPROM_NOW or DIMMER_COMMAND_WRITE_EEPROM
 #define DIMMER_COMMAND_WRITE_EEPROM_NOW     0x93
+//
 #if DEBUG || DEBUG_COMMANDS
 #define DIMMER_COMMAND_MEASURE_FREQ         0x94
 #define DIMMER_COMMAND_INIT_EEPROM          0x95
@@ -96,16 +97,16 @@
 #define DIMMER_COMMAND_DUMP_CHANNELS        0xed
 #define DIMMER_COMMAND_DUMP_MEM             0xee
 #endif
-
+//
 // DIMMER_REGISTER_COMMAND_STATUS
 #define DIMMER_COMMAND_STATUS_OK            0
 #define DIMMER_COMMAND_STATUS_ERROR         -1
-
+//
 // DIMMER_REGISTER_OPTIONS
 #define DIMMER_OPTIONS_RESTORE_LEVEL        0x01
 #define DIMMER_OPTIONS_MODE_LEADING_EDGE    0x02
 #define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED 0x04
 #define DIMMER_OPTIONS_NEGATIVE_ZC_DELAY    0x08
-
+//
 // dimmer_eeprom_written_t.flags
 #define DIMMER_EEPROM_FLAGS_CONFIG_UPDATED  0x01

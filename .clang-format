@@ -1,0 +1,18 @@
+---
+BasedOnStyle: WebKit
+Language: Cpp
+TabWidth: 4
+UseTab: Never
+CompactNamespaces: false
+ContinuationIndentWidth: 4
+IndentWidth: 4
+NamespaceIndentation: All
+BreakConstructorInitializers: AfterColon
+AllowAllConstructorInitializersOnNextLine: false
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+DerivePointerAlignment: true
+BraceWrapping:
+    AfterControlStatement: true
+    BeforeElse: true
+AlignConsecutiveMacros: AcrossComments
+IndentPPDirectives: AfterHash

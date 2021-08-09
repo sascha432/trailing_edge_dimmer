@@ -18,21 +18,20 @@
 #endif
 
 #if __GNUC__
-#ifndef __attribute_always_inline__
-#define __attribute_always_inline__         __attribute__((always_inline))
-#endif
-#ifndef __attribute_packed__
-#define __attribute_packed__                __attribute__((packed))
-#endif
+#    ifndef __attribute_always_inline__
+#        define __attribute_always_inline__ __attribute__((always_inline))
+#    endif
+#    ifndef __attribute_packed__
+#        define __attribute_packed__ __attribute__((packed))
+#    endif
 #else
-#ifndef __attribute_always_inline__
-#define __attribute_always_inline__
+#    ifndef __attribute_always_inline__
+#        define __attribute_always_inline__
+#    endif
+#    ifndef __attribute_packed__
+#        define __attribute_packed__
+#    endif
 #endif
-#ifndef __attribute_packed__
-#define __attribute_packed__
-#endif
-#endif
-
 
 // NOTE: the difference in code size between fixed point integer and ShiftedFloat/FixedPointFloat is a couple byte only
 // to optimize code size, printf would need a fixed point integer implementation as well and my guess is that
@@ -252,7 +251,7 @@ struct __attribute_packed__ register_mem_cfg_t
         if (range_divider == 0) {
             return DIMMER_MAX_LEVEL;
         }
-        return ((uint32_t)DIMMER_MAX_LEVEL * DIMMER_MAX_LEVEL) / (range_divider - range_begin);
+        return (static_cast<uint32_t>(DIMMER_MAX_LEVEL) * DIMMER_MAX_LEVEL) / (range_divider - range_begin);
     }
     void set_range_end(uint16_t range_end) {
         if (!range_end) {
@@ -263,7 +262,7 @@ struct __attribute_packed__ register_mem_cfg_t
             range_divider = range_begin ? range_begin : 0;
         }
         else {
-            range_divider = (((uint32_t)DIMMER_MAX_LEVEL * DIMMER_MAX_LEVEL) / range_end) + range_begin;
+            range_divider = ((static_cast<uint32_t>(DIMMER_MAX_LEVEL) * DIMMER_MAX_LEVEL) / range_end) + range_begin;
         }
     }
 };
@@ -473,7 +472,9 @@ namespace Dimmer  {
     using VersionType = dimmer_version_t;
 
     struct MetricsType : dimmer_metrics_t {
-        MetricsType() : dimmer_metrics_t({}) {
+        MetricsType() :
+            dimmer_metrics_t({})
+        {
             invalidate();
         }
         operator bool() const {
