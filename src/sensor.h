@@ -6,52 +6,52 @@
 
 #if HAVE_READ_INT_TEMP
 
-int16_t get_internal_temperature();
+    int16_t get_internal_temperature();
 
-#if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
+    #if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
 
-internal_temp_calibration_t atmega328p_read_ts_values();
+        internal_temp_calibration_t atmega328p_read_ts_values();
 
-#endif
+    #endif
 
 #else
 
-inline static int16_t get_internal_temperature() {
-    return Dimmer::kInvalidTemperature;
-}
+    inline static int16_t get_internal_temperature() {
+        return Dimmer::kInvalidTemperature;
+    }
 
 #endif
 
 #if HAVE_EXT_VCC
 
-uint16_t read_vcc();
+    uint16_t read_vcc();
 
 #elif HAVE_READ_VCC
 
-uint16_t read_vcc();
+    uint16_t read_vcc();
 
 #else
 
-inline static uint16_t read_vcc() {
-    return 0;
-}
+    inline static uint16_t read_vcc() {
+        return 0;
+    }
 
 #endif
 
 #if HAVE_NTC
 
-float get_ntc_temperature();
+    float get_ntc_temperature();
 
 #else
 
-inline static float get_ntc_temperature() {
-    return NAN;
-}
+    inline static float get_ntc_temperature() {
+        return NAN;
+    }
 
 #endif
 
 #if HAVE_POTI
 
-uint16_t read_poti();
+    uint16_t read_poti();
 
 #endif
