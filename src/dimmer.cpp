@@ -440,6 +440,19 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
 
     _D(5, debug_printf("fade_channel_from_to from=%d to=%d time=%f\n", from, to, time));
 
+    // stop fading at current level
+    if (to == Level::freeze) {
+        if (fade.count == 0) {
+            // fading not in progress
+            return;
+        }
+        fade.count = 1;
+        fade.step = 0; // keep current level
+        fade.level = _normalize_level(_get_level(channel));
+        fade.targetLevel = fade.level;
+        return;
+    }
+
     from = _normalize_level(from == Level::current ? _get_level(channel) : from);
     diff = _normalize_level(to) - from;
     if (diff == 0) {

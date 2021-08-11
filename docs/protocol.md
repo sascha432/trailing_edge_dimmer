@@ -85,6 +85,10 @@ The fade command can be sent in a single write operation.
 
 If set to -1 / 0xffff, it will start with the current level set. The default value is -1.
 
+### To level
+
+If set to -1 / 0xffff, the current fading operation will be stopped and a "Fading completed" event with the final level emmitted.
+
 ### Channel
 
 Channels are 0 based and -1 / 0xff means all channels

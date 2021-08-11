@@ -17,7 +17,7 @@ Firmware for a trailing/leading edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
-[Change Log v2.2.0](CHANGELOG.md)
+[Change Log v2.2.1](CHANGELOG.md)
 
 ## Version 2.2.x
 

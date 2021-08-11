@@ -178,6 +178,7 @@ namespace Dimmer {
         static constexpr type max = size;
         static constexpr type invalid = -1;
         static constexpr type current = -1;
+        static constexpr type freeze = -1;
     };
 
     static_assert(Level::size >= 255, "at least 255 levels required");

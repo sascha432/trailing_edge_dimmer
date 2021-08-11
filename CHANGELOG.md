@@ -2,6 +2,8 @@
 
 ## 2.2.1-dev
 
+ - Stop/freeze fading command
+
 ## 2.2.0
 
 - Removed linear correction
