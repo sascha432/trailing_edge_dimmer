@@ -3,6 +3,7 @@
 ## 2.2.1-dev
 
  - Stop/freeze fading command
+ - Fixed missing fading completed events
 
 ## 2.2.0
 

@@ -44,22 +44,31 @@ struct Queues {
     static constexpr int16_t kFadingCompletedEventTimerOverFlows = Dimmer::MeasureTimer::kMillisToOverflows(100);
     static constexpr uint16_t kTemperatureCheckTimerOverflows = Dimmer::MeasureTimer::kMillisToOverflows(1000);
 
-#if HAVE_PRINT_METRICS
-    struct {
-        uint24_t timer{0};
-        uint8_t interval{0};
-    } print_metrics;
-#endif
+    #if HAVE_PRINT_METRICS
+        struct {
+            uint24_t timer{0};
+            uint8_t interval{0};
+        } print_metrics;
+    #endif
 
-#if HAVE_FADE_COMPLETION_EVENT
-    struct {
-        int16_t timer{-1};
-    } fading_completed_events;
-#endif
+    #if HAVE_FADE_COMPLETION_EVENT
+        struct {
+            int16_t timer{-1};
+            void disableTimer() {
+                timer = -1;
+            }
+            void resetTimer() {
+                timer = kFadingCompletedEventTimerOverFlows;
+            }
+        } fading_completed_events;
+    #endif
 
     struct {
         uint16_t timer{kTemperatureCheckTimerOverflows};
         uint24_t report_next{0};
+        void reset() {
+            timer = kTemperatureCheckTimerOverflows;
+        }
     } check_temperature;
 
     struct {
@@ -72,5 +81,5 @@ struct Queues {
 extern Queues queues;
 
 #if HIDE_DIMMER_INFO == 0
-void display_dimmer_info();
+    void display_dimmer_info();
 #endif

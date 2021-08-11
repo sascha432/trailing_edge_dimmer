@@ -72,11 +72,11 @@ MeasureTimer timer2;
 ISR(TIMER2_OVF_vect)
 {
     timer2._overflow++;
-#if HAVE_FADE_COMPLETION_EVENT
-    if (queues.fading_completed_events.timer > 0) {
-        queues.fading_completed_events.timer--;
-    }
-#endif
+    #if HAVE_FADE_COMPLETION_EVENT
+        if (queues.fading_completed_events.timer > 0) {
+            queues.fading_completed_events.timer--;
+        }
+    #endif
     if (queues.check_temperature.timer > 0) {
         queues.check_temperature.timer--;
     }
@@ -156,11 +156,11 @@ void DimmerBase::end()
 
 void DimmerBase::zc_interrupt_handler(uint24_t ticks)
 {
-#if HAVE_DISABLE_ZC_SYNC
-    if (zc_sync_disabled) {
-        return;
-    }
-#endif
+    #if HAVE_DISABLE_ZC_SYNC
+        if (zc_sync_disabled) {
+            return;
+        }
+    #endif
     int24_t diff;
     if (dimmer_config.zero_crossing_delay_ticks) {
         // schedule next _start_halfwave() call
@@ -175,15 +175,15 @@ void DimmerBase::zc_interrupt_handler(uint24_t ticks)
     }
     diff -= dimmer_config.zero_crossing_delay_ticks;
 
-#if DIMMER_OUT_OF_SYNC_LIMIT
-    if (!sync_event.sync && (sync_event.lost || sync_event.halfwave_counter > 1)) {
-        // send in-sync event
-        sync_event.sync = true;
-        sync_event.sync_difference_cycles = diff;
-        queues.scheduled_calls.sync_event = true;
-    }
-    out_of_sync_counter = 0;
-#endif
+    #if DIMMER_OUT_OF_SYNC_LIMIT
+        if (!sync_event.sync && (sync_event.lost || sync_event.halfwave_counter > 1)) {
+            // send in-sync event
+            sync_event.sync = true;
+            sync_event.sync_difference_cycles = diff;
+            queues.scheduled_calls.sync_event = true;
+        }
+        out_of_sync_counter = 0;
+    #endif
 
     memcpy(ordered_channels, ordered_channels_buffer, sizeof(ordered_channels));
     sei();
@@ -235,32 +235,32 @@ void DimmerBase::_start_halfwave()
     Channel::type i;
     toggle_state = _config.bits.leading_edge ? DIMMER_MOSFET_OFF_STATE : DIMMER_MOSFET_ON_STATE;
 
-#if DIMMER_MAX_CHANNELS > 1
-    channel_ptr = 0;
-#endif
+    #if DIMMER_MAX_CHANNELS > 1
+        channel_ptr = 0;
+    #endif
 
-#if DIMMER_OUT_OF_SYNC_LIMIT
-    if (++out_of_sync_counter >= DIMMER_OUT_OF_SYNC_LIMIT) {
-        Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareAB>();
-        _set_all_mosfet_gates(DIMMER_MOSFET_OFF_STATE);
-        // store counter and send event
-        sync_event.lost = true;
-        sync_event.halfwave_counter = out_of_sync_counter;
-        queues.scheduled_calls.sync_event = true;
-        return;
-    }
-#else
-    Timer<1>::disable_compareB();
-#endif
+    #if DIMMER_OUT_OF_SYNC_LIMIT
+        if (++out_of_sync_counter >= DIMMER_OUT_OF_SYNC_LIMIT) {
+            Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareAB>();
+            _set_all_mosfet_gates(DIMMER_MOSFET_OFF_STATE);
+            // store counter and send event
+            sync_event.lost = true;
+            sync_event.halfwave_counter = out_of_sync_counter;
+            queues.scheduled_calls.sync_event = true;
+            return;
+        }
+    #else
+        Timer<1>::disable_compareB();
+    #endif
 
     if (ordered_channels[0].ticks) { // any channel dimmed?
-#if DIMMER_OUT_OF_SYNC_LIMIT
-        //Timer<1>::enable_compareA_disable_compareB();
-        Timer<1>::int_mask_toggle<Timer<1>::kIntMaskCompareA, Timer<1>::kIntMaskCompareB>();
-#else
-        //Timer<1>::enable_compareA();
-        Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareA>();
-#endif
+        #if DIMMER_OUT_OF_SYNC_LIMIT
+            //Timer<1>::enable_compareA_disable_compareB();
+            Timer<1>::int_mask_toggle<Timer<1>::kIntMaskCompareA, Timer<1>::kIntMaskCompareB>();
+        #else
+            //Timer<1>::enable_compareA();
+            Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareA>();
+        #endif
         OCR1A = ordered_channels[0].ticks;
         for(i = 0; ordered_channels[i].ticks; i++) {
             _set_mosfet_gate(ordered_channels[i].channel, toggle_state);
@@ -280,25 +280,25 @@ void DimmerBase::_start_halfwave()
         }
     }
     else {
-#if DIMMER_OUT_OF_SYNC_LIMIT
-        Timer<1>::int_mask_toggle<Timer<1>::kFlagsCompareB, Timer<1>::kFlagsCompareA>();
-        //Timer<1>::enable_compareB_disable_compareA();
-#else
-        Timer<1>::int_mask_disable<Timer<1>::kFlagsCompareA>();
-        // Timer<1>::disable_compareA();
-#endif
+        #if DIMMER_OUT_OF_SYNC_LIMIT
+            Timer<1>::int_mask_toggle<Timer<1>::kFlagsCompareB, Timer<1>::kFlagsCompareA>();
+            //Timer<1>::enable_compareB_disable_compareA();
+        #else
+            Timer<1>::int_mask_disable<Timer<1>::kFlagsCompareA>();
+            // Timer<1>::disable_compareA();
+        #endif
 
         // enable or disable channels
         DIMMER_CHANNEL_LOOP(i) {
             _set_mosfet_gate(i, _get_level(i) == Level::max ? DIMMER_MOSFET_ON_STATE : DIMMER_MOSFET_OFF_STATE);
         }
     }
-#if DIMMER_OUT_OF_SYNC_LIMIT
-    // keep counter up to date
-    if (!sync_event.lost && !sync_event.sync) {
-        sync_event.halfwave_counter = out_of_sync_counter;
-    }
-#endif
+    #if DIMMER_OUT_OF_SYNC_LIMIT
+        // keep counter up to date
+        if (!sync_event.lost && !sync_event.sync) {
+            sync_event.halfwave_counter = out_of_sync_counter;
+        }
+    #endif
     PIN_D11_CLEAR();
 }
 
@@ -399,15 +399,16 @@ void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
     _set_level(channel, _normalize_level(level));
 
     fading[channel].count = 0; // disable fading for this channel
-#if HAVE_FADE_COMPLETION_EVENT
-    if (fading_completed[channel] != Level::invalid) {
-        // send event with the new level
-        fading_completed[channel] = _get_level(channel);
-        ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-            queues.scheduled_calls.send_fading_events = true;
+    #if HAVE_FADE_COMPLETION_EVENT
+        if (fading_completed[channel] != Level::invalid) {
+            // send event with the new level
+            fading_completed[channel] = _get_level(channel);
+            ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                queues.scheduled_calls.send_fading_events = true;
+                queues.fading_completed_events.resetTimer();
+            }
         }
-    }
-#endif
+    #endif
 
     _calculate_channels();
 
@@ -430,9 +431,9 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
 {
     float diff;
     dimmer_fade_t &fade = fading[channel];
-#if HAVE_FADE_COMPLETION_EVENT
-    fading_completed[channel] = Level::invalid;
-#endif
+    #if HAVE_FADE_COMPLETION_EVENT
+        fading_completed[channel] = Level::invalid;
+    #endif
 
     if (_get_level(channel) == 0) {
         on_counter[channel] = 0;
@@ -506,6 +507,7 @@ void DimmerBase::_apply_fading()
                 fading_completed[i] = _get_level(i);
                 ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
                     queues.scheduled_calls.send_fading_events = true;
+                    queues.fading_completed_events.resetTimer();
                 }
 #endif
             } else {

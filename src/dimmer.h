@@ -33,10 +33,10 @@ struct dimmer_channel_t {
     uint16_t ticks;
 };
 
-typedef struct __attribute__((packed)) {
+struct __attribute__((packed)) FadingCompletionEvent_t {
     dimmer_channel_id_t channel;
     dimmer_level_t level;
-} FadingCompletionEvent_t;
+};
 
 #if not HAVE_CHANNELS_INLINE_ASM
 extern volatile uint8_t *dimmer_pins_addr[::size_of(DIMMER_MOSFET_PINS)];
@@ -62,7 +62,6 @@ namespace Dimmer {
     static constexpr TickType TickTypeMax = ~0;
     static constexpr float kVRef = INTERNAL_VREF_1_1V;
 
-
     template<int _Timer>
     struct Timer {};
 
@@ -72,11 +71,11 @@ namespace Dimmer {
         static constexpr uint8_t extraTicks = __extraTicks == 0 ? 1 : __extraTicks;     // add 48 clock cycles but at least one tick
     };
 
-#ifdef DIMMER_TIMER2_PRESCALER
-    template<>
-    struct Timer<2> : Timers::TimerBase<2, DIMMER_TIMER2_PRESCALER> {
-    };
-#endif
+    #ifdef DIMMER_TIMER2_PRESCALER
+        template<>
+        struct Timer<2> : Timers::TimerBase<2, DIMMER_TIMER2_PRESCALER> {
+        };
+    #endif
 
     struct FrequencyTimer : Timers::TimerBase<1, 1> {
         static inline void begin() {
@@ -216,9 +215,9 @@ namespace Dimmer {
     struct dimmer_t {
         Level::type level[Channel::size()];                                     // current level
         dimmer_fade_t fading[Channel::size()];                                  // calculated fading data
-#if DIMMER_MAX_CHANNELS > 1
-        Channel::type channel_ptr;
-#endif
+        #if DIMMER_MAX_CHANNELS > 1
+            Channel::type channel_ptr;
+        #endif
         dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks
         dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels
         uint8_t on_counter[Channel::size()];                                    // counts halfwaves from 0 to 254 after switching on
@@ -226,19 +225,19 @@ namespace Dimmer {
         float zc_diff_ticks;
         uint8_t zc_diff_count;
         uint8_t channel_state;                                                  // bitset of the channel state
-        bool toggle_state: 1;
-#if HAVE_DISABLE_ZC_SYNC
-        bool zc_sync_disabled: 1;
-#endif
+        bool toggle_state;
+        #if HAVE_DISABLE_ZC_SYNC
+            bool zc_sync_disabled;
+        #endif
 
-#if DIMMER_OUT_OF_SYNC_LIMIT
-        uint16_t out_of_sync_counter;
-        dimmer_sync_event_t sync_event;
-#endif
+        #if DIMMER_OUT_OF_SYNC_LIMIT
+            uint16_t out_of_sync_counter;
+            dimmer_sync_event_t sync_event;
+        #endif
 
-#if HAVE_FADE_COMPLETION_EVENT
-        Level::type fading_completed[Channel::size()];
-#endif
+        #if HAVE_FADE_COMPLETION_EVENT
+            Level::type fading_completed[Channel::size()];
+        #endif
         float halfwave_ticks_avg;
         float halfwave_ticks_avg2;
     };
@@ -356,39 +355,41 @@ namespace Dimmer {
         inline float _get_frequency() const {
             return register_mem.data.metrics.frequency;
         }
-#if HAVE_CHANNELS_INLINE_ASM
-        inline void _set_all_mosfet_gates(bool state) {
-            if (state) {
-                // if it fails to build here, run the build process again. the required include file is created automatically
-                DIMMER_SFR_ENABLE_ALL_CHANNELS();
+
+        #if HAVE_CHANNELS_INLINE_ASM
+            inline void _set_all_mosfet_gates(bool state) {
+                if (state) {
+                    // if it fails to build here, run the build process again. the required include file is created automatically
+                    DIMMER_SFR_ENABLE_ALL_CHANNELS();
+                }
+                else {
+                    DIMMER_SFR_DISABLE_ALL_CHANNELS();
+                }
             }
-            else {
-                DIMMER_SFR_DISABLE_ALL_CHANNELS();
+            inline void _set_mosfet_gate(Channel::type channel, bool state) {
+                if (state) {
+                    DIMMER_SFR_CHANNELS_ENABLE(channel);
+                }
+                else {
+                    DIMMER_SFR_CHANNELS_DISABLE(channel);
+                }
             }
-        }
-        inline void _set_mosfet_gate(Channel::type channel, bool state) {
-            if (state) {
-                DIMMER_SFR_CHANNELS_ENABLE(channel);
+        #else
+            inline void _set_all_mosfet_gates(bool state) {
+                DIMMER_CHANNEL_LOOP(i) {
+                    _set_mosfet_gate(i, state);
+                }
             }
-            else {
-                DIMMER_SFR_CHANNELS_DISABLE(channel);
+            inline void _set_mosfet_gate(Channel::type channel, bool state) {
+                if (state) {
+                    *dimmer_pins_addr[channel] |= dimmer_pins_mask[channel];
+                }
+                else {
+                    *dimmer_pins_addr[channel] &= ~dimmer_pins_mask[channel];
+                }
             }
-        }
-#else
-        inline void _set_all_mosfet_gates(bool state) {
-            DIMMER_CHANNEL_LOOP(i) {
-                _set_mosfet_gate(i, state);
-            }
-        }
-        inline void _set_mosfet_gate(Channel::type channel, bool state) {
-            if (state) {
-                *dimmer_pins_addr[channel] |= dimmer_pins_mask[channel];
-            }
-            else {
-                *dimmer_pins_addr[channel] &= ~dimmer_pins_mask[channel];
-            }
-        }
-#endif
+        #endif
+
         void _calculate_channels();
 
         register_mem_cfg_t &_config;
@@ -398,10 +399,18 @@ namespace Dimmer {
     template<uint8_t _Event>
     struct DimmerEvent {
 
-        inline static void send(const uint8_t *buffer, uint8_t length)
+        inline static void _send(const uint8_t *buffer, uint8_t length)
         {
             Wire.write(buffer, length);
             Wire.endTransmission();
+        }
+
+        template<typename _Type>
+        static void send(const _Type &data, uint8_t length)
+        {
+            Wire.beginTransmission(DIMMER_I2C_MASTER_ADDRESS);
+            Wire.write(_Event);
+            _send(reinterpret_cast<const uint8_t *>(&data), length);
         }
 
         template<typename _Type>
@@ -409,7 +418,7 @@ namespace Dimmer {
         {
             Wire.beginTransmission(DIMMER_I2C_MASTER_ADDRESS);
             Wire.write(_Event);
-            send(reinterpret_cast<const uint8_t *>(&data), (uint8_t)sizeof(data));
+            _send(reinterpret_cast<const uint8_t *>(&data), static_cast<uint8_t>(sizeof(data)));
         }
 
         template<typename _Type>
@@ -418,7 +427,7 @@ namespace Dimmer {
             Wire.beginTransmission(DIMMER_I2C_MASTER_ADDRESS);
             Wire.write(_Event);
             Wire.write(extraByte);
-            send(reinterpret_cast<const uint8_t *>(&data), (uint8_t)sizeof(data));
+            _send(reinterpret_cast<const uint8_t *>(&data), static_cast<uint8_t>(sizeof(data)));
         }
     };
 
