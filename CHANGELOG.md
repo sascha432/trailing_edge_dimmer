@@ -1,6 +1,8 @@
 # Changelog
 
-## 2.2.1-dev
+## 2.2.2-dev
+
+## 2.2.1
 
  - Stop/freeze fading command
  - Fixed missing fading completed events
