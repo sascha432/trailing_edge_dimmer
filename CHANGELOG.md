@@ -2,6 +2,8 @@
 
 ## 2.2.2-dev
 
+ - Info displayed invalid voltage during frequency calibration
+
 ## 2.2.1
 
  - Stop/freeze fading command
