@@ -83,11 +83,18 @@ void display_dimmer_info()
             dimmer_config.internal_temp_calibration.ts_gain
         );
     #endif
-    Serial.printf_P(PSTR("max.temp=%u,metrics=%u,"), dimmer_config.max_temp, REPORT_METRICS_INTERVAL(dimmer_config.report_metrics_interval));
+    Serial.printf_P(PSTR("max.temp=%u,metrics=%u"), dimmer_config.max_temp, REPORT_METRICS_INTERVAL(dimmer_config.report_metrics_interval));
     #if HAVE_READ_VCC
-        Serial.printf_P(PSTR("VCC=%.3f,"), read_vcc() / 1000.0);
+        Serial.print(F(",VCC="));
+        auto vcc = read_vcc();
+        if (vcc == 0xffff) {
+            Serial.print('-');
+        }
+        else {
+            Serial.printf_P(PSTR("%.3f"), vcc / 1000.0);
+        }
     #endif
-    Serial.printf_P(PSTR("min.on-time=%u,min.off=%u,ZC-delay=%u,"),
+    Serial.printf_P(PSTR(",min.on-time=%u,min.off=%u,ZC-delay=%u,"),
         dimmer_config.minimum_on_time_ticks,
         dimmer_config.minimum_off_time_ticks,
         dimmer_config.zero_crossing_delay_ticks
