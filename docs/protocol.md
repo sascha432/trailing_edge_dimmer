@@ -330,6 +330,11 @@ Read report metrics interval
     +I2CT=17,8a,01,b5
     +I2CR=17,01
 
+Read offset and gain for internal temperature sensor
+
+    +I2CT=17,8a,02,ad
+    +I2CR=17,02
+
 Response for 30 seconds
 
     +I2CA=171e

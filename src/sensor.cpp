@@ -16,14 +16,17 @@
 // ATmega328PB
 // T°C 	    -40 	+25 	+105
 // LSB 	    205 	270 	350
-// T = (ADC - TS_OFFSET) / k
-// TS_GAIN = 128 (k = 1.0), TS_OFFSET = 103
+// T = ((ADC - 247) * 1.0) / 1.22 + 32
+// the closest values for
+// T = ((ADC - (273 + 100 - TS_OFFSET)) * 128) / TS_GAIN + 25
+// are
+// TS_GAIN = 156, TS_OFFSET = 112
 
 // ATmega328P
 // T 		-40 	+25 	+125
 // LSB		269		352		480
 // T = ((ADC - (273 + 100 - TS_OFFSET)) * 128) / TS_GAIN + 25
-// TS_GAIN = 164 TS_OFFSET = 21 (-40=-39.78 25=25.00 125=124.90)
+// TS_GAIN = 164 TS_OFFSET = 21
 
 int16_t get_internal_temperature()
 {

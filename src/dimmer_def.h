@@ -243,15 +243,15 @@
 // accurate results the temperature measurement can be calibrated in the application software
 #if __AVR_ATmega328PB__ || MCU_IS_ATMEGA328PB == 1
 
-#    define DIMMER_AVR_TEMP_TS_OFFSET 103
-#    define DIMMER_AVR_TEMP_TS_GAIN   128
+#    ifndef DIMMER_AVR_TEMP_TS_OFFSET
+#       define DIMMER_AVR_TEMP_TS_OFFSET 112
+#       define DIMMER_AVR_TEMP_TS_GAIN   156
+#   endif
 
 #elif __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
 
 // Atmega328P only: DIMMER_AVR_TEMP_TS_GAIN = 0 reads the calibration values from the signature bytes
 #    ifndef DIMMER_AVR_TEMP_TS_OFFSET
-// #        define DIMMER_AVR_TEMP_TS_OFFSET 21
-// #        define DIMMER_AVR_TEMP_TS_GAIN   164
 #        define DIMMER_AVR_TEMP_TS_OFFSET 0
 #        define DIMMER_AVR_TEMP_TS_GAIN   0
 #    endif

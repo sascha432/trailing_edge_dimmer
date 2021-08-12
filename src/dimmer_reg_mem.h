@@ -582,7 +582,7 @@ namespace Dimmer  {
     }
 
     inline static bool isValidVoltage(uint16_t value) {
-        return value != 0;
+        return value != 0 && value != 0xffff;
     }
 
     inline static bool isValidFrequency(float frequency) {

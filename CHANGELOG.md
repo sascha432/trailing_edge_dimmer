@@ -2,6 +2,7 @@
 
 ## 2.2.2-dev
 
+ - Changed default offset/gain for ATMega328PB temperature sensor
  - Info displayed invalid voltage during frequency calibration
 
 ## 2.2.1
