@@ -19,10 +19,6 @@ Firmware for a trailing/leading edge MOSFET dimmer.
 
 [Change Log v2.2.1](CHANGELOG.md)
 
-## Version 2.2.x
-
-Version 3.0.x has been cancelled and the most useful features will go into 2.2.x. That also means that the serial protocol won't change and only new features require changes on the master side.
-
 ## Patching the Arduino libary
 
 The Arduino library requires a small patch. While building, an error will show up
@@ -34,6 +30,13 @@ patch -i ./scripts/Print.diff ~/.platformio/packages/framework-arduino-avr/cores
 ```
 
 Execute the command or patch the file by hand, then run the build process again.
+
+The patch adds public 2 methods to the Print class. Those can be used in other projects as well by adding the 3 methods from `src/helpers.cpp` at the top.
+
+```c++
+size_t printf(const char *format, ...);
+size_t printf_P(PGM_P format, ...);
+```
 
 ## WiFi Firmware update
 
