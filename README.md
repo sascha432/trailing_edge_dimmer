@@ -10,6 +10,8 @@ Firmware for a trailing/leading edge MOSFET dimmer.
 * EEPROM wear level protection
 * Serial protocol to control the dimmer
 * I2C or UART interface
+* Cubic interpolation for linear brightness
+* Zero crossing filter with predictive error correction
 * Support for 10V dimming (or any other voltage in the 0-1.1V range)
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
 * Highly configurable to match any hardware
@@ -17,7 +19,7 @@ Firmware for a trailing/leading edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
-[Change Log v2.2.1](CHANGELOG.md)
+[Change Log v2.2.2](CHANGELOG.md)
 
 ## Patching the Arduino libary
 
@@ -57,7 +59,11 @@ Test environment: 4x10W LED + 60W incandescent bulb, 50% dimmed, random 1000-250
 
 ![Comparision of unfiltered and filtered signal](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/zero_crossing_signal_filtering.png)
 
+The recent version can lose the zero crossing signal for a couple seconds before it turns the dimmer off. The time can be configured to turn the dimmer off before the signal gets out of sync.
+
 ## 3D models released
+
+It is highly recommende to use flame retardant ABS or smiliar material that can withstand higher temperatures.
 
 ![Printed version](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/housing_small.jpg)
 

@@ -1,0 +1,317 @@
+<!doctype html>
+<html>
+<head>
+    <script src="jquery-3.3.1.min.js"></script>
+    <script src="bootstrap.min.js"></script>
+    <script src="Chart.min.js"></script>
+    <script src="chartjs-plugin-dragdata.min.js"></script>
+    <script src="utils.js"></script>
+    <link rel="stylesheet" href="bootstrap.min.css">
+    </style>
+    <link rel="stylesheet" href="Chart.min.css">
+    </style>
+    <style>
+        body {
+            overflow: hidden;
+        }
+        canvas {
+            -moz-user-select: none;
+            -webkit-user-select: none;
+            -ms-user-select: none;
+            position: absolute;
+        }
+        .canvas-container {
+            width: 100%;
+            height: calc(100vh - 60px);
+            overflow: hidden;
+        }
+        .controls {
+            height: 60px;
+            min-height: 60px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="canvas-container">
+            <canvas id="canvas"></canvas>
+        </div>
+        <div class="row controls">
+            <div class="col-auto">
+                <button class="btn btn-secondary" id="restore">Restore</button>
+                <button class="btn btn-secondary" id="default">Default</button>
+                <button class="btn btn-secondary" id="discard">Discard</button>
+                <button class="btn btn-primary" id="save">Save</button>
+            </div>
+            <div class="col-1">
+                <label for="i2c-cmd">I2C Command:</label>
+            </div>
+            <div class="col">
+                <textarea class="form-control" id="i2c-cmd" rows="1"></textarea>
+            </div>
+        </div>
+        <div class="modal" tabindex="-1" role="dialog">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <p></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-primary">Yes</button>
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        var chart;
+        var datapoints;
+        var openModalFunc;
+        var channel = 0;
+
+        function create_default_datapoints() {
+            datapoints = [];
+            for (i = 0.0; i <= 255.4; i += 255 / 7.0) {
+                datapoints.push({ x: Math.round(i), y: Math.round(i) })
+            }
+        }
+
+        create_default_datapoints();
+
+        function map_range(value, prec) {
+            return Math.round(value * prec / 100.0);
+        }
+
+        function remove(arr, index) {
+            newArr = [];
+            for (i = 0; i < arr.length; i++) {
+                if (i != index) {
+                    newArr.push(arr[i]);
+                }
+            }
+            return newArr;
+        }
+
+        function adjust_values(datasetIndex, index, value, end) {
+            var do_update = false
+            var max_index = chart.data.datasets[datasetIndex].data.length - 1;
+            if (index == 0) {
+                if (value['x'] != 0) {
+                    chart.data.datasets[datasetIndex].data[0]['x'] = 0;
+                    do_update = true;
+                }
+            }
+            else if (index == max_index) {
+                if (value['x'] != 255) {
+                    chart.data.datasets[datasetIndex].data[index]['x'] = 255;
+                    do_update = true;
+                }
+            }
+            else {
+                minX = chart.data.datasets[datasetIndex].data[index - 1]['x'] + 3;
+                maxX = chart.data.datasets[datasetIndex].data[index + 1]['x'] - 3;
+                var x = chart.data.datasets[datasetIndex].data[index]['x'];
+                if (x < minX) {
+                    chart.data.datasets[datasetIndex].data[index]['x'] = minX;
+                    do_update = true;
+                }
+                else if (x > maxX) {
+                    chart.data.datasets[datasetIndex].data[index]['x'] = maxX;
+                    do_update = true;
+                }
+            }
+            if (end) {
+                for (i = 0; i <= max_index; i++) {
+                    v = chart.data.datasets[datasetIndex].data[index];
+                    chart.data.datasets[datasetIndex].data[index] = { 'x': Math.round(v['x']), 'y': Math.round(v['y']) }
+                }
+            }
+            saveDataset(datasetIndex, chart.data.datasets[datasetIndex].data);
+            if (do_update) {
+                chart.update(0);
+            }
+        }
+
+        Chart.defaults.global.elements.point.radius = 5;
+        Chart.defaults.global.elements.point.hitRadius = 10;
+
+        var config = {
+            type: 'scatter',
+            data: {
+                //labels: labels,
+                datasets: [{
+                    label: 'Channel',
+                    data: datapoints,
+                    showLine: true,
+                    borderColor: window.chartColors.red,
+                    backgroundColor: 'rgba(0, 0, 0, 0)',
+                    fill: false,
+                    cubicInterpolationMode: 'monotone'
+                }],
+            },
+            options: {
+                onClick: function (e, n) {
+                    if (n.length) {
+                        var tmp = n[0];
+                        var max_index = chart.data.datasets[tmp._datasetIndex].data.length - 1;
+                        if (tmp._index > 0 && tmp._index < max_index) {
+                            openModalFunc(function () {
+                                datapoints = remove(chart.data.datasets[tmp._datasetIndex].data, tmp._index);
+                                chart.data.datasets[tmp._datasetIndex].data = datapoints;
+                                chart.update();
+                            }, 'Delete this point?');
+                        }
+                    }
+                },
+                dragData: true,
+                dragX: true,
+                onDrag: function (e, datasetIndex, index, value) {
+                    adjust_values(datasetIndex, index, value);
+                    e.target.style.cursor = 'grabbing';
+                },
+                onDragEnd: function (e, datasetIndex, index, value) {
+                    adjust_values(datasetIndex, index, value, true);
+                    e.target.style.cursor = 'default';
+                },
+                spanGaps: true,
+                responsive: true,
+                maintainAspectRatio: false,
+                title: {
+                    display: false,
+                },
+                tooltips: {
+                    mode: 'index',
+                    callbacks: {
+                        label: function (tooltipItem, data) {
+                            var x = Math.round(tooltipItem.xLabel * 100 / 255);
+                            var y = Math.round(tooltipItem.yLabel * 100 / 255);
+                            return 'Brightness ' + x + '% = Level ' + y + '%';
+                        },
+                    },
+                },
+                scales: {
+                    xAxes: [{
+                        display: true,
+                        scaleLabel: {
+                            display: true,
+                            fontSize: 18,
+                            labelString: 'Brightness in %'
+                        },
+                        ticks: {
+                            callback: function (value) {
+                                return Math.round(value * 100 / 255);
+                            },
+                            min: 0,
+                            max: 255,
+                            stepSize: 255 / 20.0,
+                        }
+                    }],
+                    yAxes: [{
+                        display: true,
+                        scaleLabel: {
+                            display: true,
+                            fontSize: 18,
+                            labelString: 'Level in %'
+                        },
+                        ticks: {
+                            callback: function (value) {
+                                return Math.round(value * 100 / 255);
+                            },
+                            min: 0,
+                            max: 255,
+                            stepSize: 255 / 20.0,
+                        }
+                    }]
+                }
+            },
+        };
+
+        function restore_defaults() {
+            create_default_datapoints();
+            chart.data.datasets[0].data = datapoints;
+            chart.update();
+        }
+
+        window.discardDataset = function() {
+
+        };
+        window.loadDataset = function () {
+
+        };
+        window.saveDataset = function (channel, data) {
+            function hex(n) {
+                n = Math.round(n);
+                s = n.toString(16);
+                if (s.length == 1) {
+                    return '0' + s;
+                }
+                return s;
+            }
+            var str = '+I2CT=1789a3' + hex(channel);
+            for (var i = 0; i < data.length; i++) {
+                v = data[i];
+                str += hex(v.x) + hex(v.y);
+            }
+            $('#i2c-cmd').html(str);
+        };
+
+        window.initChart = function () {
+            $('body').click();
+            loadDataset(function (new_channel, new_datapoints) {
+                if (channel == 0 && new_channel > 0) {
+                    datapoints = new_datapoints;
+                    channel = new_channel;
+                    chart.data.datasets[0].data = datapoints;
+                    chart.data.datasets[0].label = 'Channel ' + new_channel;
+                    chart.update();
+                }
+            });
+        }
+
+        $(function () {
+            var ctx = document.getElementById('canvas').getContext('2d');
+            chart = new Chart(ctx, config);
+
+            var modalDialog = $('.modal');
+            var modalDialogButton = modalDialog.find('.btn-primary');
+
+            openModalFunc = function (func, text) {
+                modalDialog.find('p').html(text);
+                modalDialogButton.off('click').on('click', function () {
+                    modalDialog.modal('hide');
+                    func();
+                });
+                modalDialog.modal('show');
+            }
+
+            $('#discard').on('click', function () {
+                discardDataset();
+                channel = 0;
+                restore_defaults();
+            });
+            $('#save').on('click', function () {
+                saveDataset(channel, chart.data.datasets[0].data);
+                // channel = 0;
+                // restore_defaults();
+            });
+            $('#default').on('click', function () {
+                restore_defaults();
+            });
+            $('#restore').on('click', function () {
+                channel = 0;
+                window.initChart();
+            });
+
+            window.initChart();
+        });
+
+    </script>
+</body>
+
+</html>

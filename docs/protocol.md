@@ -412,19 +412,38 @@ Force temperature check and report metrics if enabled
 
     +I2CT=17,89,54
 
+## DIMMER_COMMAND_READ_CUBIC_INT
+
+Read x and y coordinates for cubic brightness interpolation. The first byte is the channel.
+
+    `+I2CT=17,89,a2,<channel>`
+
+    +I2CT=17,89,a2,00
+    +I2CR=17,16
+
+    +I2CA=1700000a27143e28556d78e39bf5c7ffff
+
+## DIMMER_COMMAND_WRITE_CUBIC_INT
+
+Write x and y coordinates for cubic brightness interpolation. The first byte is the channel, followed by up to 8 pairs of x and y coordinates (uint8_t). If any channel contains data, cubic interpolation will be enabled.
+
+    `+I2CT=17,89,a3,<channel>[,<x>,<y>[,...]]`
+
+    +I2CT=1789a30000000a27143e28556d78e39bf5c7ffff
+
 ## Commands available if DEBUG or DEBUG_COMMANDS is set to 1
 
 ### DIMMER_COMMAND_INCR_ZC_DELAY
 
 Increase zero crossing delay by 1 or the following byte value
 
-    +I2CT=17,89,82[,<byte>]
+    +I2CT=17,89,82[,<value>]
 
 ### DIMMER_COMMAND_DECR_ZC_DELAY
 
 Decrease zero crossing delay by 1 or the following byte value
 
-    +I2CT=17,89,83[,<byte>]
+    +I2CT=17,89,83[,<value>]
 
 ### DIMMER_COMMAND_SET_ZC_DELAY
 
@@ -436,13 +455,13 @@ Set zero crossing delay to the value of the following word
 
 Increase halfwave length by 1 or the following byte value
 
-    +I2CT=17,89,85[,<byte>]
+    +I2CT=17,89,85[,<value>]
 
 ### DIMMER_COMMAND_DECR_HW_TICKS
 
 Decrease halfwave length by 1 or the following byte value
 
-    +I2CT=17,89,86[,<byte>]
+    +I2CT=17,89,86[,<value>]
 
 ### DIMMER_COMMAND_DUMP_CHANNELS
 
@@ -455,6 +474,37 @@ Print dimmed channels. Channels that are off or fully on are not listed
 Print the contents of the register memory
 
     +I2CT=17,89,ee
+
+## DIMMER_COMMAND_PRINT_CUBIC_INT
+
+Prints the cubic interpolation tables to the serial port. The first byte is the channel, -1 for all
+
+    `+I2CT=17,89,a0,<channel>[,<stepsize>]`
+
+    +I2CT=17,89,a0,ff,20
+
+Format:
+
+Channel, X values, Y values, interpolated values per level
+
+    +REM=ch=<num>,x=[0,1,...],y=[0,1,...],l=[0,1,7,20,300,...]
+
+## DIMMER_COMMAND_GET_CUBIC_INT
+
+Translate up to 8 levels for the provided table at once. This can be used to retrieve a preview of the entire curve. The returned values are int16
+
+Table format:
+
+`<level:int16>,<number of levels:uint8>,<x1:uint8>,<x2>,...,<y1:int16>,<y2>,...`
+
+    +I2CT=17,89,a1,0a,00,0b,00,02,07,00,00,c4,09,00,20
+    +I2CR=17,16
+
+## DIMMER_COMMAND_CUBIC_INT_TEST_PERF
+
+Test performance for all levels and print results
+
+    +I2CT=17,89,a4
 
 ## Temperature, VCC status and AC Frequency (DIMMER_EVENT_METRICS_REPORT)
 

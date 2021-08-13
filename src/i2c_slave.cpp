@@ -268,8 +268,19 @@ void _dimmer_i2c_on_receive(int length)
 
                     #if HAVE_CUBIC_INT_TEST_PERFORMANCE
                         case DIMMER_COMMAND_CUBIC_INT_TEST_PERF: {
-                                DIMMER_CHANNEL_LOOP(i) {
-                                    cubicInterpolation.testPerformance(i);
+                                uint8_t levels[DIMMER_CHANNEL_COUNT];
+                                auto ptr = levels;
+                                // turn all channels off
+                                DIMMER_CHANNEL_LOOP(channel) {
+                                    *ptr++ = dimmer._get_level(channel);
+                                    dimmer.set_level(channel, 0);
+                                }
+                                DIMMER_CHANNEL_LOOP(channel2) {
+                                    cubicInterpolation.testPerformance(channel2);
+                                }
+                                ptr = levels;
+                                DIMMER_CHANNEL_LOOP(channel3) {
+                                    dimmer.set_level(channel3, *ptr++);
                                 }
                             }
                             break;

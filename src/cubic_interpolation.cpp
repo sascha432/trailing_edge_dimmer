@@ -69,10 +69,10 @@ void CubicInterpolation::testPerformance(dimmer_channel_id_t channel) const
     for(dimmer_level_t level = 0; level < DIMMER_MAX_LEVEL; level++) {
         auto start = micros();
         auto levelOut = getLevel(level, channel);
-        auto dur = micros() - start;
+        unsigned dur = micros() - start;
         if (dur > maxTime) {
             maxTime = dur;
-            Serial.printf_P(PSTR("+REM=level=%d,result=%d,time=%lu\n"), level, levelOut, (unsigned long)dur);
+            Serial.printf_P(PSTR("+REM=level=%d,result=%d,time=%u\n"), level, levelOut, dur);
         }
     }
     Serial.printf_P(PSTR("+REM=channel=%u,maxtime=%lu\n"), channel, maxTime);
