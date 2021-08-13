@@ -54,7 +54,7 @@
 #define DIMMER_REGISTER_RAM                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, ram))
 #define DIMMER_REGISTER_ADDRESS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, address))
 #define DIMMER_REGISTER_END_ADDR            (DIMMER_REGISTER_START_ADDR + sizeof(register_mem_t))
-#define DIMMER_REGISTER_CUBIC_INT_OFS       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int))
+#define DIMMER_REGISTER_CUBIC_INT_OFS       (DIMMER_REGISTER_RAM)
 #define DIMMER_REGISTER_CUBIC_INT_DATAX(n)  (DIMMER_REGISTER_CUBIC_INT_OFS + ((n) * 2))
 #define DIMMER_REGISTER_CUBIC_INT_DATAY(n)  (DIMMER_REGISTER_CUBIC_INT_OFS + 1 + ((n) * 2))
 #define DIMMER_REGISTER_MEM_SIZE            sizeof(register_mem_t)

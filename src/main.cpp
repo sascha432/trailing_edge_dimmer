@@ -68,6 +68,9 @@ void display_dimmer_info()
         Serial.print(pin);
         Serial.print(',');
     }
+    #if DIMMER_CUBIC_INTERPOLATION
+        Serial.printf_P(PSTR("cubic=%u,"), dimmer_config.bits.cubic_interpolation);
+    #endif
     Serial.printf_P(PSTR("range=%d-%d\n"), dimmer_config.range_begin, dimmer_config.get_range_end());
     Serial.flush();
 
@@ -87,7 +90,7 @@ void display_dimmer_info()
     #if HAVE_READ_VCC
         Serial.print(F(",VCC="));
         auto vcc = read_vcc();
-        if (vcc == 0xffff) {
+        if (vcc == 0xffff || vcc == 0) {
             Serial.print('-');
         }
         else {

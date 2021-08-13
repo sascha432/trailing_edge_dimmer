@@ -32,10 +32,13 @@ public:
         void free();
 
         void setDataPoint(uint8_t pos, uint8_t x, uint8_t y);
-        uint8_t getDataPoints() const;
+        uint8_t size() const;
 
         xyValueTypePtr getXValues() const;
         xyValueTypePtr getYValues() const;
+
+        void copyToConfig(register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel);
+        void createFromConfig(const register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel);
 
     public:
         xyValueTypePtr _xValues;
@@ -57,9 +60,12 @@ public:
     int16_t getLevel(dimmer_level_t level, dimmer_channel_id_t channel) const;
     uint8_t getInterpolatedLevels(dimmer_level_t *dst, dimmer_level_t *endPtr, dimmer_level_t startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const;
 
-    void copyFromConfig(register_mem_cubic_int_t &cubic_int, dimmer_channel_id_t channel);
-    void copyToConfig(register_mem_cubic_int_t &cubic_int, dimmer_channel_id_t channel);
-    void clearTable();
+    void copyFromConfig(const dimmer_config_cubic_int_t &cubicInt);
+    void copyToConfig(dimmer_config_cubic_int_t &cubicInt);
+    void clear();
+    void printConfig() const;
+
+    Channel &getChannel(dimmer_channel_id_t channel);
 
 private:
     dimmer_level_t _toLevel(double y) const;
@@ -84,7 +90,7 @@ inline bool CubicInterpolation::Channel::allocate(uint8_t dataPoints)
     free();
     if (dataPoints > 1) {
         _dataPoints = dataPoints;
-        _xValues = reinterpret_cast<xyValueTypePtr>(malloc(sizeof(xyValueType) * dataPoints * 2));
+        _xValues = new xyValueType[dataPoints << 1]();
         _yValues = &_xValues[dataPoints];
     }
     return (_xValues != nullptr);
@@ -93,10 +99,10 @@ inline bool CubicInterpolation::Channel::allocate(uint8_t dataPoints)
 inline void CubicInterpolation::Channel::free()
 {
     if (_xValues) {
-        ::free(_xValues);
+        delete[] _xValues;
         _xValues = nullptr;
+        _yValues = nullptr;
     }
-    _yValues = nullptr;
     _dataPoints = 0;
 }
 
@@ -108,7 +114,7 @@ inline void CubicInterpolation::Channel::setDataPoint(uint8_t pos, uint8_t x, ui
     }
 }
 
-inline uint8_t CubicInterpolation::Channel::getDataPoints() const
+inline uint8_t CubicInterpolation::Channel::size() const
 {
     return _dataPoints;
 }
@@ -121,10 +127,54 @@ inline CubicInterpolation::CubicInterpolation() :
 inline dimmer_level_t CubicInterpolation::getLevel(dimmer_level_t level, dimmer_channel_id_t channelNum) const
 {
     auto &channel = _channels[channelNum];
-    if (channel.getDataPoints()) {
-        return _toLevel(Interpolation::DIMMER_INTERPOLATION_METHOD(channel.getXValues(), channel.getYValues(), channel.getDataPoints(), _toY(level)));
+    if (channel.size()) {
+        return _toLevel(Interpolation::DIMMER_INTERPOLATION_METHOD(channel.getXValues(), channel.getYValues(), channel.size(), _toY(level)));
     }
     return level;
+}
+
+inline void CubicInterpolation::copyFromConfig(const dimmer_config_cubic_int_t &cubicInt)
+{
+    clear();
+    DIMMER_CHANNEL_LOOP(channel) {
+        _channels[channel].createFromConfig(cubicInt.channels[channel], channel);
+    }
+}
+
+inline void CubicInterpolation::copyToConfig(dimmer_config_cubic_int_t &cubicInt)
+{
+    DIMMER_CHANNEL_LOOP(channel) {
+        _channels[channel].copyToConfig(cubicInt.channels[channel], channel);
+    }
+}
+
+inline void CubicInterpolation::clear()
+{
+    DIMMER_CHANNEL_LOOP(channel) {
+        _channels[channel].free();
+    }
+}
+
+inline void CubicInterpolation::printConfig() const
+{
+    DIMMER_CHANNEL_LOOP(channel) {
+        Serial.printf_P(PSTR("+REM=cubic_int,%u,i2ct=%02x%02x"), channel, DIMMER_I2C_ADDRESS, DIMMER_COMMAND_WRITE_CUBIC_INT, channel);
+        Serial.flush();
+        uint8_t i;
+        for(i = 0; i < _channels[channel].size(); i++) {
+            Serial.printf_P(PSTR("%02x%02x"), _channels[channel].getXValues()[i], _channels[channel].getYValues()[i]);
+        }
+        for(; i < DIMMER_CUBIC_INT_DATA_POINTS * 4; i++) {
+            Serial.print('0');
+        }
+        Serial.println();
+        Serial.flush();
+    }
+}
+
+inline CubicInterpolation::Channel &CubicInterpolation::getChannel(dimmer_channel_id_t channel)
+{
+    return _channels[channel];
 }
 
 extern CubicInterpolation cubicInterpolation;

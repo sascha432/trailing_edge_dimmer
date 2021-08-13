@@ -25,6 +25,9 @@ struct __attribute__((__packed__)) EEPROM_config_t {
     };
     register_mem_cfg_t cfg;
     register_mem_channels_t channels;
+    #if DIMMER_CUBIC_INTERPOLATION
+        dimmer_config_cubic_int_t cubic_int;
+    #endif
 
     bool operator==(const EEPROM_config_t &config) const {
         return memcmp(this, &config, sizeof(*this)) == 0;
@@ -69,11 +72,7 @@ public:
     static constexpr uint16_t kInvalidPosition = ~0;
 
 public:
-    Config() :
-        _config(),
-        _eeprom_position(0),
-        _eeprom_write_timer(-EEPROM_REPEATED_WRITE_DELAY)
-    {}
+    Config();
 
     // clear EEPROM and store default settings
     void initEEPROM();
@@ -85,35 +84,18 @@ public:
     void readConfig();
 
     // schedule storing the configuration
-    inline void scheduleWriteConfig() {
-        writeConfig();
-    }
+    inline void scheduleWriteConfig();
 
     // force set to true writes the EEPROM even if no changes are detected
     void _writeConfig(bool force);
+    uint32_t get_eeprom_num_writes(uint32_t cycle, uint16_t position) const;
+    uint32_t getEEPROMWriteCount() const;
+    bool isEEPROMWriteTimerExpired() const;
 
-    static uint32_t get_eeprom_num_writes(uint32_t cycle, uint16_t position) {
-        return (kEEPROMMaxCopies * (cycle - 1)) + (position / sizeof(_config));
-    }
+    EEPROM_config_t &config();
 
-    uint32_t getEEPROMWriteCount() const {
-        return get_eeprom_num_writes(_config.eeprom_cycle, _eeprom_position);
-    }
-
-    bool isEEPROMWriteTimerExpired() const {
-        return (millis() >= _eeprom_write_timer);
-    }
-
-    EEPROM_config_t &config() {
-        return _config;
-    }
-
-    dimmer_level_t &level(dimmer_channel_id_t channel) {
-        return _config.channels.level[channel];
-    }
-    dimmer_level_t level(dimmer_channel_id_t channel) const {
-        return _config.channels.level[channel];
-    }
+    dimmer_level_t &level(dimmer_channel_id_t channel);
+    dimmer_level_t level(dimmer_channel_id_t channel) const;
 
 private:
     friend void dimmer_i2c_slave_setup();
@@ -121,6 +103,14 @@ private:
     void initRegisterMem() const;
     void copyToRegisterMem(const register_mem_cfg_t &config) const;
     void copyFromRegisterMem(register_mem_cfg_t &config);
+
+    #if DIMMER_CUBIC_INTERPOLATION
+        void copyToInterpolation() const;
+        void copyFromInterpolation();
+    #else
+        void copyToInterpolation() const {}
+        void copyFromInterpolation() {}
+    #endif
 
     void resetConfig();
     void writeConfig();
@@ -130,5 +120,47 @@ private:
     uint16_t _eeprom_position;
     uint32_t _eeprom_write_timer;
 };
+
+inline Config::Config() :
+    _config(),
+    _eeprom_position(0),
+    _eeprom_write_timer(-EEPROM_REPEATED_WRITE_DELAY)
+{
+}
+
+inline void Config::scheduleWriteConfig()
+{
+    writeConfig();
+}
+
+inline uint32_t Config::get_eeprom_num_writes(uint32_t cycle, uint16_t position) const
+{
+    return (kEEPROMMaxCopies * (cycle - 1)) + (position / sizeof(_config));
+}
+
+inline uint32_t Config::getEEPROMWriteCount() const
+{
+    return get_eeprom_num_writes(_config.eeprom_cycle, _eeprom_position);
+}
+
+inline bool Config::isEEPROMWriteTimerExpired() const
+{
+    return (millis() >= _eeprom_write_timer);
+}
+
+inline EEPROM_config_t &Config::config()
+{
+    return _config;
+}
+
+inline dimmer_level_t &Config::level(dimmer_channel_id_t channel)
+{
+    return _config.channels.level[channel];
+}
+
+inline dimmer_level_t Config::level(dimmer_channel_id_t channel) const
+{
+    return _config.channels.level[channel];
+}
 
 extern Config conf;

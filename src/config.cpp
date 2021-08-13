@@ -28,6 +28,20 @@ void Config::copyFromRegisterMem(register_mem_cfg_t &config)
     config = register_mem.data.cfg;
 }
 
+#if DIMMER_CUBIC_INTERPOLATION
+
+void Config::copyToInterpolation() const
+{
+    cubicInterpolation.copyFromConfig(_config.cubic_int);
+}
+
+void Config::copyFromInterpolation()
+{
+    cubicInterpolation.copyToConfig(_config.cubic_int);
+}
+
+#endif
+
 void Config::resetConfig()
 {
     initRegisterMem();
@@ -55,6 +69,7 @@ void Config::resetConfig()
     register_mem.data.metrics.frequency = NAN;
 
     copyFromRegisterMem(_config.cfg);
+    copyFromInterpolation();
 }
 
 void Config::initEEPROM()
@@ -183,6 +198,7 @@ void Config::_writeConfig(bool force)
     if (queues.scheduled_calls.eeprom_update_config) {
         event.config_updated = true;
         copyFromRegisterMem(_config.cfg);
+        copyFromInterpolation();
     }
 
     _config.channels = register_mem.data.channels;

@@ -228,6 +228,10 @@ union __attribute_packed__ register_mem_cubic_int_t {
     int16_t levels[DIMMER_CUBIC_INT_DATA_POINTS];
 };
 
+struct __attribute_packed__ dimmer_config_cubic_int_t {
+    register_mem_cubic_int_t channels[DIMMER_CHANNEL_COUNT];
+};
+
 struct __attribute_packed__ dimmer_get_cubic_int_header_t {
     int16_t start_level;
     uint8_t level_count;
@@ -354,6 +358,7 @@ union __attribute_packed__ register_mem_ram_t
     float floats[4];
     uint16_t words[8];
     uint8_t bytes[16];
+    register_mem_cubic_int_t cubic_int;
 };
 
 struct __attribute_packed__ register_mem_metrics_t {
@@ -392,9 +397,6 @@ struct __attribute_packed__ register_mem_t
     register_mem_metrics_t metrics;
     register_mem_ram_t ram;
     uint8_t address;
-    #if DIMMER_CUBIC_INTERPOLATION
-        register_mem_cubic_int_t cubic_int;
-    #endif
 };
 
 union __attribute_packed__ register_mem_union_t
@@ -597,16 +599,15 @@ namespace Dimmer  {
             constexpr config() {}
 
             constexpr uint8_t *begin() const {
-                return register_mem.raw + offsetof(register_mem_t, cfg);
+                return reinterpret_cast<uint8_t *>(&register_mem.data.cfg);
             }
             constexpr uint8_t *end() const {
-                return begin() + sizeof(register_mem_cfg_t);
+                return begin() + sizeof(register_mem.data.cfg);
             }
             constexpr size_t size() const {
-                return sizeof(register_mem_cfg_t);
+                return sizeof(register_mem.data.cfg);
             }
         };
-
     }
 
     inline static bool isValidVoltage(uint16_t value) {

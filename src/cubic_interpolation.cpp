@@ -14,8 +14,8 @@ CubicInterpolation cubicInterpolation;
 void CubicInterpolation::printState() const
 {
     if (dimmer_config.bits.cubic_interpolation) {
-        for (dimmer_channel_id_t i = 0; i < DIMMER_CHANNEL_COUNT; i++) {
-            Serial.print(_channels[i].getDataPoints());
+        DIMMER_CHANNEL_LOOP(i) {
+            Serial.print(_channels[i].size());
             Serial.print((i == (DIMMER_CHANNEL_COUNT - 1)) ? ',' : '/');
         }
     } else {
@@ -29,7 +29,7 @@ void CubicInterpolation::printTable(dimmer_channel_id_t channelNum, uint8_t leve
 {
     Serial.printf_P(PSTR("+REM=ch%d="), channelNum);
     auto &channel = _channels[channelNum];
-    uint8_t maxDataPoints = channel.getDataPoints();
+    uint8_t maxDataPoints = channel.size();
     if (maxDataPoints) {
         Serial.print(F("x=["));
         for (uint8_t i = 0; i < maxDataPoints; i++) {
@@ -66,7 +66,7 @@ void CubicInterpolation::printTable(dimmer_channel_id_t channelNum, uint8_t leve
 void CubicInterpolation::testPerformance(dimmer_channel_id_t channel) const
 {
     uint32_t maxTime = 0;
-    DIMMER_CHANNEL_LOOP(level) {
+    for(dimmer_level_t level = 0; level < DIMMER_MAX_LEVEL; level++) {
         auto start = micros();
         auto levelOut = getLevel(level, channel);
         auto dur = micros() - start;
@@ -94,50 +94,6 @@ uint8_t CubicInterpolation::getInterpolatedLevels(dimmer_level_t *dstPtr, dimmer
     return size;
 }
 
-void CubicInterpolation::copyFromConfig(register_mem_cubic_int_t &cubic_int, dimmer_channel_id_t channelNum)
-{
-    auto points = cubic_int.points;
-
-    uint8_t maxX = (points++)->x;
-    uint8_t count;
-    for (count = 1; count < DIMMER_CUBIC_INT_DATA_POINTS; count++) {
-        if (points->x <= maxX) {
-            break;
-        }
-        maxX = (points++)->x;
-    }
-
-    auto &channel = _channels[channelNum];
-    if (channel.allocate(count)) {
-        points = cubic_int.points;
-        for (uint8_t i = 0; i < count; i++) {
-            channel.setDataPoint(i, points->x, points->y);
-            points++;
-        }
-    }
-}
-
-void CubicInterpolation::copyToConfig(register_mem_cubic_int_t &cubic_int, dimmer_channel_id_t channelNum)
-{
-    auto &channel = _channels[channelNum];
-    auto xValues = channel._xValues;
-    auto yValues = channel._yValues;
-    auto points = cubic_int.points;
-    cubic_int = {};
-    for (uint8_t i = 0; i < channel._dataPoints; i++) {
-        points->x = *xValues++;
-        points->y = *yValues++;
-        points++;
-    }
-}
-
-void CubicInterpolation::clearTable()
-{
-    DIMMER_CHANNEL_LOOP(i) {
-        _channels[i].free();
-    }
-}
-
 dimmer_level_t CubicInterpolation::_toLevel(double y) const
 {
     return std::clamp<dimmer_level_t>((y * ((DIMMER_MAX_LEVEL - 1) / 255.0) + 0.5 /*round*/), 0, DIMMER_MAX_LEVEL - 1);
@@ -148,6 +104,37 @@ double CubicInterpolation::_toY(dimmer_level_t level) const
 {
     return std::min<double>(static_cast<uint16_t>(level) / ((DIMMER_MAX_LEVEL - 1) / 255.0), 255);
     // return min(255.0, (uint16_t)level / ((DIMMER_MAX_LEVEL - 1) / 255.0)); // -1 = max level
+}
+
+void CubicInterpolation::Channel::copyToConfig(register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel)
+{
+    cubicInt = {};
+    auto ptr = &cubicInt.points[0];
+    for(uint8_t i = 0; i < size(); i++) {
+        ptr->x = _xValues[i];
+        ptr->y = _yValues[i];
+        ptr++;
+    }
+}
+
+void CubicInterpolation::Channel::createFromConfig(const register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel)
+{
+    auto points = &cubicInt.points[0];
+    uint8_t maxX = (points++)->x;
+    uint8_t count;
+    for (count = 1; count < DIMMER_CUBIC_INT_DATA_POINTS; count++) {
+        if (points->x <= maxX) {
+            break;
+        }
+        maxX = (points++)->x;
+    }
+    if (allocate(count)) {
+        points = &cubicInt.points[0];
+        for (uint8_t i = 0; i < count; i++) {
+            setDataPoint(i, points->x, points->y);
+            points++;
+        }
+    }
 }
 
 #endif

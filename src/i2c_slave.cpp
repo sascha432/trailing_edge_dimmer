@@ -146,6 +146,9 @@ void _dimmer_i2c_on_receive(int length)
                             Serial.printf_P(PSTR("%02x"), data);
                         }
                         Serial.println();
+                        #if DIMMER_CUBIC_INTERPOLATION
+                            cubicInterpolation.printConfig();
+                        #endif
                     } break;
 
                 case DIMMER_COMMAND_RESTORE_FS:
@@ -295,7 +298,6 @@ void _dimmer_i2c_on_receive(int length)
                                 length -= Wire.readBytes(reinterpret_cast<uint8_t *>(&header), sizeof(header));
 
                                 // start:uint16_t,num_level:uint8_t(1-8),step_size:uint8_t,x values:uint8[],y values:uint8_t[]
-
                                 uint8_t count = length;
                                 if (count % 2 == 0) {
                                     count /= 2;
@@ -305,8 +307,8 @@ void _dimmer_i2c_on_receive(int length)
                                         length -= Wire.readBytes(reinterpret_cast<uint8_t *>(x_values), count);
                                         length -= Wire.readBytes(reinterpret_cast<uint8_t *>(y_values), count);
                                         uint8_t size = cubicInterpolation.getInterpolatedLevels(
-                                            register_mem.data.cubic_int.levels,
-                                            &register_mem.data.cubic_int.levels[sizeof(register_mem.data.cubic_int.levels) / sizeof(*register_mem.data.cubic_int.levels)],
+                                            register_mem.data.ram.cubic_int.levels,
+                                            &register_mem.data.ram.cubic_int.levels[DIMMER_CUBIC_INT_DATA_POINTS],
                                             header.start_level,
                                             header.level_count,
                                             header.step_size,
@@ -324,7 +326,29 @@ void _dimmer_i2c_on_receive(int length)
                     case DIMMER_COMMAND_WRITE_CUBIC_INT: {
                             uint8_t channel = Wire_read_uint8_t(length, 0xff);
                             if (channel < DIMMER_CHANNEL_COUNT) {
-                                cubicInterpolation.copyFromConfig(register_mem.data.cubic_int, channel);
+                                ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                                    register_mem.data.ram.cubic_int = {};
+                                    if (length > 0) {
+                                        auto size = std::min<uint8_t>(DIMMER_CUBIC_INT_DATA_POINTS * 2, length);
+                                        _D(5, debug_printf("write_cubic_int %u\n", length));
+                                        if (Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.ram.cubic_int.points), size) == size) {
+                                            cubicInterpolation.getChannel(channel).createFromConfig(register_mem.data.ram.cubic_int, channel);
+                                        }
+                                    }
+                                    else {
+                                        _D(5, debug_printf("write_cubic_int clear\n"));
+                                        cubicInterpolation.getChannel(channel).createFromConfig(register_mem.data.ram.cubic_int, channel);
+                                    }
+                                    // check if there is any data
+                                    dimmer_config.bits.cubic_interpolation = false;
+                                    DIMMER_CHANNEL_LOOP(channel) {
+                                        _D(5, debug_printf("write_cubic_int channel=%u size=%u\n"), channel, cubicInterpolation.getChannel(channel).size());
+                                        if (cubicInterpolation.getChannel(channel).size()) {
+                                            dimmer_config.bits.cubic_interpolation = true;
+                                            break;
+                                        }
+                                    }
+                                }
                             }
                         }
                         break;
@@ -332,8 +356,9 @@ void _dimmer_i2c_on_receive(int length)
                     case DIMMER_COMMAND_READ_CUBIC_INT: {
                             uint8_t channel = Wire_read_uint8_t(length, 0xff);
                             if (channel < DIMMER_CHANNEL_COUNT) {
-                                cubicInterpolation.copyToConfig(register_mem.data.cubic_int, channel);
-                                i2c_slave_set_register_address(length, DIMMER_REGISTER_CUBIC_INT_OFS, sizeof(register_mem.data.cubic_int));
+                                cubicInterpolation.getChannel(channel).copyToConfig(register_mem.data.ram.cubic_int, channel);
+                                _D(5, debug_printf("read_cubic_int\n"));
+                                i2c_slave_set_register_address(length, DIMMER_REGISTER_CUBIC_INT_OFS, sizeof(register_mem.data.ram.cubic_int));
                             }
                         }
                         break;
