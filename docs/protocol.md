@@ -425,7 +425,9 @@ Read x and y coordinates for cubic brightness interpolation. The first byte is t
 
 ## DIMMER_COMMAND_WRITE_CUBIC_INT
 
-Write x and y coordinates for cubic brightness interpolation. The first byte is the channel, followed by up to 8 pairs of x and y coordinates (uint8_t). If any channel contains data, cubic interpolation will be enabled.
+Write x and y coordinates for cubic brightness interpolation. The first byte is the channel, followed by up to 8 pairs of x and y coordinates (uint8_t). If any channel contains data, cubic interpolation will be enabled. You can find a browser based tool to create the curves in `Resources/edit_curve.html`
+
+NOTE: The performance with 8MHz might not be sufficient to create the interpolation within one halfwave for more than 4 active channels. The update rate will be reduced from 120 to 60Hz in this case.
 
     `+I2CT=17,89,a3,<channel>[,<x>,<y>[,...]]`
 
@@ -491,7 +493,7 @@ Channel, X values, Y values, interpolated values per level
 
 ## DIMMER_COMMAND_GET_CUBIC_INT
 
-Translate up to 8 levels for the provided table at once. This can be used to retrieve a preview of the entire curve. The returned values are int16
+Translate up to 11 levels for the provided table at once. This can be used to retrieve a preview of the entire curve. The returned values are int16
 
 Table format:
 
