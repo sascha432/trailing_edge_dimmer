@@ -106,16 +106,16 @@ void DimmerBase::begin()
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
     DIMMER_CHANNEL_LOOP(i) {
-#if not HAVE_CHANNELS_INLINE_ASM
-	    dimmer_pins_mask[i] = digitalPinToBitMask(Channel::pins[i]);
-	    dimmer_pins_addr[i] = portOutputRegister(digitalPinToPort(Channel::pins[i]));
-        _D(5, debug_printf("ch=%u pin=%u addr=%02x mask=%02x\n", i, Channel::pins[i], dimmer_pins_addr[i], dimmer_pins_mask[i]));
-#else
-        _D(5, debug_printf("ch=%u pin=%u\n", i, Channel::pins[i]));
-#endif
-#if HAVE_FADE_COMPLETION_EVENT
-        fading_completed[i] = Level::invalid;
-#endif
+        #if !HAVE_CHANNELS_INLINE_ASM
+                dimmer_pins_mask[i] = digitalPinToBitMask(Channel::pins[i]);
+                dimmer_pins_addr[i] = portOutputRegister(digitalPinToPort(Channel::pins[i]));
+                _D(5, debug_printf("ch=%u pin=%u addr=%02x mask=%02x\n", i, Channel::pins[i], dimmer_pins_addr[i], dimmer_pins_mask[i]));
+        #else
+                _D(5, debug_printf("ch=%u pin=%u\n", i, Channel::pins[i]));
+        #endif
+        #if HAVE_FADE_COMPLETION_EVENT
+                fading_completed[i] = Level::invalid;
+        #endif
         digitalWrite(Channel::pins[i], DIMMER_MOSFET_OFF_STATE);
         pinMode(Channel::pins[i], OUTPUT);
     }
@@ -362,7 +362,7 @@ void DimmerBase::_calculate_channels()
     uint8_t new_channel_state = 0;
 
     DIMMER_CHANNEL_LOOP(i) {
-        auto level = _get_level(i);
+        auto level = DIMMER_LINEAR_LEVEL(_get_level(i), i);
         if (level >= Level::max) {
             new_channel_state |= (1 << i);
         }
@@ -375,11 +375,11 @@ void DimmerBase::_calculate_channels()
     }
     ordered_channels[count] = {};
 
-#if DIMMER_MAX_CHANNELS > 1
+    #if DIMMER_MAX_CHANNELS > 1
 
-    dimmer_bubble_sort(ordered_channels, count);
+        dimmer_bubble_sort(ordered_channels, count);
 
-#endif
+    #endif
 
     cli(); // copy double buffer with interrupts disabled
     if (new_channel_state != channel_state) {
@@ -503,21 +503,21 @@ void DimmerBase::_apply_fading()
             fade.level += fade.step;
             if (--fade.count == 0) {
                 _set_level(i, fade.targetLevel);
-#if HAVE_FADE_COMPLETION_EVENT
-                fading_completed[i] = _get_level(i);
-                ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-                    queues.scheduled_calls.send_fading_events = true;
-                    queues.fading_completed_events.resetTimer();
-                }
-#endif
+                #if HAVE_FADE_COMPLETION_EVENT
+                    fading_completed[i] = _get_level(i);
+                    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                        queues.scheduled_calls.send_fading_events = true;
+                        queues.fading_completed_events.resetTimer();
+                    }
+                #endif
             } else {
                 _set_level(i, fade.level);
             }
-#if DEBUG
-            if (fade.count % 60 == 0) {
-                _D(5, debug_printf("fading ch=%u lvl=%u ticks=%u\n", i, _get_level(i), _get_ticks(i, _get_level(i))));
-            }
-#endif
+            #if DEBUG
+                if (fade.count % 60 == 0) {
+                    _D(5, debug_printf("fading ch=%u lvl=%u ticks=%u\n", i, _get_level(i), _get_ticks(i, _get_level(i))));
+                }
+            #endif
         }
     }
 

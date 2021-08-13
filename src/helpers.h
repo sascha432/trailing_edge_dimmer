@@ -66,25 +66,88 @@ static inline void __debug_printf_i(uint16_t interval, const char *format, ...) 
 #define _ASSERT_EXPR(cond, expr, ...)       ( (!(cond)) ? debug_printf(expr, _STRINGIFY(cond), ##__VA_ARGS__) + assert_failed() : 0 )
 #endif
 
+namespace std {
 
-
-template< typename T > class unique_ptr
-{
-public:
-    using pointer = T*;
-    unique_ptr() noexcept : ptr(nullptr) {}
-    unique_ptr(pointer p) : ptr(p) {}
-    pointer operator->() const noexcept { return ptr; }
-    T& operator[](decltype(sizeof(0)) i) const { return ptr[i]; }
-    void reset(pointer p = pointer()) noexcept
-    {
-        delete ptr;
-        ptr = p;
+    template <typename _Ta, typename _Tpred>
+    const _Ta& clamp(const _Ta& value, const _Ta& minValue, const _Ta& maxValue, _Tpred pred) {
+        if (pred(maxValue, value)) {
+            return maxValue;
+        }
+        if (pred(value, minValue)) {
+            return minValue;
+        }
+        return value;
     }
-    T& operator*() const { return *ptr; }
-private:
-    pointer ptr;
-};
+
+    template <typename _Ta>
+    const _Ta& clamp(const _Ta& value, const _Ta& minValue, const _Ta& maxValue) {
+        if (maxValue < value) {
+            return maxValue;
+        }
+        if (value < minValue) {
+            return minValue;
+        }
+        return value;
+    }
+
+    #undef min
+    #undef max
+
+    template<typename _Ta>
+    constexpr const _Ta &min(const _Ta &a, const _Ta &b)
+    {
+        return (a < b) ? a : b;
+    }
+
+    template<typename _Ta>
+    constexpr const _Ta &min(const _Ta &a, const _Ta &b, const _Ta &c)
+    {
+        return min<_Ta>(min<_Ta>(a, b), c);
+    }
+
+    template<typename _Ta>
+    constexpr const _Ta &min(const _Ta &a, const _Ta &b, const _Ta &c, const _Ta &d)
+    {
+        return min<_Ta>(min<_Ta>(min<_Ta>(a, b), c), d);
+    }
+
+    template<typename _Ta>
+    constexpr const _Ta &max(const _Ta &a, const _Ta &b)
+    {
+        return (a < b) ? b : a;
+    }
+
+    template<typename _Ta>
+    constexpr const _Ta &max(const _Ta &a, const _Ta &b, const _Ta &c)
+    {
+        return max<_Ta>(max<_Ta>(a, b), c);
+    }
+
+    template<typename _Ta>
+    constexpr const _Ta &max(const _Ta &a, const _Ta &b, const _Ta &c, const _Ta &d)
+    {
+        return max<_Ta>(max<_Ta>(max<_Ta>(a, b), c), d);
+    }
+
+    template< typename T > class unique_ptr
+    {
+    public:
+        using pointer = T*;
+        unique_ptr() noexcept : ptr(nullptr) {}
+        unique_ptr(pointer p) : ptr(p) {}
+        pointer operator->() const noexcept { return ptr; }
+        T& operator[](decltype(sizeof(0)) i) const { return ptr[i]; }
+        void reset(pointer p = pointer()) noexcept
+        {
+            delete ptr;
+            ptr = p;
+        }
+        T& operator*() const { return *ptr; }
+    private:
+        pointer ptr;
+    };
+
+}
 
 #ifndef FPSTR
 #define FPSTR(str)                              reinterpret_cast<const __FlashStringHelper *>(PSTR(str))

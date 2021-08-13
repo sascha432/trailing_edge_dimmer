@@ -61,7 +61,6 @@ void _dimmer_i2c_on_receive(int length)
         if (addr == DIMMER_REGISTER_ADDRESS) {
             register_mem.data.address--;
             _D(5, debug_printf("I2C set addr=%#02x\n", register_mem.data.address));
-
             // legacy version request
             //
             // +i2ct=17,8a,02,b9
@@ -122,18 +121,18 @@ void _dimmer_i2c_on_receive(int length)
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_RAM, sizeof(register_mem.data.ram.timers));
                     break;
 
-#if HIDE_DIMMER_INFO == 0
-                case DIMMER_COMMAND_PRINT_INFO:
-                    display_dimmer_info();
-                    break;
-#endif
+                #if HIDE_DIMMER_INFO == 0
+                    case DIMMER_COMMAND_PRINT_INFO:
+                        display_dimmer_info();
+                        break;
+                #endif
 
-#if HAVE_PRINT_METRICS
-                case DIMMER_COMMAND_PRINT_METRICS:
-                    queues.print_metrics.timer = 0;
-                    queues.print_metrics.interval = Wire_read_uint8_t(length, 0);
-                    break;
-#endif
+                #if HAVE_PRINT_METRICS
+                    case DIMMER_COMMAND_PRINT_METRICS:
+                        queues.print_metrics.timer = 0;
+                        queues.print_metrics.interval = Wire_read_uint8_t(length, 0);
+                        break;
+                #endif
 
                 case DIMMER_COMMAND_SET_MODE:
                     if (length-- > 0) {
@@ -177,89 +176,169 @@ void _dimmer_i2c_on_receive(int length)
                     queues.report_metrics.timer = 0;
                     break;
 
-#if DEBUG_COMMANDS
-                case DIMMER_COMMAND_MEASURE_FREQ: {
-                        _D(5, debug_printf("measuring...\n"));
-                        Serial.println(F("+REM=freq"));
-                        dimmer.end();
-                        delay(500);
-                        start_measure_frequency();
-                    }
-                    break;
-
-                case DIMMER_COMMAND_INIT_EEPROM:
-                    conf.initEEPROM();
-                    break;
-
-                case DIMMER_COMMAND_INCR_ZC_DELAY:
-                    register_mem.data.cfg.zero_crossing_delay_ticks += Wire_read_uint8_t(length, 1);
-                    goto print_zcdelay;
-                case DIMMER_COMMAND_DECR_ZC_DELAY:
-                    register_mem.data.cfg.zero_crossing_delay_ticks -= Wire_read_uint8_t(length, 1);
-                    goto print_zcdelay;
-                case DIMMER_COMMAND_SET_ZC_DELAY:
-                    if (length-- >= (int)sizeof(register_mem.data.cfg.zero_crossing_delay_ticks)) {
-                        Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.cfg.zero_crossing_delay_ticks), sizeof(register_mem.data.cfg.zero_crossing_delay_ticks));
-                    }
-                    print_zcdelay:
-                    Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
-                    break;
-                case DIMMER_COMMAND_INCR_HW_TICKS:
-                    dimmer.halfwave_ticks += Wire_read_uint8_t(length, 1);
-                    goto print_ticks;
-                case DIMMER_COMMAND_DECR_HW_TICKS:
-                    dimmer.halfwave_ticks -= Wire_read_uint8_t(length, 1);
-                    print_ticks:
-                    Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
-                    break;
-
-#if HAVE_DISABLE_ZC_SYNC
-                case DIMMER_COMMAND_SET_ZC_SYNC: {
-                        if (length == 0) {
-                            dimmer.zc_sync_disabled = !dimmer.zc_sync_disabled;
+                #if DEBUG_COMMANDS
+                    case DIMMER_COMMAND_MEASURE_FREQ: {
+                            _D(5, debug_printf("measuring...\n"));
+                            Serial.println(F("+REM=freq"));
+                            dimmer.end();
+                            delay(500);
+                            start_measure_frequency();
                         }
-                        else {
-                            dimmer.zc_sync_disabled = Wire_read_uint8_t(length, 0);
-                        }
-                        Serial.printf_P(PSTR("+REM=sync=%u\n"), !dimmer.zc_sync_disabled);
-                    }
-                    break;
-#endif
+                        break;
 
-                case DIMMER_COMMAND_DUMP_CHANNELS: {
-                        auto &tmp = dimmer.ordered_channels;
-                        Serial.print(F("+REM="));
-                        if (tmp[0].ticks) {
-                            for(Dimmer::Channel::type i = 0; tmp[i].ticks; i++) {
-                                Serial.printf_P(PSTR("%u=%u(%u) "), tmp[i].channel, tmp[i].ticks, dimmer._get_level(tmp[i].channel));
+                    case DIMMER_COMMAND_INIT_EEPROM:
+                        conf.initEEPROM();
+                        break;
+
+                    case DIMMER_COMMAND_INCR_ZC_DELAY:
+                        register_mem.data.cfg.zero_crossing_delay_ticks += Wire_read_uint8_t(length, 1);
+                        Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
+                        break;
+                    case DIMMER_COMMAND_DECR_ZC_DELAY:
+                        register_mem.data.cfg.zero_crossing_delay_ticks -= Wire_read_uint8_t(length, 1);
+                        Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
+                        break;
+                    case DIMMER_COMMAND_SET_ZC_DELAY:
+                        if (length-- >= (int)sizeof(register_mem.data.cfg.zero_crossing_delay_ticks)) {
+                            Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.cfg.zero_crossing_delay_ticks), sizeof(register_mem.data.cfg.zero_crossing_delay_ticks));
+                        }
+                        Serial.printf_P(PSTR("+REM=zcdelay=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
+                        break;
+                    case DIMMER_COMMAND_INCR_HW_TICKS:
+                        dimmer.halfwave_ticks += Wire_read_uint8_t(length, 1);
+                        Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
+                        break;
+                    case DIMMER_COMMAND_DECR_HW_TICKS:
+                        dimmer.halfwave_ticks -= Wire_read_uint8_t(length, 1);
+                        Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
+                        break;
+
+                    #if HAVE_DISABLE_ZC_SYNC
+                        case DIMMER_COMMAND_SET_ZC_SYNC: {
+                            if (length == 0) {
+                                dimmer.zc_sync_disabled = !dimmer.zc_sync_disabled;
+                            }
+                            else {
+                                dimmer.zc_sync_disabled = Wire_read_uint8_t(length, 0);
+                            }
+                            Serial.printf_P(PSTR("+REM=sync=%u\n"), !dimmer.zc_sync_disabled);
+                        }
+                        break;
+                    #endif
+
+                    case DIMMER_COMMAND_DUMP_CHANNELS: {
+                            auto &tmp = dimmer.ordered_channels;
+                            Serial.print(F("+REM="));
+                            if (tmp[0].ticks) {
+                                for(Dimmer::Channel::type i = 0; tmp[i].ticks; i++) {
+                                    Serial.printf_P(PSTR("%u=%u(%u) "), tmp[i].channel, tmp[i].ticks, dimmer._get_level(tmp[i].channel));
+                                }
+                                Serial.println();
+                            }
+                            else {
+                                Serial.println(F("No channels active"));
+                            }
+                        }
+                        break;
+                    case DIMMER_COMMAND_DUMP_MEM: {
+                            Serial.print(F("+REM="));
+                            auto ptr = Dimmer::RegisterMemory::raw::begin();
+                            for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++, ptr++) {
+                                //1Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
+                                if (addr % 4 == 0) {
+                                    Serial.printf_P(PSTR("[%02x]"), addr);
+                                }
+                                Serial.printf_P(PSTR("%02x"), *ptr);
+                                if (addr % 16 == 15) {
+                                    Serial.print(F("\n+REM="));
+                                }
+                                else if (addr % 4 == 3) {
+                                    Serial.print(' ');
+                                }
                             }
                             Serial.println();
                         }
-                        else {
-                            Serial.println(F("No channels active"));
+                        break;
+                #endif
+
+                #if DIMMER_CUBIC_INTERPOLATION
+
+                    #if HAVE_CUBIC_INT_TEST_PERFORMANCE
+                        case DIMMER_COMMAND_CUBIC_INT_TEST_PERF: {
+                                DIMMER_CHANNEL_LOOP(i) {
+                                    cubicInterpolation.testPerformance(i);
+                                }
+                            }
+                            break;
+                    #endif
+
+                    #if HAVE_CUBIC_INT_PRINT_TABLE
+                        case DIMMER_COMMAND_PRINT_CUBIC_INT: {
+                                uint8_t channel = Wire_read_uint8_t(length, 0xff);
+                                uint8_t stepSize = Wire_read_uint8_t(length, 127);
+                                if (channel < DIMMER_CHANNEL_COUNT) {
+                                    cubicInterpolation.printTable(channel, stepSize);
+                                }
+                                else {
+                                    DIMMER_CHANNEL_LOOP(i) {
+                                        cubicInterpolation.printTable(i, stepSize);
+                                    }
+                                }
+                            }
+                            break;
+                    #endif
+
+                    #if HAVE_CUBIC_INT_GET_TABLE
+                        case DIMMER_COMMAND_GET_CUBIC_INT:
+                            if (length > (int8_t)sizeof(dimmer_get_cubic_int_header_t)) {
+                                dimmer_get_cubic_int_header_t header;
+                                length -= Wire.readBytes(reinterpret_cast<uint8_t *>(&header), sizeof(header));
+
+                                // start:uint16_t,num_level:uint8_t(1-8),step_size:uint8_t,x values:uint8[],y values:uint8_t[]
+
+                                uint8_t count = length;
+                                if (count % 2 == 0) {
+                                    count /= 2;
+                                    if (count && count <= DIMMER_CUBIC_INT_DATA_POINTS) {
+                                        CubicInterpolation::xyValueType x_values[DIMMER_CUBIC_INT_DATA_POINTS * 2] = {};
+                                        CubicInterpolation::xyValueType *y_values = &x_values[DIMMER_CUBIC_INT_DATA_POINTS];
+                                        length -= Wire.readBytes(reinterpret_cast<uint8_t *>(x_values), count);
+                                        length -= Wire.readBytes(reinterpret_cast<uint8_t *>(y_values), count);
+                                        uint8_t size = cubicInterpolation.getInterpolatedLevels(
+                                            register_mem.data.cubic_int.levels,
+                                            &register_mem.data.cubic_int.levels[sizeof(register_mem.data.cubic_int.levels) / sizeof(*register_mem.data.cubic_int.levels)],
+                                            header.start_level,
+                                            header.level_count,
+                                            header.step_size,
+                                            count,
+                                            x_values,
+                                            y_values
+                                        );
+                                        i2c_slave_set_register_address(length, DIMMER_REGISTER_CUBIC_INT_OFS, size);
+                                    }
+                                }
+                            }
+                            break;
+                    #endif
+
+                    case DIMMER_COMMAND_WRITE_CUBIC_INT: {
+                            uint8_t channel = Wire_read_uint8_t(length, 0xff);
+                            if (channel < DIMMER_CHANNEL_COUNT) {
+                                cubicInterpolation.copyFromConfig(register_mem.data.cubic_int, channel);
+                            }
                         }
-                    }
-                    break;
-                case DIMMER_COMMAND_DUMP_MEM: {
-                        Serial.print(F("+REM="));
-                        auto ptr = Dimmer::RegisterMemory::raw::begin();
-                        for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++, ptr++) {
-                            //1Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
-                            if (addr % 4 == 0) {
-                                Serial.printf_P(PSTR("[%02x]"), addr);
-                            }
-                            Serial.printf_P(PSTR("%02x"), *ptr);
-                            if (addr % 16 == 15) {
-                                Serial.print(F("\n+REM="));
-                            }
-                            else if (addr % 4 == 3) {
-                                Serial.print(' ');
+                        break;
+
+                    case DIMMER_COMMAND_READ_CUBIC_INT: {
+                            uint8_t channel = Wire_read_uint8_t(length, 0xff);
+                            if (channel < DIMMER_CHANNEL_COUNT) {
+                                cubicInterpolation.copyToConfig(register_mem.data.cubic_int, channel);
+                                i2c_slave_set_register_address(length, DIMMER_REGISTER_CUBIC_INT_OFS, sizeof(register_mem.data.cubic_int));
                             }
                         }
-                        Serial.println();
-                    }
-                    break;
-#endif
+                        break;
+
+                #endif
             }
         }
     }
@@ -268,9 +347,9 @@ void _dimmer_i2c_on_receive(int length)
 
 void _dimmer_i2c_on_request()
 {
-#if DEBUG
-    auto tmp = register_mem.data.cmd.read_length;
-#endif
+    #if DEBUG
+        auto tmp = register_mem.data.cmd.read_length;
+    #endif
     Dimmer::RegisterMemory::request data(register_mem.data.address, register_mem.data.cmd.read_length);
     _D(5, debug_printf("I2C on_request addr=%#02x len=%u avail=%u\n", register_mem.data.address, tmp, data.size()));
     Wire.write(data.data(), data.size());

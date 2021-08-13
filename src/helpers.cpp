@@ -248,50 +248,50 @@ void get_mcu_type(MCUInfo_t &info)
     *ptr++ = boot_lock_fuse_bits_get(GET_HIGH_FUSE_BITS);
     *ptr++ = boot_lock_fuse_bits_get(GET_EXTENDED_FUSE_BITS);
 
-#if __AVR_ATmega328PB__ || (MCU_IS_ATMEGA328PB == 1)
+    #if __AVR_ATmega328PB__ || (MCU_IS_ATMEGA328PB == 1)
 
-    info.name = FPSTR("ATmega328PB");
+        info.name = FPSTR("ATmega328PB");
 
-#elif __AVR_ATmega328P__
+    #elif __AVR_ATmega328P__
 
-#if !defined(MCU_IS_ATMEGA328PB)
-#error set MCU_IS_ATMEGA328PB to 0 or 1, if the selected target MCU is ATmega328P
-#endif
+        #if !defined(MCU_IS_ATMEGA328PB)
+        #error set MCU_IS_ATMEGA328PB to 0 or 1, if the selected target MCU is ATmega328P
+        #endif
 
-    info.name = FPSTR("ATmega328P");
+        info.name = FPSTR("ATmega328P");
 
-#elif __AVR_ATmega2560__
+    #elif __AVR_ATmega2560__
 
-    info.name = FPSTR("ATmega2560");
+        info.name = FPSTR("ATmega2560");
 
-#else
+    #else
 
-    info.name = nullptr;
-    if (info.sig[0] == 0x1e) {
-        if (info.sig[1] == 0x98) {
-            switch(info.sig[2]) {
-                case 0x01:
-                    info.name = FPSTR("ATmega2560");
-                    break;
+        info.name = nullptr;
+        if (info.sig[0] == 0x1e) {
+            if (info.sig[1] == 0x98) {
+                switch(info.sig[2]) {
+                    case 0x01:
+                        info.name = FPSTR("ATmega2560");
+                        break;
+                }
+            }
+            else if (info.sig[1] == 0x95) {
+                switch(info.sig[2]) {
+                    case 0x02:
+                        info.name = FPSTR("ATmega32");
+                        break;
+                    case 0x0f:
+                        info.name = FPSTR("ATmega328P");
+                        break;
+                    case 0x14:
+                        info.name = FPSTR("ATmega328-PU");
+                        break;
+                    case 0x16:
+                        info.name = FPSTR("ATmega328PB");
+                        break;
+                }
             }
         }
-        else if (info.sig[1] == 0x95) {
-            switch(info.sig[2]) {
-                case 0x02:
-                     info.name = FPSTR("ATmega32");
-                     break;
-                case 0x0f:
-                    info.name = FPSTR("ATmega328P");
-                    break;
-                case 0x14:
-                    info.name = FPSTR("ATmega328-PU");
-                    break;
-                case 0x16:
-                    info.name = FPSTR("ATmega328PB");
-                    break;
-            }
-        }
-    }
-#endif
+    #endif
 
 }

@@ -2,6 +2,7 @@
 
 ## 2.2.2-dev
 
+ - Added cubic interpolation to create linear brightness levels
  - Changed default offset/gain for ATMega328PB temperature sensor
  - Info displayed invalid voltage during frequency calibration
 

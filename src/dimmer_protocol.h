@@ -54,6 +54,10 @@
 #define DIMMER_REGISTER_RAM                 (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, ram))
 #define DIMMER_REGISTER_ADDRESS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, address))
 #define DIMMER_REGISTER_END_ADDR            (DIMMER_REGISTER_START_ADDR + sizeof(register_mem_t))
+#define DIMMER_REGISTER_CUBIC_INT_OFS       (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cubic_int))
+#define DIMMER_REGISTER_CUBIC_INT_DATAX(n)  (DIMMER_REGISTER_CUBIC_INT_OFS + ((n) * 2))
+#define DIMMER_REGISTER_CUBIC_INT_DATAY(n)  (DIMMER_REGISTER_CUBIC_INT_OFS + 1 + ((n) * 2))
+#define DIMMER_REGISTER_MEM_SIZE            sizeof(register_mem_t)
 //
 // first byte in master mode indicates the data that was sent
 #define DIMMER_EVENT_METRICS_REPORT         0xf0
@@ -84,6 +88,11 @@
 #define DIMMER_COMMAND_PRINT_CONFIG         0x91
 #define DIMMER_COMMAND_WRITE_CONFIG         0x92 // this byte must be send after DIMMER_COMMAND_WRITE_EEPROM_NOW or DIMMER_COMMAND_WRITE_EEPROM
 #define DIMMER_COMMAND_WRITE_EEPROM_NOW     0x93
+#define DIMMER_COMMAND_PRINT_CUBIC_INT      0xa0
+#define DIMMER_COMMAND_GET_CUBIC_INT        0xa1
+#define DIMMER_COMMAND_READ_CUBIC_INT       0xa2
+#define DIMMER_COMMAND_WRITE_CUBIC_INT      0xa3
+#define DIMMER_COMMAND_CUBIC_INT_TEST_PERF  0xa4
 //
 #if DEBUG || DEBUG_COMMANDS
 #define DIMMER_COMMAND_MEASURE_FREQ         0x94

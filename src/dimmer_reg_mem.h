@@ -208,8 +208,33 @@ struct __attribute_packed__ config_options_t
     uint8_t leading_edge: 1;
     uint8_t over_temperature_alert_triggered: 1;
     uint8_t negative_zc_delay: 1;                            // currently not implemented: zc delay = halfwave length - zcdelay, effectively making zc delay negative
-    uint8_t ___reserved: 4;
+    #if DIMMER_CUBIC_INTERPOLATION
+        uint8_t cubic_interpolation: 1;
+        uint8_t ___reserved: 3;
+    #else
+        uint8_t ___reserved: 4;
+    #endif
 };
+
+#if DIMMER_CUBIC_INTERPOLATION
+
+struct __attribute_packed__ register_mem_cubic_int_data_point_t {
+    uint8_t x;
+    uint8_t y;
+};
+
+union __attribute_packed__ register_mem_cubic_int_t {
+    register_mem_cubic_int_data_point_t points[DIMMER_CUBIC_INT_DATA_POINTS];
+    int16_t levels[DIMMER_CUBIC_INT_DATA_POINTS];
+};
+
+struct __attribute_packed__ dimmer_get_cubic_int_header_t {
+    int16_t start_level;
+    uint8_t level_count;
+    uint8_t step_size;
+};
+
+#endif
 
 #define REPORT_METRICS_INTERVAL(value)             (value)
 #define REPORT_METRICS_INTERVAL_MILLIS(value)      (value * 1000UL)
@@ -367,6 +392,9 @@ struct __attribute_packed__ register_mem_t
     register_mem_metrics_t metrics;
     register_mem_ram_t ram;
     uint8_t address;
+    #if DIMMER_CUBIC_INTERPOLATION
+        register_mem_cubic_int_t cubic_int;
+    #endif
 };
 
 union __attribute_packed__ register_mem_union_t

@@ -103,35 +103,35 @@ void setup() {
 
     memset(&poll_channels, 0, sizeof(poll_channels));
 
-#if ZC_PIN
-    digitalWrite(ZC_PIN, LOW);
-    pinMode(ZC_PIN, OUTPUT);
-    TIMSK1 |= (1 << OCIE1A) | (1 << OCIE1B);
-    TCCR1A = 0;
-    TCCR1B = (1 << CS12); // prescaler 256 = 16us
-    // TCCR1B = ((1 << CS11) | (1 << CS10)); // prescaler 64
-    // TCCR1B = (1 << CS11); // prescaler 8 = 0.5us
-    TCNT1 = 0;
-    OCR1A = F_CPU / 256 / 120;                          // 120Hz
-    // OCR1B = OCR1A + 12;                                 // 192us
-    OCR1B = OCR1A + 3;                                  // 48us
+    #if ZC_PIN
+        digitalWrite(ZC_PIN, LOW);
+        pinMode(ZC_PIN, OUTPUT);
+        TIMSK1 |= (1 << OCIE1A) | (1 << OCIE1B);
+        TCCR1A = 0;
+        TCCR1B = (1 << CS12); // prescaler 256 = 16us
+        // TCCR1B = ((1 << CS11) | (1 << CS10)); // prescaler 64
+        // TCCR1B = (1 << CS11); // prescaler 8 = 0.5us
+        TCNT1 = 0;
+        OCR1A = F_CPU / 256 / 120;                          // 120Hz
+        // OCR1B = OCR1A + 12;                                 // 192us
+        OCR1B = OCR1A + 3;                                  // 48us
 
-    // OCR1B = OCR1A + 12; //(F_CPU / 256 / (1e6 / 200));
-#endif
+        // OCR1B = OCR1A + 12; //(F_CPU / 256 / (1e6 / 200));
+    #endif
 
     Serial.begin(DEFAULT_BAUD_RATE);
     Serial.print(F("Dimmer control example @ "));
     Serial.printf_P(PSTR("0x%02x\n"), DIMMER_I2C_ADDRESS);
 
-#if SERIAL_I2C_BRDIGE
-    Serial2.begin(DEFAULT_BAUD_RATE);
+    #if SERIAL_I2C_BRDIGE
+        Serial2.begin(DEFAULT_BAUD_RATE);
 
-    // set read handler
-    Wire.onReadSerial([](){
-        Wire._serialEvent();
-    });
+        // set read handler
+        Wire.onReadSerial([](){
+            Wire._serialEvent();
+        });
 
-#endif
+    #endif
 
     // receive incoming data as slave
     Wire.begin(DIMMER_I2C_MASTER_ADDRESS);

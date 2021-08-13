@@ -369,7 +369,7 @@ void loop()
             #if HAVE_READ_INT_TEMP
                 register_mem.data.metrics.int_temp = get_internal_temperature();
                 if (!isnan(register_mem.data.metrics.int_temp)) {
-                    current_temp = max(current_temp, register_mem.data.metrics.int_temp);
+                    current_temp = std::max(current_temp, register_mem.data.metrics.int_temp);
                 }
             #endif
 

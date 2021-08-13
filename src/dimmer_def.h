@@ -298,6 +298,33 @@
 #    define EEPROM_REPEATED_WRITE_DELAY 5000
 #endif
 
+#ifndef DIMMER_CUBIC_INTERPOLATION
+#   define DIMMER_CUBIC_INTERPOLATION 0
+#endif
+
+#if DIMMER_CUBIC_INTERPOLATION
+#    define DIMMER_LINEAR_LEVEL(level, channel) (dimmer_config.bits.cubic_interpolation ? cubicInterpolation.getLevel(level, channel) : level)
+#    if DIMMER_CUBIC_INTERPOLATION
+#        ifndef DIMMER_INTERPOLATION_METHOD
+#            define DIMMER_INTERPOLATION_METHOD CatmullSpline
+// #            define DIMMER_INTERPOLATION_METHOD ConstrainedSpline
+#        endif
+#    endif
+#   ifndef INTERPOLATION_LIB_XYVALUES_TYPE
+#       error define INTERPOLATION_LIB_XYVALUES_TYPE=uint8_t
+#   endif
+#else
+#    define DIMMER_LINEAR_LEVEL(level, channel) level
+#endif
+
+#ifndef DIMMER_CUBIC_INT_DATA_POINTS
+#   define DIMMER_CUBIC_INT_DATA_POINTS 8
+#endif
+
+#ifndef DIMMER_CUBIC_INT_TABLE_SIZE
+#   define DIMMER_CUBIC_INT_TABLE_SIZE 8
+#endif
+
 #ifndef DIMMER_VERSION_MAJOR
 #    define DIMMER_VERSION_MAJOR    2
 #    define DIMMER_VERSION_MINOR    2

@@ -160,10 +160,14 @@ public:
         return _lo;
     }
 
-    uint24_t &operator=(const uint64_t value) __attribute_always_inline__ {
-        *this = static_cast<const uint32_t>(value);
-        return *this;
-    }
+    #if !defined(__INTELLISENSE__)
+
+        uint24_t &operator=(const uint64_t value) __attribute_always_inline__ {
+            *this = static_cast<const uint32_t>(value);
+            return *this;
+        }
+
+    #endif
 
     uint24_t &operator=(const uint32_t value) {
         // _union_ref().ui24 = value;               // -O2 24318
@@ -180,37 +184,45 @@ public:
         return *this;
     }
 
-    uint24_t &operator=(const uint16_t value) {
-        _lo = static_cast<uint8_t>(value);
-        _mid = value >> 8;
-        _hi = 0;
-        return *this;
-    }
+    #if !defined(__INTELLISENSE__)
 
-    uint24_t &operator=(const int16_t value) {
-        _lo = static_cast<uint8_t>(value);
-        _mid = value >> 8;
-        _hi = static_cast<uint8_t>(value >= 0 ? 0 : 0xff);
-        return *this;
-    }
+        uint24_t &operator=(const uint16_t value) {
+            _lo = static_cast<uint8_t>(value);
+            _mid = value >> 8;
+            _hi = 0;
+            return *this;
+        }
 
-    uint24_t &operator=(const uint8_t value) {
-        _lo = value;
-        _mid = 0;
-        _hi = 0;
-        return *this;
-    }
+        uint24_t &operator=(const int16_t value) {
+            _lo = static_cast<uint8_t>(value);
+            _mid = value >> 8;
+            _hi = static_cast<uint8_t>(value >= 0 ? 0 : 0xff);
+            return *this;
+        }
 
-    uint24_t &operator=(const int8_t value) {
-        _lo = static_cast<uint8_t>(value);
-        _mid = static_cast<uint8_t>(value >= 0 ? 0 : 0xff);
-        _hi = _mid;
-        return *this;
-    }
+        uint24_t &operator=(const uint8_t value) {
+            _lo = value;
+            _mid = 0;
+            _hi = 0;
+            return *this;
+        }
 
-    uint24_t &operator=(const char value) {
-        return this->operator=(static_cast<int8_t>(value));
-    }
+        uint24_t &operator=(const int8_t value) {
+            _lo = static_cast<uint8_t>(value);
+            _mid = static_cast<uint8_t>(value >= 0 ? 0 : 0xff);
+            _hi = _mid;
+            return *this;
+        }
+
+        uint24_t &operator=(const char value) {
+            return this->operator=(static_cast<int8_t>(value));
+        }
+
+        uint24_t &operator=(const char value) {
+            return this->operator=(static_cast<int24_t>(value));
+        }
+
+    #endif
 
 public:
     template<typename _T>
