@@ -97,13 +97,11 @@ uint8_t CubicInterpolation::getInterpolatedLevels(dimmer_level_t *dstPtr, dimmer
 dimmer_level_t CubicInterpolation::_toLevel(double y) const
 {
     return std::clamp<dimmer_level_t>((y * ((DIMMER_MAX_LEVEL - 1) / 255.0) + 0.5 /*round*/), 0, DIMMER_MAX_LEVEL - 1);
-    // return min(DIMMER_MAX_LEVEL - 1, max(0, (dimmer_level_t)((y * ((DIMMER_MAX_LEVEL - 1) / 255.0) + 0.5 /*round*/))));
 }
 
 double CubicInterpolation::_toY(dimmer_level_t level) const
 {
     return std::min<double>(static_cast<uint16_t>(level) / ((DIMMER_MAX_LEVEL - 1) / 255.0), 255);
-    // return min(255.0, (uint16_t)level / ((DIMMER_MAX_LEVEL - 1) / 255.0)); // -1 = max level
 }
 
 void CubicInterpolation::Channel::copyToConfig(register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel)

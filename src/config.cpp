@@ -243,13 +243,14 @@ void Config::_writeConfig(bool force)
     Wire.write(reinterpret_cast<const uint8_t *>(&event), sizeof(event));
     Wire.endTransmission();
 
-    Serial.printf_P(PSTR("+REM=EEPROMW,c=%lu,p=%u,n=%lu,w=%u,f=%u,crc=%04x\n"),
-        (uint32_t)event.write_cycle,
+    Serial.printf_P(PSTR("+REM=EEPROMW,c=%lu,p=%u,n=%lu,w=%u,f=%u,crc=%04x,cfg=%u\n"),
+        event.write_cycle,
         _eeprom_position,
         conf.getEEPROMWriteCount(),
         event.bytes_written,
         event.flags,
-        _config.crc16
+        _config.crc16,
+        event.config_updated
     );
 }
 
