@@ -17,6 +17,10 @@
 
 #endif
 
+#ifndef DIMMER_CUBIC_INT_DATA_POINTS
+#   define DIMMER_CUBIC_INT_DATA_POINTS 8
+#endif
+
 #if __GNUC__
 #    ifndef __attribute_always_inline__
 #        define __attribute_always_inline__ __attribute__((always_inline))
@@ -208,15 +212,9 @@ struct __attribute_packed__ config_options_t
     uint8_t leading_edge: 1;
     uint8_t over_temperature_alert_triggered: 1;
     uint8_t negative_zc_delay: 1;                            // currently not implemented: zc delay = halfwave length - zcdelay, effectively making zc delay negative
-    #if DIMMER_CUBIC_INTERPOLATION
-        uint8_t cubic_interpolation: 1;
-        uint8_t ___reserved: 3;
-    #else
-        uint8_t ___reserved: 4;
-    #endif
+    uint8_t cubic_interpolation: 1;
+    uint8_t ___reserved: 3;
 };
-
-#if DIMMER_CUBIC_INTERPOLATION
 
 struct __attribute_packed__ register_mem_cubic_int_data_point_t {
     uint8_t x;
@@ -237,8 +235,6 @@ struct __attribute_packed__ dimmer_get_cubic_int_header_t {
     uint8_t level_count;
     uint8_t step_size;
 };
-
-#endif
 
 #define REPORT_METRICS_INTERVAL(value)             (value)
 #define REPORT_METRICS_INTERVAL_MILLIS(value)      (value * 1000UL)
@@ -516,6 +512,39 @@ namespace Dimmer  {
         void validate() {
             temp_check_value = 0;
         }
+
+        static constexpr size_t size() {
+            return sizeof(dimmer_metrics_t);
+        }
+    };
+
+    struct CubicInterpolation {
+
+        CubicInterpolation() : _channel(0xff) {}
+        CubicInterpolation(uint8_t channel, const register_mem_cubic_int_t &data) : _data(data), _channel(channel) {}
+
+        operator bool() const {
+            return _channel != 0xff;
+        }
+
+        void invalidate() {
+            _channel = 0xff;
+        }
+
+        void setChannel(uint8_t channel) {
+            _channel = channel;
+        }
+
+        static constexpr size_t size() {
+            return sizeof(register_mem_cubic_int_t);
+        }
+
+        static constexpr size_t count() {
+            return DIMMER_CUBIC_INT_DATA_POINTS;
+        }
+
+        register_mem_cubic_int_t _data;
+        uint8_t _channel;
     };
 
     struct __attribute_packed__ Config
@@ -599,7 +628,7 @@ namespace Dimmer  {
             constexpr config() {}
 
             constexpr uint8_t *begin() const {
-                return reinterpret_cast<uint8_t *>(&register_mem.data.cfg);
+                return register_mem.raw + offsetof(register_mem_t, cfg);
             }
             constexpr uint8_t *end() const {
                 return begin() + sizeof(register_mem.data.cfg);
