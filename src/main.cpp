@@ -250,7 +250,7 @@ void loop()
     #if HAVE_POTI
         {
             auto level = read_poti();
-            if (abs(level - poti_level) >= max(1, (Dimmer::Level::max >> 10)) || (level == 0 && poti_level != 0)) {     // = ~0.1% steps
+            if (abs(level - poti_level) >= std::max<int>(1, (Dimmer::Level::max >> 10)) || (level == 0 && poti_level != 0)) {     // = ~0.1% steps
                 if (level > Dimmer::Level::max) {
                     level = Dimmer::Level::max;
                 }

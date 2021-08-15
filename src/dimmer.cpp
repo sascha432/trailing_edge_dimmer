@@ -326,7 +326,7 @@ void DimmerBase::compare_interrupt()
         }
         else if (next_channel->ticks > channel->ticks) {
             // next channel has a different time slot, re-schedule
-            OCR1A = max(TCNT1 + Dimmer::Timer<1>::extraTicks, next_channel->ticks);  // make sure to trigger an interrupt even if the time slot is in the past by using TCNT1 + 1 as minimum
+            OCR1A = std::max<uint16_t>(TCNT1 + Dimmer::Timer<1>::extraTicks, next_channel->ticks);  // make sure to trigger an interrupt even if the time slot is in the past by using TCNT1 + 1 as minimum
             break;
         }
         //
