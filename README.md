@@ -50,6 +50,12 @@ The recent version of the KFC firmware supports programming the ATmega over the 
 
 ![KFC Firmware UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui2.jpg)
 
+## Linear brightness from 1-100%
+
+Since most LEDs do not dim linearly the dimmer supports to set up to 8 points which are interpolated to have smooth dimming over the entire range.
+
+![KFC Firmware UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/gui_cubic_curve.jpg)
+
 ## Zero crossing detection update
 
 I've improved the zero crossing detection by adding a RC filter, which improves the signal but still has a 0.5% error rate compared to 2.2% before.
