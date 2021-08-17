@@ -105,11 +105,9 @@ private:
     void copyFromRegisterMem(register_mem_cfg_t &config);
 
     #if DIMMER_CUBIC_INTERPOLATION
+        void resetInterpolation();
         void copyToInterpolation() const;
         void copyFromInterpolation();
-    #else
-        void copyToInterpolation() const {}
-        void copyFromInterpolation() {}
     #endif
 
     void resetConfig();

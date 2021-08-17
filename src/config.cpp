@@ -30,6 +30,11 @@ void Config::copyFromRegisterMem(register_mem_cfg_t &config)
 
 #if DIMMER_CUBIC_INTERPOLATION
 
+void Config::resetInterpolation()
+{
+    _config.cubic_int = {};
+}
+
 void Config::copyToInterpolation() const
 {
     cubicInterpolation.copyFromConfig(_config.cubic_int);
@@ -69,7 +74,9 @@ void Config::resetConfig()
     register_mem.data.metrics.frequency = NAN;
 
     copyFromRegisterMem(_config.cfg);
-    copyFromInterpolation();
+    #if DIMMER_CUBIC_INTERPOLATION
+        resetInterpolation();
+    #endif
 }
 
 void Config::initEEPROM()
@@ -122,10 +129,10 @@ void Config::readConfig()
     // if the most recent configuration cannot be read, the previous one is used
 
     _D(5, debug_printf("reading eeprom "));
-#if DEBUG
-    char type;
-    uint32_t start = micros();
-#endif
+    #if DEBUG
+        char type;
+        uint32_t start = micros();
+    #endif
     while((pos + sizeof(temp_config)) <= EEPROM.length()) {
         EEPROM.get(pos, temp_config);
         if (EEPROMConfig::crc16(temp_config) == temp_config.crc16) {
@@ -136,22 +143,22 @@ void Config::readConfig()
                 max_cycle = temp_config.eeprom_cycle;
                 _eeprom_position = pos;
                 _config = temp_config;
-#if DEBUG
-                type = 'N'; // new
-#endif
+                #if DEBUG
+                    type = 'N'; // new
+                #endif
             }
-#if DEBUG
+            #if DEBUG
+                else {
+                    type = 'O'; // old
+                }
+            #endif
+        }
+        #if DEBUG
             else {
-                type = 'O'; // old
+                type = 'E'; // error
             }
-#endif
-        }
-#if DEBUG
-        else {
-            type = 'E'; // error
-        }
-        _D(5, Serial.printf_P(PSTR("%lu:%u<%c> "), temp_config.eeprom_cycle, pos, type));
-#endif
+            _D(5, Serial.printf_P(PSTR("%lu:%u<%c> "), temp_config.eeprom_cycle, pos, type));
+        #endif
         pos += sizeof(_config);
     }
     _D(5, Serial.printf_P(PSTR("mxcy=%lu p=%d t=%.3fms\n"), max_cycle, _eeprom_position, (micros() - start) / 1000.0));
@@ -162,16 +169,15 @@ void Config::readConfig()
         return;
     }
 
-    if (_config.cfg.max_temp < 55) {
-        _config.cfg.max_temp = 55;
-    }
-    else if (_config.cfg.max_temp > 125) {
-        _config.cfg.max_temp = 125;
-    }
+    _config.cfg.max_temp = std::clamp<uint8_t>(_config.cfg.max_temp, 55, 125);
 
     copyToRegisterMem(_config.cfg);
     _D(5, debug_print_memory(&_config.cfg, sizeof(_config.cfg)));
-    // if this does not compile check RREADME.md "Patching the Arduino libary"
+    #if DIMMER_CUBIC_INTERPOLATION
+        copyToInterpolation();
+        _D(5, debug_print_memory(&_config.cubic_int, sizeof(_config.cubic_int)));
+    #endif
+    // if this does not compile check README.md "Patching the Arduino libary"
     Serial.printf_P(PSTR("+REM=EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x\n"), (uint32_t)max_cycle, _eeprom_position, get_eeprom_num_writes(max_cycle, _eeprom_position), _config.crc16);
 }
 
@@ -198,7 +204,9 @@ void Config::_writeConfig(bool force)
     if (queues.scheduled_calls.eeprom_update_config) {
         event.config_updated = true;
         copyFromRegisterMem(_config.cfg);
-        copyFromInterpolation();
+        #if DIMMER_CUBIC_INTERPOLATION
+            copyFromInterpolation();
+        #endif
     }
 
     _config.channels = register_mem.data.channels;
