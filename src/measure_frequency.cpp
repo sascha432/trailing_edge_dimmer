@@ -166,9 +166,11 @@ static inline void zc_measure_handler()
 {
     volatile uint16_t counter = TCNT1;
     volatile uint16_t overflow = timer1_overflow;
-    if (TIFR1 & TOV1) { //TODO check if that ever happens, counter should be close to 0
-        Serial.printf_P(PSTR("timer overflow TCNT=%u\n"), counter);
-    }
+    #if 0
+        if (TIFR1 & TOV1) { //TODO check if that ever happens, counter should be close to 0
+            Serial.printf_P(PSTR("timer overflow TCNT=%u\n"), counter);
+        }
+    #endif
     sei();
     measure->zc_measure_handler(counter, overflow);
 }
