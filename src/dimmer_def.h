@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include <Arduino.h>
+
 // enable debug code
 #ifndef DEBUG
 #    define DEBUG 0
@@ -28,7 +30,13 @@
 
 // pin for the zero crossing signal
 #ifndef ZC_SIGNAL_PIN
-#    define ZC_SIGNAL_PIN 3
+#    error ZC_SIGNAL_PIN not defined
+#endif
+
+// min. pulse width in microseconds
+// this can be used to filter short pulses during the frequency detection
+#ifndef DIMMER_ZC_MIN_PULSE_WIDTH_US
+#   define DIMMER_ZC_MIN_PULSE_WIDTH_US 0
 #endif
 
 // delay after receiving the zero crossing signal and the mosfets being turned on
@@ -46,6 +54,10 @@
 #ifndef DIMMER_ZC_INTERRUPT_MODE
 #    define DIMMER_ZC_INTERRUPT_MODE RISING
 // #    define DIMMER_ZC_INTERRUPT_MODE FALLING
+#endif
+
+#if DIMMER_ZC_MIN_PULSE_WIDTH_US && DIMMER_ZC_INTERRUPT_MODE == CHANGE
+#   error DIMMER_ZC_MIN_PULSE_WIDTH_US>0 requires DIMMER_ZC_INTERRUPT_MODE=RISING or FALLING
 #endif
 
 // DIMMER_MIN_ON_TIME_US and DIMMER_MIN_OFF_TIME_US remove the unusable part of the halfwave

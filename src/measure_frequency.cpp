@@ -4,6 +4,7 @@
 
 #include "measure_frequency.h"
 #include "adc.h"
+#include <avr/io.h>
 
 // currently only single filter stage implemented
 // WORK IN PROGRESS
@@ -171,12 +172,32 @@ static inline void zc_measure_handler()
             Serial.printf_P(PSTR("timer overflow TCNT=%u\n"), counter);
         }
     #endif
+    #if DIMMER_ZC_MIN_PULSE_WIDTH_US
+        // wait min. pulse with
+        delayMicroseconds(DIMMER_ZC_MIN_PULSE_WIDTH_US);
+        // check if any interrupt has occurred
+        asm volatile("sbic %0, %1" :: "I" (_SFR_IO_ADDR(EIFR)), "I" (digitalPinToInterrupt(ZC_SIGNAL_PIN)));
+        asm volatile("rjmp SKIP");
+        // check if zero crossing pin is still high/low
+        #if DIMMER_ZC_INTERRUPT_MODE == RISING
+            DIMMER_SFR_ZC_JMP_IF_CLR(SKIP);
+        #elif DIMMER_ZC_INTERRUPT_MODE == FALLING
+            DIMMER_SFR_ZC_JMP_IF_SET(SKIP);
+        #endif
+    #endif
     sei();
     measure->zc_measure_handler(counter, overflow);
+    #if DIMMER_ZC_MIN_PULSE_WIDTH_US
+        asm volatile("SKIP:");
+    #endif
 }
 
 static void attach_zc_measure_handler()
 {
+    #if digitalPinToInterrupt(ZC_SIGNAL_PIN) == -1
+        // check if the pin supports external interrupts
+        #error ZC_SIGNAL_PIN not supported
+    #endif
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), zc_measure_handler, DIMMER_ZC_INTERRUPT_MODE);
 }
 

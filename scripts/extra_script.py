@@ -86,6 +86,7 @@ def update_dimmer_inline_asm(source, target, env):
 
     have_inline_asm = False
     pins = []
+    zc_pin = None
 
     cppdefines = env.get('CPPDEFINES')
     for data in cppdefines:
@@ -102,6 +103,8 @@ def update_dimmer_inline_asm(source, target, env):
                 val = 0
             if val!=0:
                 have_inline_asm = True
+        if key=='ZC_SIGNAL_PIN':
+            zc_pin = str(int(val))
         if key=='DIMMER_MOSFET_PINS':
             if ',' in str(val):
                 for pin in val.split(','):
@@ -125,7 +128,11 @@ def update_dimmer_inline_asm(source, target, env):
         output = header
         print_created = True
 
-    args = [ python, script, '--output', output, '--pins' ] + pins
+    if zc_pin==None:
+        click.secho('ZC_SIGNAL_PIN not set', fg='red')
+        env.Exit(1)
+
+    args = [ python, script, '--output', output, '--zc-pin', zc_pin,  '--pins' ] + pins
     return_code = subprocess.run(args, shell=True).returncode
     if return_code!=0:
         error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))

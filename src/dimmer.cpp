@@ -28,7 +28,6 @@
 #define PIN_D11_IS_SET()                                ((_SFR_IO_ADDR(PINB) & _BV(3)) != 0)
 #define PIN_D11_IS_CLEAR()                              ((_SFR_IO_ADDR(PINB) & _BV(3)) == 0)
 
-
 using namespace Dimmer;
 
 DimmerBase dimmer(register_mem.data);
@@ -123,9 +122,10 @@ void DimmerBase::begin()
     cli();
     timer2.begin();
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
-        //volatile
         uint24_t ticks = timer2.get_clear_no_cli();
-        //dimmer.zc_interrupt_handler(const_cast<const uint24_t &>(ticks));
+        #if DIMMER_ZC_INTERRUPT_MIN_TIME
+            bool state = DIMMER_SFR_ZC_STATE;
+        #endif
         dimmer.zc_interrupt_handler(ticks);
     }, DIMMER_ZC_INTERRUPT_MODE);
 

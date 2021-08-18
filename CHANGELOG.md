@@ -2,6 +2,7 @@
 
 ## 2.2.2-dev
 
+ - Min. pulse width for frequency measurement
  - Browser based tool to create cubic interpolation curves
  - Added cubic interpolation to create linear brightness levels
  - Changed default offset/gain for ATMega328PB temperature sensor

@@ -34,6 +34,9 @@ class AvrPinMapping(object):
     def get_bv(self, pin):
         return self.mapping.pin_to_BIT.__getitem__(pin)[1]
 
+    def get_pin(self, pin):
+        return self.mapping.pin_to_PIN.__getitem__(pin)
+
     def get_port(self, pin):
         return self.mapping.pin_to_PORT.__getitem__(pin)
 

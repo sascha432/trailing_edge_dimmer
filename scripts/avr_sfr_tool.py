@@ -10,6 +10,7 @@ parser = argparse.ArgumentParser(description='Firmware Configuration Tool', form
 parser.add_argument('-m', '--mcu', help='MCU name', default='atmega328p')
 parser.add_argument('--output', help='output file', type=str, default='-')
 parser.add_argument('--pins', help='output pins', type=int, default=[], nargs='+', required=True)
+parser.add_argument('--zc-pin', help='zero crossing pin', type=int, required=True)
 
 args = parser.parse_args()
 mcu = libs.avr_mapping.AvrPinMapping(args.mcu)
@@ -22,13 +23,11 @@ else:
 def fprint(msg = ''):
     file.write(str(msg) + '\n')
 
-
 all = []
 mask = {}
 channels = args.pins
 
 for pin in channels:
-
     bit = mcu.get_bit(pin)
     bit_value = mcu.get_bv(pin)
     port = mcu.get_port(pin)
@@ -45,7 +44,9 @@ enable = []
 disable = []
 write = []
 n = 0
-comment = []
+comment = [
+    'zero crossing pin=%s mask=0x%02x/b%s' % (mcu.get_pin(args.zc_pin), mcu.get_bv(args.zc_pin), format(mcu.get_bv(args.zc_pin), '08b'))
+]
 channel_data = []
 for port, val in all:
     for (pin, bit, pin_val) in val['pins']:
@@ -64,6 +65,12 @@ fprint('// %s' % '\n// '.join(comment))
 fprint()
 fprint('#pragma once')
 fprint('#include <avr/io.h>')
+fprint()
+fprint('#define DIMMER_SFR_ZC_STATE (%s & 0x%02x)' % (mcu.get_pin(args.zc_pin), mcu.get_bv(args.zc_pin)))
+fprint('#define DIMMER_SFR_ZC_IS_SET asm volatile ("sbis %%0, %%1" :: "I" ( _SFR_IO_ADDR(%s)), "I" (%u));' % (mcu.get_pin(args.zc_pin), mcu.get_bit(args.zc_pin)))
+fprint('#define DIMMER_SFR_ZC_IS_CLR asm volatile ("sbic %%0, %%1" :: "I" ( _SFR_IO_ADDR(%s)), "I" (%u));' % (mcu.get_pin(args.zc_pin), mcu.get_bit(args.zc_pin)))
+fprint('#define DIMMER_SFR_ZC_JMP_IF_SET(label) DIMMER_SFR_ZC_IS_CLR asm volatile("rjmp " # label);');
+fprint('#define DIMMER_SFR_ZC_JMP_IF_CLR(label) DIMMER_SFR_ZC_IS_SET asm volatile("rjmp " # label);');
 fprint()
 fprint('// all ports are read first, modified and written back to minimize the delay between toggling different ports (3 cycles, 187.5ns per port @16MHz)')
 fprint()
