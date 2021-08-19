@@ -19,7 +19,7 @@ Firmware for a trailing/leading edge MOSFET dimmer.
 
 [I2C/UART protocol](docs/protocol.md)
 
-[Change Log v2.2.2](CHANGELOG.md)
+[Change Log v2.2.3](CHANGELOG.md)
 
 ## Patching the Arduino libary
 
@@ -68,7 +68,7 @@ The firmware supports trailing and leading edge with MOSFETs and BJTs. With TRIA
 
 Due to limited space the Energy Monitor is not integrated into the ATmega firmware. It is available for the ESP8266 using the KFC Firmware, which offers an easy way to configure the firmware over a WebUI. Direct access to the I2C or UART is also available. MQTT and Home Assistant are supported.
 
-![KFC WebUI Configuraiton](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfc_webui1.png)
+![KFC WebUI Configuration](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfc_webui1.png)
 
 ![KFC WebUI Interface](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfc_webui2.png)
 

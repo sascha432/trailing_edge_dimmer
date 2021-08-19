@@ -1,5 +1,9 @@
 # Changelog
 
+## 2.2.3-dev
+
+ - New version
+
 ## 2.2.2
 
  - Min. pulse width for frequency measurement
