@@ -1,6 +1,6 @@
-# Trailing/Leading Edge MOSFET Dimmer
+# Trailing/Leading Edge MOSFET/BJT/TRIAC Dimmer
 
-Firmware for a trailing/leading edge MOSFET dimmer.
+Firmware for a trailing/leading edge dimmer written in C++ including schematics/PCB layouts
 
 * 16666/20000 (60/50Hz) different dimming levels
 * Up to 8 different channels
