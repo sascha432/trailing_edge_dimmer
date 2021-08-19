@@ -50,13 +50,29 @@ The recent version of the KFC firmware supports programming the ATmega over the 
 
 ![KFC Firmware UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui2.jpg)
 
-## Linear brightness from 1-100%
+## Linear Brightness from 1-100%
 
-Since most LEDs do not dim linearly the dimmer supports to set up to 8 points which are interpolated to have smooth dimming over the entire range.
+Since most LEDs do not dim linearly the firmware supports to set up to 8 points which are interpolated to have smooth dimming over the entire range.
 
 ![KFC Firmware UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/gui_cubic_curve.jpg)
 
-## Zero crossing detection update
+## Trailing Edge and Leading Edge
+
+The firmware supports trailing and leading edge with MOSFETs and BJTs. With TRIACs, only leading edge is possible. The mode can be changed without upgrading the firmware.
+
+![Trailing Edge Screencap](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/scap_trailing.png)
+
+![Leading Edge Screencap](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/scap_leading.png)
+
+## Energy Monitor and Advanced Features
+
+Due to limited space the Energy Monitor is not integrated into the ATmega firmware. It is available for ESP8266 using the KFC Firmware, which offers an easy way to configure the firmware over a WebUI. Direct access to the I2C or UART is also available. MQTT and Home Assistant are supported.
+
+![KFC WebUI Configuraiton](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfc_webui1.png)
+
+![KFC WebUI Interface](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfc_webui2.png)
+
+## Zero Crossing Detection Update
 
 I've improved the zero crossing detection by adding a RC filter, which improves the signal but still has a 0.5% error rate compared to 2.2% before.
 Software filtering reduces the error rate to 0.001% even without the RC filter.
@@ -67,7 +83,7 @@ Test environment: 4x10W LED + 60W incandescent bulb, 50% dimmed, random 1000-250
 
 The recent version can lose the zero crossing signal for a couple seconds before it turns the dimmer off. The time can be configured to turn the dimmer off before the signal gets out of sync.
 
-## 3D models released
+## 3D Models Released
 
 It is highly recommende to use flame retardant ABS or smiliar material that can withstand higher temperatures.
 
@@ -84,6 +100,9 @@ It is highly recommende to use flame retardant ABS or smiliar material that can 
 ## Tested PCB Rev 3.3 is online
 
 * [4 Channel Dimmer](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2)
+
+**UPDATE**: The 4 channel dimmer (Rev1.0) has reached 500kWh without any issues. I am looking forward to see 1.0MWh :)
+The LEDs are 20x15W NOMA 052-9892-8 2700K/5000K 1600lm, probably using an non-isolated offline buck driver without power factor correction. The actual power consumption is over 17.5W and they are getting up to 120°C at the outside with good ventilation. Nothing I can recommend, but they are doing ok temperature wise running at 8-9W and have a good light output when not over-driven.
 
 ![KFC FW UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui.jpg)
 ![4 Channel Dimmer](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/4ch_dimmer.JPG)
@@ -112,22 +131,26 @@ Testing it with a PWM generator to simulate the zero crossing signal, dimming a 
 
 [Open schematics...](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2)
 
-## Improved zero crossing detection
+## Improved Zero Crossing detection
 
 * Low current consumption (0.15mA @ 120V)
 * Tested with 85-265V 50/60Hz
 * Logic level output with different opto isolators (4N25, PC817, ACPL-217)
 * 50-110us pulse width to extend opto isolator live
 
+**UPDATE**: I've updated the previous version of the zero crossing detection to support a wide range voltage of 12-265VAC, consuming 2mW-75mW depending on the voltage. The error rate has also been reduced to almost zero. Send me an email if interested.
+
 ![Zero crossing detection](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.png)
+
+The schematics are for the current zero crossing detection I am using and is different from the picture above.
 
 [Open schematics...](https://easyeda.com/sascha23095123423/isolated-zero-crossing-detection-with-logic-level-output)
 
-## In action
+## In Action
 
 ![In action](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/oscilloscope_example.jpg)
 
-## Dev board schematics with ESP8266
+## Dev Board Schematics with ESP8266
 
 ![Dev board](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_4Ch-Dimmer-Rev1.3_dev_example.png)
 
