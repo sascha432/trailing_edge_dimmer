@@ -1,6 +1,6 @@
 # Changelog
 
-## 2.2.2-dev
+## 2.2.2
 
  - Min. pulse width for frequency measurement
  - Browser based tool to create cubic interpolation curves
