@@ -66,7 +66,7 @@ The firmware supports trailing and leading edge with MOSFETs and BJTs. With TRIA
 
 ## Energy Monitor and Advanced Features
 
-Due to limited space the Energy Monitor is not integrated into the ATmega firmware. It is available for ESP8266 using the KFC Firmware, which offers an easy way to configure the firmware over a WebUI. Direct access to the I2C or UART is also available. MQTT and Home Assistant are supported.
+Due to limited space the Energy Monitor is not integrated into the ATmega firmware. It is available for the ESP8266 using the KFC Firmware, which offers an easy way to configure the firmware over a WebUI. Direct access to the I2C or UART is also available. MQTT and Home Assistant are supported.
 
 ![KFC WebUI Configuraiton](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfc_webui1.png)
 
@@ -104,7 +104,10 @@ It is highly recommende to use flame retardant ABS or smiliar material that can 
 * [4 Channel Dimmer](https://easyeda.com/sascha23095123423/trailing-edge-dimmer-rev2)
 
 **UPDATE**: The 4 channel dimmer (Rev1.0) has reached 500kWh without any issues. I am looking forward to see 1.0MWh :)
-The LEDs are 20x15W NOMA 052-9892-8 2700K/5000K 1600lm, probably using an non-isolated offline buck driver without power factor correction. The actual power consumption is over 17.5W and they are getting up to 120°C at the outside with good ventilation. Nothing I can recommend, but they are doing ok temperature wise running at 8-9W and have a good light output when not over-driven.
+
+The LEDs are 20x15W NOMA 052-9892-8 2700K/5000K 1600lm, probably using an non-isolated offline buck driver without power factor correction.
+
+The actual power consumption is over 17.5W and they are getting up to 120°C at the outside with good ventilation. Nothing I can recommend, but they are doing ok temperature wise running at 8-9W and have a good light output when not over-driven.
 
 ![KFC FW UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui.jpg)
 
@@ -147,7 +150,7 @@ Testing it with a PWM generator to simulate the zero crossing signal, dimming a 
 * Logic level output with different opto isolators (4N25, PC817, ACPL-217)
 * 50-110us pulse width to extend opto isolator live
 
-**UPDATE**: I've updated the previous version of the zero crossing detection to support a wide range voltage of 12-265VAC, consuming 2mW-75mW depending on the voltage. The error rate has also been reduced to almost zero. Send me an email if interested.
+**UPDATE**: I've updated the previous version of the zero crossing detection to support a wide voltage range of 12-265VAC, consuming 2mW-75mW depending on the voltage. The error rate has also been reduced to almost zero. Send me an email if interested.
 
 ![Zero crossing detection](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/Schematic_Isolated-zero-crossing-detection-with-logic-level-output.png)
 
