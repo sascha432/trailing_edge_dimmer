@@ -109,8 +109,6 @@ The LEDs are 20x15W NOMA 052-9892-8 2700K/5000K 1600lm, probably using an non-is
 
 The actual power consumption is over 17.5W and they are getting up to 120°C at the outside with good ventilation. Nothing I can recommend, but they are doing ok temperature wise running at 8-9W and have a good light output when not over-driven.
 
-![KFC FW UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui.jpg)
-
 New version with Energy Monitor
 
 ![4 Channel Dimmer New Version](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/new_4ch_dimmer.jpg)
@@ -118,6 +116,8 @@ New version with Energy Monitor
 Old version
 
 ![4 Channel Dimmer Old Version](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/4ch_dimmer.JPG)
+
+![KFC FW UI](https://raw.githubusercontent.com/sascha432/trailing_edge_dimmer/master/docs/images/kfcfw_ui.jpg)
 
 ## PCBs arrived and first prototype is working
 
