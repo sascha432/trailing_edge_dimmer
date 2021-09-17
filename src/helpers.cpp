@@ -250,7 +250,7 @@ void get_mcu_type(MCUInfo_t &info)
 
     #if __AVR_ATmega328PB__ || (MCU_IS_ATMEGA328PB == 1)
 
-        info.name = FPSTR("ATmega328PB");
+        info.name = F("ATmega328PB");
 
     #elif __AVR_ATmega328P__
 
@@ -258,11 +258,11 @@ void get_mcu_type(MCUInfo_t &info)
         #error set MCU_IS_ATMEGA328PB to 0 or 1, if the selected target MCU is ATmega328P
         #endif
 
-        info.name = FPSTR("ATmega328P");
+        info.name = F("ATmega328P");
 
     #elif __AVR_ATmega2560__
 
-        info.name = FPSTR("ATmega2560");
+        info.name = F("ATmega2560");
 
     #else
 
@@ -271,23 +271,23 @@ void get_mcu_type(MCUInfo_t &info)
             if (info.sig[1] == 0x98) {
                 switch(info.sig[2]) {
                     case 0x01:
-                        info.name = FPSTR("ATmega2560");
+                        info.name = F("ATmega2560");
                         break;
                 }
             }
             else if (info.sig[1] == 0x95) {
                 switch(info.sig[2]) {
                     case 0x02:
-                        info.name = FPSTR("ATmega32");
+                        info.name = F("ATmega32");
                         break;
                     case 0x0f:
-                        info.name = FPSTR("ATmega328P");
+                        info.name = F("ATmega328P");
                         break;
                     case 0x14:
-                        info.name = FPSTR("ATmega328-PU");
+                        info.name = F("ATmega328-PU");
                         break;
                     case 0x16:
-                        info.name = FPSTR("ATmega328PB");
+                        info.name = F("ATmega328PB");
                         break;
                 }
             }

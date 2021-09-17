@@ -150,9 +150,12 @@ namespace std {
 }
 
 #ifndef FPSTR
-#define FPSTR(str)                              reinterpret_cast<const __FlashStringHelper *>(PSTR(str))
+#define FPSTR(str)                              reinterpret_cast<const __FlashStringHelper *>(str)
 #endif
 
+#ifndef F
+#define F(str)                                  FPSTR(PSTR(str))
+#endif
 
 typedef struct {
     uint8_t sig[3];
@@ -210,7 +213,11 @@ bool Serial_readLine(String &input, bool allowEmpty);
 #define ___STRINGIFY(...)                       #__VA_ARGS__
 
 #ifndef FPSTR
-#define FPSTR(str)                              reinterpret_cast<const __FlashStringHelper *>(PSTR(str))
+#define FPSTR(str)                              reinterpret_cast<const __FlashStringHelper *>(str)
+#endif
+
+#ifndef F
+#define F(str)                                  FPSTR(PSTR(str))
 #endif
 
 template<typename ..._Args>
