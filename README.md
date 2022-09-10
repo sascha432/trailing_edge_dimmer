@@ -15,7 +15,7 @@ Firmware for a trailing/leading edge dimmer written in C++ including schematics/
 * Support for 10V dimming (or any other voltage in the 0-1.1V range)
 * Over temperature protection using an external NTC or the internal ATmega temperature sensor
 * Highly configurable to match any hardware
-* MOSFETs, BJTs and, TRIACs can be used
+* MOSFETs, IGBTs, BJTs and, TRIACs can be used
 
 [I2C/UART protocol](docs/protocol.md)
 
