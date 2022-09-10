@@ -2,7 +2,7 @@
 
 ## 2.2.3-dev
 
- - New version
+ - Added example of 16 channels `16ch_dimmer_p`
 
 ## 2.2.2
 

@@ -61,7 +61,7 @@ public:
 #endif
 
     static constexpr uint8_t kMaxPositon = kHaveNtc + kHaveReadVcc + kReadIntTemp + kHavePoti;
-    static constexpr uint8_t kPosNTC = kHaveNtc - 1;
+    static constexpr uint8_t kPosNTC = std::max(0, kHaveNtc - 1);
     static constexpr uint8_t kPosVCC = kPosNTC + kHaveReadVcc;
     static constexpr uint8_t kPosIntTemp = kPosVCC + kReadIntTemp;
     static constexpr uint8_t kPosPoti = kPosIntTemp + kHavePoti;

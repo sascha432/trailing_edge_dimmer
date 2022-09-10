@@ -119,6 +119,8 @@ private:
     uint32_t _eeprom_write_timer;
 };
 
+constexpr uint32_t x = sizeof(EEPROM_config_t);
+
 inline Config::Config() :
     _config(),
     _eeprom_position(0),

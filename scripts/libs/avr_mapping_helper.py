@@ -14,7 +14,7 @@ def ra(a, b):
 def bv(bits):
     return list(map(lambda n: (1 << n), bits))
 
-# create formated list from fmt and list items
+# create formatted list from fmt and list items
 # pf('MyValue%03u', [1, 2]) = ['MyValue001', 'MyValue002']
 def pf(fmt, items):
     return list(map(lambda n: fmt % (n), items))

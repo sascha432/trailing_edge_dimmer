@@ -111,7 +111,7 @@ full_signature += channels
 full_signature = map(lambda n: ('0x%02x' % n), full_signature)
 
 fprint()
-fprint("// verify signature during compliation")
+fprint("// verify signature during compilation")
 fprint("static constexpr uint8_t kInlineAssemblerSignature[] = { %s }; // MCU %s (%02x-%02x-%02x)" % (', '.join(full_signature), mcu.get_mcu_name(), signature[0], signature[1], signature[2]))
 fprint()
 

@@ -166,7 +166,7 @@ namespace Dimmer {
         }
     };
 
-    static_assert(Channel::size() <= 8, "limited to 8 channels");
+    static_assert(Channel::size() <= 16, "limited to 16 channels");
     static_assert(Channel::size() <= DIMMER_MAX_CHANNELS, "increase DIMMER_MAX_CHANNELS");
 
     struct Level {

@@ -28,7 +28,7 @@ def verbose(msg):
 def disassemble(source, target, env):
 
     input_file = str(target[0])
-    if input_file=='disassemble':
+    if input_file=='disassemble' or input_file=='disasm':
         input_file = env.subst("$BUILD_DIR/${PROGNAME}.elf")
     input_file = path.realpath(input_file)
 
@@ -48,7 +48,7 @@ def disassemble(source, target, env):
     if not path.exists(input_file):
         error("no such file or directory: %s" % path.relpath(input_file))
 
-    project_dir = path.realpath(env.subst("$PROJECT_DIR"))
+    # project_dir = path.realpath(env.subst("$PROJECT_DIR"))
     target_file = path.realpath(target_file)
     args = [
         'avr-objdump'

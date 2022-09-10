@@ -6,6 +6,14 @@
     ],
     "settings": {
         "C_Cpp.default.cppStandard": "c++11",
-        "C_Cpp.default.intelliSenseMode": "gcc-arm"
+        "C_Cpp.default.intelliSenseMode": "gcc-arm",
+        "cSpell.words": [
+            "eeprom"
+        ],
+        "workbench.colorCustomizations": {
+            "activityBar.background": "#1F1688",
+            "titleBar.activeBackground": "#2C1FBE",
+            "titleBar.activeForeground": "#FCFCFE"
+        }
     }
 }
