@@ -3,7 +3,7 @@
 Firmware for a trailing/leading edge dimmer written in C++ including schematics/PCB layouts
 
 * 16666/20000 (60/50Hz) different dimming levels
-* Up to 8 different channels
+* Up to 8 different channels (16 channels without cubic interpolation and temperature sensing)
 * Trailing edge or leading edge mode
 * 50/60Hz auto detection
 * Store last levels in EEPROM and restore during startup
