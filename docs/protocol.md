@@ -6,9 +6,9 @@ The default address is 0x17 for the slave. When sending data, the dimmer acts as
 
 The values for the registers and commands can be found in [dimmer_protocol.h](../src/dimmer_protocol.h)
 
-The examples are using the UART protocol and can send to the dimmer using any terminal software. The commands might not be up-to-date.
+The examples are using the UART protocol and can send to the dimmer using any terminal software. The commands might not be up-to-date, as well as the data structures. Check the source to verify if something does not work
 
-Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge)) instead:
+Using the Arduino TwoWire class (or the drop-in replacement for UART [SerialTwoWire](https://github.com/sascha432/i2c_uart_bridge) instead:
 
     // +I2CT=17,89,22
     Wire.beginTransmission(DIMMER_I2C_ADDRESS);
@@ -560,6 +560,12 @@ This event is fired after a reboot when the frequency detection has been finishe
 ## Commands cheatsheet
 
 Not all commands are available if DEBUG_COMMANDS is not enabled. They are marked with (*)
+
+### Halt dimmer
+
+    Stop dimmer and any serial output, serial ports are floating. Requires a reset of the MCU to continue
+
+    +I2CT=17,89,a5
 
 ### Increase zero crossing delay by 10 (*)
 

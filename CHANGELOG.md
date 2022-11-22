@@ -2,6 +2,8 @@
 
 ## 2.2.3-dev
 
+ - library.json to include the library directly for headers only without being compiled
+ - Halt command to shut down the dimmer and release the Serial Port/I2C Bus
  - Added example of 16 channels `16ch_dimmer_p`
 
 ## 2.2.2

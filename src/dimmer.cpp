@@ -376,9 +376,7 @@ void DimmerBase::_calculate_channels()
     ordered_channels[count] = {};
 
     #if DIMMER_MAX_CHANNELS > 1
-
         dimmer_bubble_sort(ordered_channels, count);
-
     #endif
 
     cli(); // copy double buffer with interrupts disabled

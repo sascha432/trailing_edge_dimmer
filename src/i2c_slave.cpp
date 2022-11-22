@@ -7,6 +7,7 @@
 #include "dimmer.h"
 #include "measure_frequency.h"
 #include "main.h"
+#include <avr/wdt.h>
 
 register_mem_union_t register_mem;
 
@@ -375,6 +376,21 @@ void _dimmer_i2c_on_receive(int length)
                         break;
 
                 #endif
+
+                    case DIMMER_COMMAND_HALT: {
+                        _D(5, debug_printf("halting...\n"));
+                        dimmer.end();
+                        Serial.println(F("+REM=halt"));
+                        Serial.end();
+                        Wire.end();
+                        // disable WDT in case it is activated by the fuse bits
+                        wdt_disable();
+                        for(;;) {
+                            delay(5);
+                            wdt_reset();
+                        }
+                    }
+                    break;
             }
         }
     }

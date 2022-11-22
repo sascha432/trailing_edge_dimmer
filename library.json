@@ -1,0 +1,17 @@
+{
+    "name": "trailing_edge_dimmer",
+    "version": "2.2.3",
+    "authors": {
+        "name": "sascha lammers",
+        "maintainer": true
+    },
+    "build": {
+        "include": "src",
+        "srcDir": "lib",
+        "srcDir_is_to_avoid_building_if_only_headers_are_required_does_not_affect_local_builds": "lib"
+    },
+    "frameworks": "arduino",
+    "platforms": [
+        "atmelavr"
+    ]
+}
