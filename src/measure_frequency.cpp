@@ -6,33 +6,19 @@
 #include "adc.h"
 #include <avr/io.h>
 
-// currently only single filter stage implemented
-// WORK IN PROGRESS
-
-// TODO
-// improve algorithm for invalid ZC signals
+// measure the interval between the zero crossing events
 //
-// after initial frequency detection, measure the halfwave time again filtering invalid signals
+// first stage filter is 48-62Hz, 10 valid results must be present
 //
-// the halfwave resolution is 62.5ns but the timer runs with prescaler 8 and 500ns - to match the excact halfwave length, one tick can be removed and replaced with
-// a short delay. right now the halfwave stays pretty much in sync when disconnecting the ZC signal, moving a few 100µs back and forth but over several seconds it gets out of sync
-// i also noticed that the ZC signal coming from the dimmer is a bit asymmetrical, one half wave is detected ~18µs ealier using RISING as interrupt source... checking with the oscilloscope
-// shows the same but the center of the signal matches the zerocrossing. using CHANGE as trigger might be a solution. the C0G capacitors still seems to be a bit temperature sensitive
-// moving the signal a few µs per °C, but not like the X5R which had 100µs offset per a few degree...
+// second state filter is to compare all results and generate an average. values that are +-0.75% are removed.
+// 10 valid values must be present here as well to calculate the frequency
 //
-// what effect does the load have on the zero crossing? and the snubber network? you can see a certain offset when the mosfets are open (no load, no snubber, just a resistor)
-// testing some transformers seems to cause a pretty big shift, as well as some LEDs with buck regulators. the spike when turning the mosfets off sometimes causes a voltage drop at the gate
-// driver turning them on again. the 1nF capacitor might not be enough when switching inductive loads like transformers
+// the timer for the prediction will run at this rate and synchronized by the zero crossing events. invalid events are 
+// filtered. the dimmer will turn off after 2500 (DIMMER_OUT_OF_SYNC_LIMIT) half waves (25 seconds @ 50Hz). this value
+// should be adjusted how precise the MCU is triggering the zero crossing timer (external crystal, internal one, heat changes etc...)
+// under good conditions the timer might stay in sync for minutes or get out of sync after seconds already
 
-static void attach_zc_measure_handler();
-static void detach_zc_measure_handler();
-static void reset_measurement_timeout();
-
-static constexpr uint32_t kFrequencyWaitTimerInit = 0;
-static constexpr uint32_t kFrequencyWaitTimerDone = ~0;
-
-uint32_t frequency_wait_timer;
-bool frequency_measurement;
+void remln(const __FlashStringHelper *str);
 
 volatile uint16_t timer1_overflow;
 
@@ -41,18 +27,20 @@ ISR(TIMER1_OVF_vect)
     timer1_overflow++;
 }
 
-FrequencyMeasurement *measure;
+FrequencyMeasurement *measure = nullptr;
 
 void FrequencyMeasurement::calc_min_max()
 {
     uint24_t _min = 0;
     uint24_t _max = 0;
 
-    _frequency = NAN;
+    _frequency = 0;
 
     _D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
-    if (_count > 10) {
-        //uint24_t ticks_sum = _ticks[_count - 1]._ticks - _ticks[0]._ticks;
+    if (_count > DIMMER_ZC_MIN_VALID_SAMPLES) {
+
+        // stage 1
+
         uint32_t sum = 0;
         uint8_t num = 0;
         for(int i = 0; i < _count - 1; i++) {
@@ -63,11 +51,14 @@ void FrequencyMeasurement::calc_min_max()
                 num++;
             }
         }
-        if (num > 10) {
+        if (num > DIMMER_ZC_MIN_VALID_SAMPLES) {
+
+            // stage 2
+
             _min = sum / num;
             _max = _min;
-            // allow up to +-0.75% deviation from the filtered avg value
-            uint16_t limit = _min * 0.0075;
+            // allow up to +-0.75% deviation from the filtered avg. value
+            uint16_t limit = _min * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
             _min = _min - limit;
             _max = _max + limit;
 
@@ -83,44 +74,15 @@ void FrequencyMeasurement::calc_min_max()
                 }
             }
 
-            if (num > 10) {
-                float ticks = (sum / (float)num) + DIMMER_MEASURE_ADJ_CYCLE_CNT;
-                _frequency = 1000000.0 / clockCyclesToMicroseconds(ticks) / 2.0;
+            if (num > DIMMER_ZC_MIN_VALID_SAMPLES) {
+                auto ticks = (sum / static_cast<float>(num)) + DIMMER_MEASURE_ADJ_CYCLE_CNT;
+                _frequency = 500000.0 / clockCyclesToMicroseconds(ticks);
                 _D(5, debug_printf("measure=%lu/%u\n", (uint32_t)sum, num));
-                // Serial.println(_frequency);
-            }
+            } 
 
         }
-        //_count--;
-        //float ticks = (ticks_sum / (float)_count) + DIMMER_MEASURE_ADJ_CYCLE_CNT;
-        //_D(5, debug_printf("ticks=%lu f=%f cnt=%u err=%u\n", ticks_sum, _frequency, _count, _errors));
     }
-    // else {
-    //     Serial.printf_P(PSTR("+REM=errors=%u,zc=%u\n"), _errors, _count);
-    // }
 }
-
-// void FrequencyMeasurement::calc()
-// {
-//     //_D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
-//     if (_count > 4) {
-//         uint24_t ticks_sum = _ticks[_count - 1]._ticks - _ticks[0]._ticks;
-
-//         _count--;
-//         Serial.printf_P(PSTR("AVG %f Hz\n"), 1000000.0 / clockCyclesToMicroseconds(ticks_sum / (float)_count));
-//         Serial.printf_P(PSTR("AVG ticks=%f\n"), clockCyclesToMicroseconds(ticks_sum / (float)_count));
-
-//         Serial.printf_P(PSTR("%ld\n"), (long)_ticks[_count - 1]._ticks);
-
-//         float ticks = (ticks_sum / (float)_count) + DIMMER_MEASURE_ADJ_CYCLE_CNT;
-//         _frequency = 1000000.0 / clockCyclesToMicroseconds(ticks) / 2.0;
-
-//         _D(5, debug_printf("ticks=%lu f=%f cnt=%u err=%u\n", ticks_sum, _frequency, _count, _errors));
-//     }
-//     else {
-//         Serial.printf_P(PSTR("+REM=errors=%u,zc=%u\n"), _errors, _count);
-//     }
-// }
 
 void FrequencyMeasurement::zc_measure_handler(uint16_t lo, uint16_t hi)
 {
@@ -130,40 +92,13 @@ void FrequencyMeasurement::zc_measure_handler(uint16_t lo, uint16_t hi)
     }
     _ticks[_count++] = lo | (uint24_t)hi << 16;
     if (_count == kMeasurementBufferSize) {
-        cli();
-        // detach handler while doing calculations
-        detach_zc_measure_handler();
-        sei();
+        // detach handler and do calculations
+        FrequencyMeasurement::detach_handler();
         calc_min_max();
-        frequency_wait_timer = kFrequencyWaitTimerDone;
-
-#if 0
-        switch(_state) {
-            // initial run determines the base frequency 50/60hz
-            case StateType::INIT:
-                _state = StateType::MEASURE;
-                calc_min_max();
-
-                reset_measurement_timeout();
-                cli();
-                _count = -5;
-                attach_zc_measure_handler();
-                sei();
-
-
-                break;
-            // second run filters all events that are not close to the base frequency
-            case StateType::MEASURE:
-                //TODO
-                calc();
-                frequency_wait_timer = kFrequencyWaitTimerDone;
-                break;
-        }
-#endif
     }
 }
 
-static inline void zc_measure_handler()
+static inline void zc_intr_measure_handler()
 {
     volatile uint16_t counter = TCNT1;
     volatile uint16_t overflow = timer1_overflow;
@@ -185,46 +120,35 @@ static inline void zc_measure_handler()
             DIMMER_SFR_ZC_JMP_IF_SET(SKIP);
         #endif
     #endif
-    sei();
     measure->zc_measure_handler(counter, overflow);
     #if DIMMER_ZC_MIN_PULSE_WIDTH_US
         asm volatile("SKIP:");
     #endif
 }
 
-static void attach_zc_measure_handler()
+void FrequencyMeasurement::attach_handler() 
 {
     #if digitalPinToInterrupt(ZC_SIGNAL_PIN) == -1
         // check if the pin supports external interrupts
         #error ZC_SIGNAL_PIN not supported
     #endif
-    attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), zc_measure_handler, DIMMER_ZC_INTERRUPT_MODE);
+    attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), zc_intr_measure_handler, DIMMER_ZC_INTERRUPT_MODE);
 }
 
-static void detach_zc_measure_handler()
-{
-    detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
-}
-
-static void reset_measurement_timeout()
-{
-    frequency_wait_timer = millis() + FrequencyMeasurement::kTimeout;
-}
-
-static void cleanup_measurement()
+void FrequencyMeasurement::cleanup()
 {
     cli();
-    detach_zc_measure_handler();
+    FrequencyMeasurement::detach_handler();
     Dimmer::FrequencyTimer::end();
-    sei();
-    frequency_measurement = false;
     delete measure;
+    measure = nullptr;
+    sei();
 }
 
 // returns true when finished
-bool run_frequency_measurement()
+bool FrequencyMeasurement::run()
 {
-    if (frequency_wait_timer == kFrequencyWaitTimerInit) {
+    if (measure == nullptr) {
         _D(5, debug_printf("measuring...\n"));
         dimmer.end();
         _adc.end();
@@ -232,35 +156,38 @@ bool run_frequency_measurement()
         // give everything some time to settle before starting the measurement
         delay(100);
 
-        reset_measurement_timeout();
         measure = new FrequencyMeasurement();
-        cli();
-        attach_zc_measure_handler();
-        Dimmer::FrequencyTimer::begin();
-        TCNT1 = 0;
-        TIFR1 |= _BV(TOV1);
-        sei();
+        if (measure) {
+            cli();
+            measure->attach_handler();            
+            Dimmer::FrequencyTimer::begin();
+            sei();
+        }
+        #if 0
+            else {
+                remln(F("MEM"));
+                delay(1000);
+            }
+        #endif
         return false;
     }
 
-    if (frequency_wait_timer == kFrequencyWaitTimerDone) {
+    if (measure->is_done()) {
         _D(5, debug_printf("measurement done\n"));
-        dimmer.set_frequency(measure->get_frequency());
-        cleanup_measurement();
+        auto freq = measure->get_frequency();
+        if (freq < 45 || freq > 65) {
+            freq = NAN;
+        }
+        dimmer.set_frequency(freq);
+        cleanup();
         return true;
     }
-    if (millis() >= frequency_wait_timer) {
+    if (measure->is_timeout()) {
         _D(5, debug_printf("timeout during measuring\n"));
         dimmer.set_frequency(NAN);
-        cleanup_measurement();
+        cleanup();
         return true;
     }
 
     return false;
-}
-
-void start_measure_frequency()
-{
-    frequency_measurement = true;
-    frequency_wait_timer = 0;
 }

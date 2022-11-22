@@ -18,18 +18,18 @@
 
 Queues queues;
 
-void rem()
+void remln(const __FlashStringHelper *str)
 {
-    Serial.print(F("+REM="));
+    rem();
+    Serial.println(str);
+    Serial.flush();
 }
 
 #if HIDE_DIMMER_INFO == 0
 
 void display_dimmer_info()
 {
-    rem();
-    Serial.println(F("MOSFET Dimmer " DIMMER_VERSION " " __DATE__ " " __TIME__ " " DIMMER_INFO));
-    Serial.flush();
+    remln(F("MOSFET Dimmer " DIMMER_VERSION " " __DATE__ " " __TIME__ " " DIMMER_INFO));
 
     rem();
     MCUInfo_t mcu;
@@ -91,13 +91,13 @@ void display_dimmer_info()
         Serial.print(F(",VCC="));
         auto vcc = read_vcc();
         if (vcc == 0xffff || vcc == 0) {
-            Serial.print('-');
+            Serial.print('/');
         }
         else {
             Serial.printf_P(PSTR("%.3f"), vcc / 1000.0);
         }
     #endif
-    Serial.printf_P(PSTR(",min.on-time=%u,min.off=%u,ZC-delay=%u,"),
+    Serial.printf_P(PSTR(",min.on-time=%u,min.off=%u,ZC=%u,"),
         dimmer_config.minimum_on_time_ticks,
         dimmer_config.minimum_off_time_ticks,
         dimmer_config.zero_crossing_delay_ticks
@@ -120,9 +120,7 @@ void setup()
     #endif
 
     #if HIDE_DIMMER_INFO == 0
-        rem();
-        Serial.println(F("BOOT"));
-        Serial.flush();
+        remln(F("BOOT"));
     #endif
 
     dimmer_i2c_slave_setup();
@@ -138,7 +136,7 @@ void setup()
 
     register_mem.data.errors = {};
 
-    start_measure_frequency();
+    FrequencyMeasurement::run();
     _D(5, debug_printf("exiting setup\n"));
 }
 
@@ -185,8 +183,8 @@ void restore_level()
 void loop()
 {
     // run in main loop that the I2C slave is responding
-    if (frequency_measurement) {
-        if (run_frequency_measurement()) {
+    if (measure) {
+        if (FrequencyMeasurement::run()) {
 
             // read all values once before starting the dimmer
             cli();
@@ -228,7 +226,6 @@ void loop()
     if (_adc.canScheduleNext()) {
         _adc.next();
     }
-
 
     // create non-volatile copy for read operations
     // reduces code size by ~30-40 byte
@@ -401,7 +398,7 @@ void loop()
 
                 dimmer.fade_from_to(Dimmer::Channel::any, Dimmer::Level::current, Dimmer::Level::off, 10);
 
-                Dimmer::DimmerEvent<DIMMER_EVENT_TEMPERATURE_ALERT>::send(dimmer_over_temperature_event_t{ (uint8_t)current_temp, dimmer_config.max_temp });
+                Dimmer::DimmerEvent<DIMMER_EVENT_TEMPERATURE_ALERT>::send(dimmer_over_temperature_event_t{ static_cast<uint8_t>(current_temp), dimmer_config.max_temp });
             }
 
         }
@@ -409,7 +406,7 @@ void loop()
         if (dimmer_config.report_metrics_interval && millis24 >= queues.report_metrics.timer) {
             queues.report_metrics.timer = millis24 + REPORT_METRICS_INTERVAL_MILLIS24(dimmer_config.report_metrics_interval);
             // Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT, dimmer_metrics_t>(dimmer_metrics_t{(uint8_t)current_temp, register_mem.data.metrics});
-            Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT>::send((uint8_t)current_temp, register_mem.data.metrics);
+            Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT>::send(static_cast<uint8_t>(current_temp), register_mem.data.metrics);
         }
 
         // restart reading adc values

@@ -200,7 +200,7 @@ void _dimmer_i2c_on_receive(int length)
                             Serial.println(F("+REM=freq"));
                             dimmer.end();
                             delay(500);
-                            start_measure_frequency();
+                            FrequencyMeasurement::run();
                         }
                         break;
 

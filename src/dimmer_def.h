@@ -97,7 +97,7 @@
 #endif
 
 // adjustment for measuring clock cycles due to pushing registers on
-// the stack before reading TCNT1
+// the stack before reading TCNT1 in "static inline void zc_measure_handler()"
 #ifndef DIMMER_MEASURE_ADJ_CYCLE_CNT
 #    define DIMMER_MEASURE_ADJ_CYCLE_CNT -56
 #endif
@@ -108,6 +108,21 @@
 // the time limit to keep the drift below 100-200µs
 #ifndef DIMMER_OUT_OF_SYNC_LIMIT
 #    define DIMMER_OUT_OF_SYNC_LIMIT 2500
+#endif
+
+// min. number of samples to collect
+#ifndef DIMMER_ZC_MIN_SAMPLES
+#    define DIMMER_ZC_MIN_SAMPLES 100
+#endif
+
+// valid samples after 2 stage filtering
+#ifndef DIMMER_ZC_MIN_VALID_SAMPLES
+#    define DIMMER_ZC_MIN_VALID_SAMPLES 10
+#endif
+
+// max. deviation (+-0.75%)
+#ifndef DIMMER_ZC_INTERVAL_MAX_DEVIATION
+#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (0.75 / 100.0)
 #endif
 
 // default mode

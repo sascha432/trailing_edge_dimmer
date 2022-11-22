@@ -178,7 +178,9 @@ void Config::readConfig()
         _D(5, debug_print_memory(&_config.cubic_int, sizeof(_config.cubic_int)));
     #endif
     // if this does not compile check README.md "Patching the Arduino libary"
-    Serial.printf_P(PSTR("+REM=EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x\n"), (uint32_t)max_cycle, _eeprom_position, get_eeprom_num_writes(max_cycle, _eeprom_position), _config.crc16);
+    
+    rem();
+    Serial.printf_P(PSTR("EEPROMR,c=%lu,p=%u,n=%lu,crc=%04x\n"), (uint32_t)max_cycle, _eeprom_position, get_eeprom_num_writes(max_cycle, _eeprom_position), _config.crc16);
 }
 
 void Config::writeConfig()

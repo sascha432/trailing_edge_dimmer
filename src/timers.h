@@ -91,6 +91,10 @@ namespace Timers {
             return tmp;
         }
 
+        static inline void clear_counter() {
+            TCNT1 = 0;
+        }
+
         static constexpr uint8_t kIntMaskOverflow = _BV(TOIE1);
         static constexpr uint8_t kIntMaskCompareA = _BV(OCIE1A);
         static constexpr uint8_t kIntMaskCompareB = _BV(OCIE1B);
@@ -223,6 +227,10 @@ namespace Timers {
         template<uint8_t _Flag>
         static inline bool get_flag() {
             return TIFR2 & _Flag;
+        }
+
+        static inline void clear_counter() {
+            TCNT2 = 0;
         }
 
         static constexpr uint8_t kIntMaskOverflow = _BV(TOIE2);

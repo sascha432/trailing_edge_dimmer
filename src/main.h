@@ -10,6 +10,14 @@
 
 static_assert(DIMMER_REGISTER_MEM_SIZE + DIMMER_REGISTER_START_ADDR <= 255, "out of memory");
 
+inline void rem()
+{
+    Serial.print(F("+REM="));
+}
+
+void remln(const __FlashStringHelper *str);
+
+
  // bitset
 template<typename _Type>
 struct dimmer_scheduled_calls_templ_t {
@@ -87,5 +95,5 @@ extern Queues queues;
 #endif
 
 #if DIMMER_CUBIC_INTERPOLATION
-#include "cubic_interpolation.h"
+#    include "cubic_interpolation.h"
 #endif

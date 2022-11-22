@@ -79,7 +79,9 @@ namespace Dimmer {
 
     struct FrequencyTimer : Timers::TimerBase<1, 1> {
         static inline void begin() {
+            TimerBase::clear_counter();
             TimerBase::begin<kIntMaskOverflow>();
+            TimerBase::clear_flags<kFlagsOverflow>();
         }
     };
 
