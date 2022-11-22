@@ -561,12 +561,6 @@ This event is fired after a reboot when the frequency detection has been finishe
 
 Not all commands are available if DEBUG_COMMANDS is not enabled. They are marked with (*)
 
-### Halt dimmer
-
-    Stop dimmer and any serial output, serial ports are floating. Requires a reset of the MCU to continue
-
-    +I2CT=17,89,a5
-
 ### Increase zero crossing delay by 10 (*)
 
     +I2CT=17,89,82,0a
