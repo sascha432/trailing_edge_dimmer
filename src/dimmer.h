@@ -12,8 +12,10 @@
 #include "dimmer_protocol.h"
 #include "dimmer_reg_mem.h"
 #if HAVE_CHANNELS_INLINE_ASM
-#include "dimmer_inline_asm.h"
+#    include "dimmer_inline_asm.h"
 #endif
+
+void remln(const __FlashStringHelper *str);
 
 extern register_mem_union_t register_mem;
 

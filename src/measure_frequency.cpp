@@ -18,16 +18,13 @@
 // should be adjusted how precise the MCU is triggering the zero crossing timer (external crystal, internal one, heat changes etc...)
 // under good conditions the timer might stay in sync for minutes or get out of sync after seconds already
 
-void remln(const __FlashStringHelper *str);
-
 volatile uint16_t timer1_overflow;
+FrequencyMeasurement *measure = nullptr;
 
 ISR(TIMER1_OVF_vect)
 {
     timer1_overflow++;
 }
-
-FrequencyMeasurement *measure = nullptr;
 
 void FrequencyMeasurement::calc_min_max()
 {
@@ -35,6 +32,8 @@ void FrequencyMeasurement::calc_min_max()
     uint24_t _max = 0;
 
     _frequency = 0;
+
+    // stage 0
 
     _D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
     if (_count > DIMMER_ZC_MIN_VALID_SAMPLES) {
@@ -46,11 +45,11 @@ void FrequencyMeasurement::calc_min_max()
         for(int i = 0; i < _count - 1; i++) {
             auto diff = _ticks[i + 1].diff(_ticks[i]);
             if (diff >= Dimmer::kMinCyclesPerHalfWave && diff <= Dimmer::kMaxCyclesPerHalfWave) { // filter between 48 and 62Hz
-                //Serial.println(diff);
                 sum += diff;
                 num++;
             }
         }
+
         if (num > DIMMER_ZC_MIN_VALID_SAMPLES) {
 
             // stage 2
@@ -68,7 +67,6 @@ void FrequencyMeasurement::calc_min_max()
             for(int i = 0; i < _count - 1; i++) {
                 auto diff = _ticks[i + 1].diff(_ticks[i]);
                 if (diff >= _min && diff <= _max) {
-                    //Serial.println(diff);
                     sum += diff;
                     num++;
                 }
@@ -166,7 +164,7 @@ bool FrequencyMeasurement::run()
         #if 0
             else {
                 remln(F("MEM"));
-                delay(1000);
+                delay(2000);
             }
         #endif
         return false;
@@ -174,14 +172,11 @@ bool FrequencyMeasurement::run()
 
     if (measure->is_done()) {
         _D(5, debug_printf("measurement done\n"));
-        auto freq = measure->get_frequency();
-        if (freq < 45 || freq > 65) {
-            freq = NAN;
-        }
-        dimmer.set_frequency(freq);
+        dimmer.set_frequency(measure->get_frequency());
         cleanup();
         return true;
     }
+
     if (measure->is_timeout()) {
         _D(5, debug_printf("timeout during measuring\n"));
         dimmer.set_frequency(NAN);

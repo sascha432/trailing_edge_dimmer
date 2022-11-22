@@ -15,9 +15,10 @@ extern volatile overflow_counter_t timer1_overflow;
 class FrequencyMeasurement {
 public:
     static constexpr uint8_t kMeasurementBufferSize = DIMMER_ZC_MIN_SAMPLES; // number of samples to collect
-    static constexpr uint16_t kTimeoutMillis = (kMeasurementBufferSize * Dimmer::kMaxMicrosPerHalfWave) * 1.5 / 1000;
+    static constexpr uint16_t kTimeoutMillis = (static_cast<uint32_t>(kMeasurementBufferSize) * Dimmer::kMaxMicrosPerHalfWave) * 1.5 / 1000;
     static constexpr size_t kMaxCycles_uint24 = (1UL << 24) / Dimmer::kMaxCyclesPerHalfWave;
 
+    static_assert(kTimeoutMillis > 500, "timeout should not be less than 500ms");
     static_assert(kTimeoutMillis < 5000, "timeout should not exceed 5 seconds");
 
     class Ticks {
@@ -60,6 +61,7 @@ private:
     void calc_min_max();
 
 private:
+public:
     float _frequency;
     uint16_t _errors;
     int16_t _count;
@@ -71,7 +73,7 @@ extern FrequencyMeasurement *measure;
 
 inline bool FrequencyMeasurement::is_timeout() const
 {
-    return (millis() - _start) > kTimeoutMillis;
+    return (static_cast<uint16_t>(millis()) - _start) > kTimeoutMillis;
 }
 
 inline bool FrequencyMeasurement::is_done() const
@@ -81,7 +83,7 @@ inline bool FrequencyMeasurement::is_done() const
 
 inline float FrequencyMeasurement::get_frequency() const 
 {
-    return _frequency;
+    return _frequency == 0 ? NAN : _frequency;
 }
 
 inline void FrequencyMeasurement::detach_handler() 
