@@ -8,7 +8,12 @@
         "C_Cpp.default.cppStandard": "c++11",
         "C_Cpp.default.intelliSenseMode": "gcc-arm",
         "cSpell.words": [
-            "eeprom"
+            "ATMEGA",
+            "eeprom",
+            "MOSFET",
+            "POTI",
+            "PRESCALER",
+            "VREF"
         ],
         "workbench.colorCustomizations": {
             "activityBar.background": "#1F1688",

@@ -2,7 +2,6 @@
 
 ## 2.2.3-dev
 
-
  - More options to configure the frequency measurement
  - library.json to include the library directly for headers only without being compiled
  - Added example of 16 channels `16ch_dimmer_p`

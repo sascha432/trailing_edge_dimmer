@@ -39,8 +39,8 @@
 #   define DIMMER_ZC_MIN_PULSE_WIDTH_US 0
 #endif
 
-// delay after receiving the zero crossing signal and the mosfets being turned on
-// if RISING is used, there is still a difference of about 20µs (1 channel @16MHz) until the mosfets turn on. this
+// delay after receiving the zero crossing signal and the MOSFETs being turned on
+// if RISING is used, there is still a difference of about 20µs (1 channel @16MHz) until the MOSFETs turn on. this
 // value varies depending on the number of channels and CPU frequency
 //
 // this should be calibrated at a temperature close to the working temperature. the zc crossing detection being used
@@ -82,12 +82,12 @@
 #endif
 
 // default for DIMMER_REGISTER_MIN_OFF_TIME_TICKS
-// minimum time to turn MOSFETs off before the halfwave ends
+// minimum time to turn MOSFETs off before the half wave ends
 // this is level Level::max - 1
 // level Level::max turns the mosfet on permanently
 //
 // NOTE:
-// leading edge mode: min. off time starts at zc delay + halfwave - min. off time
+// leading edge mode: min. off time starts at zc delay + half wave - min. off time
 // trailing edge mode: min. off time starts at zc delay + min. off time.
 //
 // https://github.com/sascha432/trailing_edge_dimmer/blob/bedf1d01b5e8d3531ac5dc090c64a4bc6f67bfd3/docs/images/min_off_time.png
@@ -103,24 +103,24 @@
 #endif
 
 // keep dimmer enabled when loosing the ZC signal for up to
-// DIMMER_OUT_OF_SYNC_LIMIT halfwaves. 250 @ 60Hz ~ 2seconds
+// DIMMER_OUT_OF_SYNC_LIMIT half waves. 250 @ 60Hz ~ 2seconds
 // once the signal is lost, it will start to drift and get out of sync. adjust
 // the time limit to keep the drift below 100-200µs
 #ifndef DIMMER_OUT_OF_SYNC_LIMIT
 #    define DIMMER_OUT_OF_SYNC_LIMIT 2500
 #endif
 
-// min. number of samples to collect
+// min. number of samples to collect, should be more than 50. it requires 3 byte per sample and is released after the measurement is done
 #ifndef DIMMER_ZC_MIN_SAMPLES
 #    define DIMMER_ZC_MIN_SAMPLES 100
 #endif
 
-// valid samples after 2 stage filtering
+// valid samples after 2 stage filtering, should be at least 10
 #ifndef DIMMER_ZC_MIN_VALID_SAMPLES
 #    define DIMMER_ZC_MIN_VALID_SAMPLES 10
 #endif
 
-// max. deviation (+-0.75%)
+// max. deviation (+-0.75%). if the deviation is too low, stage 2 might filter too many results
 #ifndef DIMMER_ZC_INTERVAL_MAX_DEVIATION
 #    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (0.75 / 100.0)
 #endif
@@ -203,8 +203,8 @@
 #    define POTI_CHANNEL 0
 #endif
 
-#ifndef SERIAL_I2C_BRDIGE
-#    define SERIAL_I2C_BRDIGE 0
+#ifndef SERIAL_I2C_BRIDGE
+#    define SERIAL_I2C_BRIDGE 0
 #endif
 
 #ifndef DEFAULT_BAUD_RATE
@@ -234,14 +234,14 @@
 #endif
 
 // after calibration VCC readings are pretty accurate, ±1-2mV
-// NOTE: VCC is read 64x in a row, once per second and the capacitence of the ADC is very low,
+// NOTE: VCC is read 64x in a row, once per second and the capacitance of the ADC is very low,
 // which can lead to jumping values if the VCC is not stable
 // default for cfg.internal_1_1v_ref
 #ifndef INTERNAL_VREF_1_1V
 #    define INTERNAL_VREF_1_1V 1.1
 #endif
 
-// to get more stable (average) VCC readings, an additonal circuit with more capacitance can be
+// to get more stable (average) VCC readings, an additional circuit with more capacitance can be
 // added to an analog port
 
 // voltage divider on analog port

@@ -57,7 +57,7 @@ void display_dimmer_info()
     #if HAVE_FADE_COMPLETION_EVENT
         Serial.print(F("fading_events=1,"));
     #endif
-    #if SERIAL_I2C_BRDIGE
+    #if SERIAL_I2C_BRIDGE
         Serial.print(F("proto=UART,"));
     #else
         Serial.print(F("proto=I2C,"));
@@ -115,7 +115,7 @@ void setup()
 {
     Serial.begin(DEFAULT_BAUD_RATE);
 
-    #if SERIAL_I2C_BRDIGE && DEBUG
+    #if SERIAL_I2C_BRIDGE && DEBUG
         _debug_level = 9;
     #endif
 

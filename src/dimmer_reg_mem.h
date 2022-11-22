@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <math.h>
 
-#if SERIAL_I2C_BRDIGE
+#if SERIAL_I2C_BRIDGE
 
 #include "SerialTwoWire.h"
 

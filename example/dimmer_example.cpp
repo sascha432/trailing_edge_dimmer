@@ -51,7 +51,7 @@ Keys
 */
 
 #include <Arduino.h>
-#if SERIAL_I2C_BRDIGE
+#if SERIAL_I2C_BRIDGE
 #include <SoftwareSerial.h>
 #include "SerialTwoWire.h"
 #else
@@ -65,7 +65,7 @@ Keys
 #define DEFAULT_BAUD_RATE 115200
 #endif
 
-#if SERIAL_I2C_BRDIGE
+#if SERIAL_I2C_BRIDGE
 SoftwareSerial Serial2(8, 9);
 SerialTwoWire Wire(Serial2);
 #endif
@@ -123,7 +123,7 @@ void setup() {
     Serial.print(F("Dimmer control example @ "));
     Serial.printf_P(PSTR("0x%02x\n"), DIMMER_I2C_ADDRESS);
 
-    #if SERIAL_I2C_BRDIGE
+    #if SERIAL_I2C_BRIDGE
         Serial2.begin(DEFAULT_BAUD_RATE);
 
         // set read handler
@@ -335,7 +335,7 @@ void read_errors() {
 
 void loop() {
 
-#if SERIAL_I2C_BRDIGE
+#if SERIAL_I2C_BRIDGE
     Wire._serialEvent();
 #endif
 
