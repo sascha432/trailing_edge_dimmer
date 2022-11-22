@@ -10,6 +10,12 @@ from SCons.Script import ARGUMENTS
 import tempfile
 import hashlib
 import click
+import platform
+
+if platform.system() == 'Windows':
+    subprocess_run_as_shell = True
+else:
+    subprocess_run_as_shell = False
 
 verbose_flag = int(ARGUMENTS.get("PIOVERBOSE", 0)) and True or False
 
@@ -63,7 +69,7 @@ def disassemble(source, target, env):
     if verbose_flag:
         print(' '.join(args))
 
-    return_code = subprocess.run(args, shell=True).returncode
+    return_code = subprocess.run(args, shell=subprocess_run_as_shell).returncode
     if return_code!=0:
         error('Failed to disassemble binary: exit code %u: %s' % (return_code, ' '.join(args)))
 
@@ -77,7 +83,7 @@ def read_def(source, target, env):
     project_dir = path.realpath(env.subst("$PROJECT_DIR"))
     script = path.realpath(path.join(project_dir, './scripts/read_def.py'))
     args = [ python, script ]
-    return_code = subprocess.run(args, shell=True).returncode
+    return_code = subprocess.run(args, shell=subprocess_run_as_shell).returncode
     if return_code!=0:
         error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))
 
@@ -133,7 +139,7 @@ def update_dimmer_inline_asm(source, target, env):
         env.Exit(1)
 
     args = [ python, script, '--output', output, '--zc-pin', zc_pin,  '--pins' ] + pins
-    return_code = subprocess.run(args, shell=True).returncode
+    return_code = subprocess.run(args, shell=subprocess_run_as_shell).returncode
     if return_code!=0:
         error('Failed to run script: exit code %u: %s' % (return_code, ' '.join(args)))
 
