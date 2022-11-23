@@ -9,7 +9,9 @@ import click
 from SCons.Script import ARGUMENTS
 import tempfile
 import hashlib
+import shutil
 import click
+import json
 import platform
 
 if platform.system() == 'Windows':
@@ -26,6 +28,30 @@ def error(msg):
 def verbose(msg):
     if verbose_flag:
         print(msg)
+
+# read version from library.json
+try:
+    filename = env.subst("$PROJECT_DIR/library.json")
+    with open(filename, 'rt') as file:
+        library = json.load(file)
+    version_str = library['version']
+    parts = version_str.split('.')
+except:
+    error("%s does not contain valid version (major.minor.revision)" % (filename))
+
+# store in header file
+filename = env.subst("$PROJECT_SRC_DIR/dimmer_version.h")
+header = '// library.json { "version":"%s" }\n' % version_str
+
+rewrite = False
+with open(filename, 'rt') as file:
+    if file.readline() != header:
+       rewrite = True 
+
+if rewrite:
+    verbose('creating %s' % filename)
+    with open(filename, 'wt') as file:
+        file.writelines([header, '#define DIMMER_VERSION_MAJOR %u\n' % int(parts[0]), '#define DIMMER_VERSION_MINOR %u\n' % int(parts[1]), '#define DIMMER_VERSION_REVISION %u\n' % int(parts[2])])
 
 #
 # disassemble ELF binary
@@ -159,6 +185,27 @@ def update_dimmer_inline_asm(source, target, env):
         # click.secho('Run build process again...', fg='yellow')
         # env.Exit(1)
 
+def copy_hex_file(source, target, env):
+    dst = target = env.subst(env.GetProjectOption('custom_copy_hex_file', None))
+    if dst:
+        mcu = '328p'
+        defs = env.get('CPPDEFINES')
+        for data in defs:
+            if len(data)!=1:
+                key = data[0]
+                val = data[1]
+                if key=='MCU_IS_ATMEGA328PB' and val==1:
+                    mcu = '328pb'
+
+        src = env.subst("$BUILD_DIR/${PROGNAME}.hex")
+
+        for dst in dst.split('\n'):
+            dst = path.abspath(dst.replace('FIRMWAREVERSION', version_str + '-' + mcu))
+            verbose('copying %s to %s' % ( src, dst ))
+            try:
+                shutil.copy(src, dst)
+            except:
+                click.secho('Failed to copy %s to %s' % ( src, dst ), fg='red')
 
 env.AddPreAction('$BUILD_DIR/scripts/print_def.cpp.o', read_def)
 env.AddPreAction('$BUILD_DIR/src/dimmer.cpp.o', update_dimmer_inline_asm)
@@ -167,3 +214,5 @@ env.AlwaysBuild(env.Alias("disassemble", None, disassemble))
 
 if env.subst("$PIOENV") not in ("printdef"):
     env.AddPostAction(env.subst('$PIOMAINPROG'), disassemble)
+
+env.AddPostAction(env.subst("$BUILD_DIR/${PROGNAME}.hex"), copy_hex_file)
