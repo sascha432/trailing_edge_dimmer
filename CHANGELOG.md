@@ -2,6 +2,7 @@
 
 ## 2.2.3-dev
 
+ - Added custom_copy_hex_file to platformio.ini. Multiple locations can be specified
  - Creating dimmer_version.h from library.json
  - More options to configure the frequency measurement
  - library.json to include the library directly for headers only without being compiled
