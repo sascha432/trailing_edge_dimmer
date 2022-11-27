@@ -217,19 +217,6 @@ void _dimmer_i2c_on_receive(int length)
                         Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                         break;
 
-                    #if HAVE_DISABLE_ZC_SYNC
-                        case DIMMER_COMMAND_SET_ZC_SYNC: {
-                            if (length == 0) {
-                                dimmer.zc_sync_disabled = !dimmer.zc_sync_disabled;
-                            }
-                            else {
-                                dimmer.zc_sync_disabled = Wire_read_uint8_t(length, 0);
-                            }
-                            Serial.printf_P(PSTR("+REM=sync=%u\n"), !dimmer.zc_sync_disabled);
-                        }
-                        break;
-                    #endif
-
                     case DIMMER_COMMAND_DUMP_CHANNELS: {
                             auto &tmp = dimmer.ordered_channels;
                             Serial.print(F("+REM="));

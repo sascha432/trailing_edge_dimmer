@@ -119,8 +119,9 @@ namespace Dimmer {
             uint8_t oldSREG = SREG;
             cli();
             uint8_t tmp = TCNT2;
-            if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
+            if (TimerBase::get_flag<kFlagsOverflow>() && TCNT2 < 255) {
                 _overflow++;
+                TimerBase::clear_flags<kFlagsOverflow>();
             }
             uint16_t tmp2 = _overflow;
             SREG = oldSREG;
@@ -131,10 +132,10 @@ namespace Dimmer {
         // interrupts must be disabled
         inline uint24_t get_no_cli() {
             uint8_t tmp = TCNT2;
-            if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
+            if (TimerBase::get_flag<kFlagsOverflow>() && TCNT2 < 255) {
                 _overflow++;
+                TimerBase::clear_flags<kFlagsOverflow>();
             }
-            //return ((uint24_t)_overflow << 8) | tmp;
             return __uint24_from_ui16_ui8(_overflow, tmp);
         }
 
@@ -142,12 +143,12 @@ namespace Dimmer {
         // interrupts must be disabled
         inline uint24_t get_clear_no_cli() {
             uint8_t tmp = TCNT2;
-            TCNT2 = 0;
-            if (TimerBase::get_clear_flag<kFlagsOverflow>()) {
+            if (TimerBase::get_flag<kFlagsOverflow>() && TCNT2 < 255) {
                 _overflow++;
             }
+            TCNT2 = 0;
+            TimerBase::clear_flags<kFlagsOverflow>();
             auto tmp2 = __uint24_from_ui16_ui8(_overflow, tmp);
-            //auto tmp2 = ((uint24_t)_overflow << 8) | tmp;
             _overflow = 0;
             return tmp2;
         }
@@ -186,8 +187,7 @@ namespace Dimmer {
 
     static_assert(Level::size >= 255, "at least 255 levels required");
 
-    // filter all zc interrupts that occur fastere than (frequency + kZCFilterFrequency)
-    static constexpr int8_t kZCFilterFrequency = -5;
+    static constexpr float kZCFilterFrequencyDeviation = DIMMER_ZC_INTERVAL_MAX_DEVIATION;
 
     static constexpr uint8_t kMinFrequency = 48;
     static constexpr uint8_t kMaxFrequency = 62;
@@ -224,26 +224,15 @@ namespace Dimmer {
         #endif
         dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks
         dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels
-        uint8_t on_counter[Channel::size()];                                    // counts halfwaves from 0 to 254 after switching on
         TickType halfwave_ticks;
-        float zc_diff_ticks;
-        uint8_t zc_diff_count;
+        uint24_t halfwave_ticks_prescaler1;
         uint8_t channel_state;                                                  // bitset of the channel state
         bool toggle_state;
-        #if HAVE_DISABLE_ZC_SYNC
-            bool zc_sync_disabled;
-        #endif
-
-        #if DIMMER_OUT_OF_SYNC_LIMIT
-            uint16_t out_of_sync_counter;
-            dimmer_sync_event_t sync_event;
-        #endif
+        dimmer_sync_event_t sync_event;
 
         #if HAVE_FADE_COMPLETION_EVENT
             Level::type fading_completed[Channel::size()];
         #endif
-        float halfwave_ticks_avg;
-        float halfwave_ticks_avg2;
     };
 
     class DimmerBase : public dimmer_t {
@@ -257,7 +246,7 @@ namespace Dimmer {
 
         void begin();
         void end();
-        void zc_interrupt_handler(uint24_t ticks);
+        void zc_interrupt_handler(uint16_t counter, uint24_t ticks);
 
         inline void set_frequency(float freq) {
             register_mem.data.metrics.frequency = freq;
@@ -307,7 +296,7 @@ namespace Dimmer {
         void fade_from_to(Channel::type channel, Level::type from_level, Level::type to_level, float time, bool absolute_time = false);
 
         //
-        // send fading complention events for all channels
+        // send fading completion events for all channels
         //
         void send_fading_completion_events();
 
@@ -323,13 +312,6 @@ namespace Dimmer {
             return _config.bits.leading_edge ?
                 (_get_ticks_per_halfwave() - __get_ticks(channel, level)) :
                 __get_ticks(channel, level);
-        }
-
-        inline TickType _get_min_on_ticks(Channel::type channel) const {
-            if (_config.switch_on_count && _config.switch_on_minimum_ticks && (on_counter[channel] < kOnSwitchCounterMax) && (on_counter[channel] < _config.switch_on_count - 1)) {
-                return _config.switch_on_minimum_ticks;
-            }
-            return _config.minimum_on_time_ticks;
         }
 
         inline uint16_t _get_level(Channel::type channel) const {

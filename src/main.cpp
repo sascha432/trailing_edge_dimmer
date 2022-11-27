@@ -97,14 +97,10 @@ void display_dimmer_info()
             Serial.printf_P(PSTR("%.3f"), vcc / 1000.0);
         }
     #endif
-    Serial.printf_P(PSTR(",min.on-time=%u,min.off=%u,ZC=%u,"),
+    Serial.printf_P(PSTR(",min.on-time=%u,min.off=%u,ZC=%u\n"),
         dimmer_config.minimum_on_time_ticks,
         dimmer_config.minimum_off_time_ticks,
         dimmer_config.zero_crossing_delay_ticks
-    );
-    Serial.printf_P(PSTR("sw.on-time=%u/%u\n"),
-        dimmer_config.switch_on_minimum_ticks,
-        dimmer_config.switch_on_count
     );
     Serial.flush();
 }
@@ -335,20 +331,13 @@ void loop()
     }
 
     if (tmp_scheduled_calls.sync_event) {
-        cli();
-        auto event = dimmer.sync_event;
-        if (event.sync) {
-            dimmer.sync_event = {}; // clear data
-        }
-        else {
-            dimmer.sync_event.lost = false; // keep data for sync event
-        }
-        queues.scheduled_calls.sync_event = false;
-        sei();
+        Dimmer::DimmerEvent<DIMMER_EVENT_SYNC_EVENT>::send(dimmer.sync_event);
 
-        Dimmer::DimmerEvent<DIMMER_EVENT_SYNC_EVENT>::send(event);
+        Serial.printf_P(PSTR("+REM=lost,invalid=%u,time=%u,restarting\n"), dimmer.sync_event.invalid_signals, dimmer.sync_event.halfwave_micros);
 
-        Serial.printf_P(PSTR("+REM=lost=%u,sync=%u,cnt=%u,c=%ld,t=%.1fus\n"), event.lost, event.sync, event.halfwave_counter, event.sync_difference_cycles * Dimmer::Timer<1>::prescaler, event.sync_difference_cycles / Dimmer::Timer<1>::ticksPerMicrosecond);
+        // start new measurement
+        FrequencyMeasurement::run();
+        return;
     }
 
     if (queues.check_temperature.timer == 0) {

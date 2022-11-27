@@ -17,9 +17,9 @@ Firmware for a trailing/leading edge dimmer written in C++ including schematics/
 * Highly configurable to match any hardware
 * MOSFETs, IGBTs, BJTs and, TRIACs can be used
 
-[I2C/UART protocol](docs/protocol.md)
+[I2C/UART protocol](docs/PROTOCOL.md)
 
-[Change Log v2.2.3](CHANGELOG.md)
+[Change Log v2.2.3](docs/CHANGELOG.md)
 
 ## Patching the Arduino libary
 

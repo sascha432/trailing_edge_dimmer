@@ -268,9 +268,6 @@ struct __attribute_packed__ register_mem_cfg_t
     internal_temp_calibration_t internal_temp_calibration;
     temp_ofs_t ntc_temp_cal_offset;
     uint8_t report_metrics_interval;        // in seconds, 0=disabled
-    int8_t halfwave_adjust_cycles;          // correction for measured time in clock cycles
-    uint16_t switch_on_minimum_ticks;       // "minimum_on_time_ticks" after "switching on"
-    uint8_t switch_on_count;                // number of half cycles before changing to minimum_on_time_ticks
 
     uint16_t get_range_end() const {
         if (range_divider == 0) {
@@ -460,14 +457,11 @@ struct __attribute_packed__ dimmer_channel_state_event_t {
 static_assert(sizeof(dimmer_channel_state_event_t) == 1, "check struct");
 
 struct __attribute_packed__ dimmer_sync_event_t {
-    uint8_t lost: 1;
-    uint8_t sync: 1;
-    uint8_t __reserved: 2;
-    int32_t sync_difference_cycles: 28;
-    uint16_t halfwave_counter;
+    uint16_t invalid_signals;
+    uint16_t halfwave_micros;
 };
 
-static_assert(sizeof(dimmer_sync_event_t) == 6, "check struct");
+static_assert(sizeof(dimmer_sync_event_t) == 4, "check struct");
 
 extern register_mem_union_t register_mem;
 

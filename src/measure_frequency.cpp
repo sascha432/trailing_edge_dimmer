@@ -8,15 +8,13 @@
 
 // measure the interval between the zero crossing events
 //
-// first stage filter is 48-62Hz, 10 valid results must be present
+// first stage filter is 48-62Hz, DIMMER_ZC_MIN_VALID_SAMPLES valid results must be present
 //
 // second state filter is to compare all results and generate an average. values that are +-0.75% are removed.
-// 10 valid values must be present here as well to calculate the frequency
+// DIMMER_ZC_MIN_VALID_SAMPLES valid values must be present here as well to calculate the frequency
 //
-// the timer for the prediction will run at this rate and synchronized by the zero crossing events. invalid events are 
-// filtered. the dimmer will turn off after 2500 (DIMMER_OUT_OF_SYNC_LIMIT) half waves (25 seconds @ 50Hz). this value
-// should be adjusted how precise the MCU is triggering the zero crossing timer (external crystal, internal one, heat changes etc...)
-// under good conditions the timer might stay in sync for minutes or get out of sync after seconds already
+// this makes sure all zc events that are received are within the range of the initial measurement over many cycles (DIMMER_ZC_INTERVAL_MAX_DEVIATION)
+// if too many invalid signals are received, the dimmer is stopped (DIMMER_OUT_OF_SYNC_LIMIT) and a new frequency measurement started
 
 volatile uint16_t timer1_overflow;
 FrequencyMeasurement *measure = nullptr;
@@ -36,13 +34,13 @@ void FrequencyMeasurement::calc_min_max()
     // stage 0
 
     _D(5, debug_printf("frequency errors=%u,zc=%u\n", _errors, _count));
-    if (_count > DIMMER_ZC_MIN_VALID_SAMPLES) {
+    if (_count-- > DIMMER_ZC_MIN_VALID_SAMPLES) {
 
         // stage 1
 
         uint32_t sum = 0;
         uint8_t num = 0;
-        for(int i = 0; i < _count - 1; i++) {
+        for(int i = 0; i < _count; i++) {
             auto diff = _ticks[i + 1].diff(_ticks[i]);
             if (diff >= Dimmer::kMinCyclesPerHalfWave && diff <= Dimmer::kMaxCyclesPerHalfWave) { // filter between 48 and 62Hz
                 sum += diff;
@@ -55,8 +53,7 @@ void FrequencyMeasurement::calc_min_max()
             // stage 2
 
             _min = sum / num;
-            _max = _min;
-            // allow up to +-0.75% deviation from the filtered avg. value
+            // allow up to DIMMER_ZC_INTERVAL_MAX_DEVIATION % deviation from the filtered avg. value
             uint16_t limit = _min * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
             _min = _min - limit;
             _max = _max + limit;
@@ -64,7 +61,7 @@ void FrequencyMeasurement::calc_min_max()
             // filter again with new min/max
             sum = 0;
             num = 0;
-            for(int i = 0; i < _count - 1; i++) {
+            for(int i = 0; i < _count; i++) {
                 auto diff = _ticks[i + 1].diff(_ticks[i]);
                 if (diff >= _min && diff <= _max) {
                     sum += diff;
@@ -73,7 +70,7 @@ void FrequencyMeasurement::calc_min_max()
             }
 
             if (num > DIMMER_ZC_MIN_VALID_SAMPLES) {
-                auto ticks = (sum / static_cast<float>(num)) + DIMMER_MEASURE_ADJ_CYCLE_CNT;
+                auto ticks = (sum / static_cast<float>(num));
                 _frequency = 500000.0 / clockCyclesToMicroseconds(ticks);
                 _D(5, debug_printf("measure=%lu/%u\n", (uint32_t)sum, num));
             } 
@@ -98,30 +95,12 @@ void FrequencyMeasurement::zc_measure_handler(uint16_t lo, uint16_t hi)
 
 static inline void zc_intr_measure_handler()
 {
-    volatile uint16_t counter = TCNT1;
-    volatile uint16_t overflow = timer1_overflow;
-    #if 0
-        if (TIFR1 & TOV1) { //TODO check if that ever happens, counter should be close to 0
-            Serial.printf_P(PSTR("timer overflow TCNT=%u\n"), counter);
-        }
-    #endif
-    #if DIMMER_ZC_MIN_PULSE_WIDTH_US
-        // wait min. pulse with
-        delayMicroseconds(DIMMER_ZC_MIN_PULSE_WIDTH_US);
-        // check if any interrupt has occurred
-        asm volatile("sbic %0, %1" :: "I" (_SFR_IO_ADDR(EIFR)), "I" (digitalPinToInterrupt(ZC_SIGNAL_PIN)));
-        asm volatile("rjmp SKIP");
-        // check if zero crossing pin is still high/low
-        #if DIMMER_ZC_INTERRUPT_MODE == RISING
-            DIMMER_SFR_ZC_JMP_IF_CLR(SKIP);
-        #elif DIMMER_ZC_INTERRUPT_MODE == FALLING
-            DIMMER_SFR_ZC_JMP_IF_SET(SKIP);
-        #endif
-    #endif
-    measure->zc_measure_handler(counter, overflow);
-    #if DIMMER_ZC_MIN_PULSE_WIDTH_US
-        asm volatile("SKIP:");
-    #endif
+    uint16_t counter = TCNT1;
+    if ((TIFR1 & _BV(TOV1)) && counter < 0xffff) {
+        timer1_overflow++;
+        TIFR1 |= _BV(TOV1);
+    }
+    measure->zc_measure_handler(counter, timer1_overflow);
 }
 
 void FrequencyMeasurement::attach_handler() 
@@ -161,12 +140,6 @@ bool FrequencyMeasurement::run()
             Dimmer::FrequencyTimer::begin();
             sei();
         }
-        #if 0
-            else {
-                remln(F("MEM"));
-                delay(2000);
-            }
-        #endif
         return false;
     }
 

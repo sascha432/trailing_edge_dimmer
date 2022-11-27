@@ -2,6 +2,8 @@
 
 ## 2.2.3-dev
 
+ - Auto restart if the dimmer was shut down due to invalid zero crossing signals
+ - Improved ZC filtering and prediction
  - Added custom_copy_hex_file to platformio.ini. Multiple locations can be specified
  - Creating dimmer_version.h from library.json
  - More options to configure the frequency measurement

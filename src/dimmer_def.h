@@ -20,26 +20,9 @@
 #    define DEBUG_COMMANDS 1
 #endif
 
-#if DEBUG || DEBUG_COMMANDS
-#    ifndef HAVE_DISABLE_ZC_SYNC
-#        define HAVE_DISABLE_ZC_SYNC 0
-#    endif
-#else
-#    if HAVE_DISABLE_ZC_SYNC
-#        error requires DEBUG mode
-#    endif
-#    define HAVE_DISABLE_ZC_SYNC 0
-#endif
-
 // pin for the zero crossing signal
 #ifndef ZC_SIGNAL_PIN
 #    error ZC_SIGNAL_PIN not defined
-#endif
-
-// min. pulse width in microseconds
-// this can be used to filter short pulses during the frequency detection
-#ifndef DIMMER_ZC_MIN_PULSE_WIDTH_US
-#   define DIMMER_ZC_MIN_PULSE_WIDTH_US 0
 #endif
 
 // delay after receiving the zero crossing signal and the MOSFETs being turned on
@@ -57,10 +40,6 @@
 #ifndef DIMMER_ZC_INTERRUPT_MODE
 #    define DIMMER_ZC_INTERRUPT_MODE RISING
 // #    define DIMMER_ZC_INTERRUPT_MODE FALLING
-#endif
-
-#if DIMMER_ZC_MIN_PULSE_WIDTH_US && DIMMER_ZC_INTERRUPT_MODE == CHANGE
-#   error DIMMER_ZC_MIN_PULSE_WIDTH_US>0 requires DIMMER_ZC_INTERRUPT_MODE=RISING or FALLING
 #endif
 
 // DIMMER_MIN_ON_TIME_US and DIMMER_MIN_OFF_TIME_US remove the unusable part of the halfwave
@@ -99,31 +78,25 @@
 #    define DIMMER_MIN_OFF_TIME_US 300
 #endif
 
-// adjustment for measuring clock cycles due to pushing registers on
-// the stack before reading TCNT1 in "static inline void zc_measure_handler()"
-#ifndef DIMMER_MEASURE_ADJ_CYCLE_CNT
-#    define DIMMER_MEASURE_ADJ_CYCLE_CNT -56
-#endif
-
-// keep dimmer enabled when loosing the ZC signal for up to
-// DIMMER_OUT_OF_SYNC_LIMIT half waves. 250 @ 60Hz ~ 2seconds
-// once the signal is lost, it will start to drift and get out of sync. adjust
-// the time limit to keep the drift below 100-200µs
+// keep dimmer enabled when loosing the ZC signal for up to DIMMER_OUT_OF_SYNC_LIMIT half waves
+// once the signal is lost, it will start to drift and get out of sync. adjust the time limit to keep the drift below 100-200µs
 #ifndef DIMMER_OUT_OF_SYNC_LIMIT
-#    define DIMMER_OUT_OF_SYNC_LIMIT 2500
+#    define DIMMER_OUT_OF_SYNC_LIMIT 2000
 #endif
 
-// min. number of samples to collect, should be more than 50. it requires 3 byte per sample and is released after the measurement is done
+// min. number of samples to collect, should be more than 100. it requires 3 byte per sample and is released after the measurement is done
 #ifndef DIMMER_ZC_MIN_SAMPLES
-#    define DIMMER_ZC_MIN_SAMPLES 100
+#    define DIMMER_ZC_MIN_SAMPLES 128
 #endif
 
-// valid samples after 2 stage filtering, should be at least 10
+// valid samples after 2 stage filtering, should be at least 50% of DIMMER_ZC_MIN_SAMPLES
 #ifndef DIMMER_ZC_MIN_VALID_SAMPLES
-#    define DIMMER_ZC_MIN_VALID_SAMPLES 10
+#    define DIMMER_ZC_MIN_VALID_SAMPLES (DIMMER_ZC_MIN_SAMPLES / 2)
 #endif
 
-// max. deviation (+-0.75%). if the deviation is too low, stage 2 might filter too many results
+// max. deviation (+-0.75%). if the deviation is too low
+// too low filters too many events
+// to hight might lead to flickering
 #ifndef DIMMER_ZC_INTERVAL_MAX_DEVIATION
 #    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (0.75 / 100.0)
 #endif
