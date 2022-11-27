@@ -72,11 +72,13 @@ void FrequencyMeasurement::calc_min_max()
             if (num > DIMMER_ZC_MIN_VALID_SAMPLES) {
                 auto ticks = (sum / static_cast<float>(num));
                 _frequency = 500000.0 / clockCyclesToMicroseconds(ticks);
-                _D(5, debug_printf("measure=%lu/%u\n", (uint32_t)sum, num));
+                Serial.printf_P(PSTR("+REM=f-sync=%f,valid=%u\n"), _frequency, num);
+                return;
             } 
 
         }
     }
+    Serial.println(F("+REM=f-sync failed\n"));
 }
 
 void FrequencyMeasurement::zc_measure_handler(uint16_t lo, uint16_t hi)
