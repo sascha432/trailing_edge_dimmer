@@ -10,10 +10,13 @@
         "cSpell.words": [
             "ATMEGA",
             "eeprom",
+            "FORCEON",
             "HALFWAVE",
+            "MILLIS",
             "MOSFET",
             "POTI",
             "PRESCALER",
+            "UART",
             "VREF"
         ],
         "workbench.colorCustomizations": {

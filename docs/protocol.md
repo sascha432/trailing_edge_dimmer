@@ -41,7 +41,7 @@ For more options check
 
 ### Modifying the dimmer configuration
 
-The configuation can be modifed for a specific version without a physical connection to the dimmer.
+The configuration can be modified for a specific version without a physical connection to the dimmer.
 
     python ./scripts/cfg_tool.py modify --version 2.2 --data '+REM=v840,i2ct=17a2024b0000904002000000b004ff0d0002cdcc8c3f00000500000020001412' -s range_begin=1
     Detected version: 2.2.0
@@ -87,7 +87,7 @@ If set to -1 / 0xffff, it will start with the current level set. The default val
 
 ### To level
 
-If set to -1 / 0xffff, the current fading operation will be stopped and a "Fading completed" event with the final level emmitted.
+If set to -1 / 0xffff, the current fading operation will be stopped and a "Fading completed" event with the final level emitted.
 
 ### Channel
 
@@ -99,7 +99,7 @@ Set *from level* to -1, *channel* to 0, *to level* to 0x0301, *time* 7.5 (second
 
     +I2CT=17,80,ff,ff,00,03,01,00,00,f0,40,11
                 ^^^^^ from level           ^^ command
-                      ^^ channnel
+                      ^^ channel
                          ^^^^^ to level
                                ^^^^^^^^^^^ time
 
@@ -197,7 +197,7 @@ Store current dimming levels in EEPROM. If the following byte is 92, the configu
 
 ***Note:*** The command might be delayed due to the wear leveling algorithm. The maximum delay is *EEPROM_REPEATED_WRITE_DELAY* (5 seconds by default) Any changes during this time will be written to the EEPROM as well
 
-See *DIMMER_COMMAND_WRITE_EEPROM_NOW* how to force writing immediatelly.
+See *DIMMER_COMMAND_WRITE_EEPROM_NOW* how to force writing immediately.
 
 In UART or I2C master/master mode, the event *DIMMER_EEPROM_WRITTEN* confirms successful execution. It also indicates if any data has been written to the EEPROM.
 
@@ -217,7 +217,7 @@ In UART or I2C master/master mode, the event *DIMMER_EEPROM_WRITTEN* confirms su
 
 ***Note:*** This command cancels all previous *DIMMER_COMMAND_WRITE_EEPROM* commands that have not been executed yet. If the configuration was set to be saved, it will be saved as well.
 
-It is recommended to execute this command several times after the initial calibration. This ensures that several copies of the configuration exist and can be used in case of a read failure or damanged EEPROM cells.
+It is recommended to execute this command several times after the initial calibration. This ensures that several copies of the configuration exist and can be used in case of a read failure or damaged EEPROM cells.
 
     +I2CT=17,89,93[,92]
 
@@ -394,7 +394,7 @@ Print dimmer info on serial port
 - min.on-time = minimum on time ticks (timer1)
 - min-off = minimum off time ticks
 - zcdelay = zero crossing delay in ticks
-- sw.on-time = switch on minimum time in ticks / duratiuon in half cycles (120 = 1 second for 60 Hz, 1 = 8.333ms...)
+- sw.on-time = switch on minimum time in ticks / duration in half cycles (120 = 1 second for 60 Hz, 1 = 8.333ms...)
 
 ## DIMMER_COMMAND_PRINT_METRICS
 
