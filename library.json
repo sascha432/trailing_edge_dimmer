@@ -7,7 +7,7 @@
     },
     "build": {
         "includeDir": "src",
-        "srcDir": "lib",
+        "srcDir": "docs",
         "srcDir_is_to_avoid_building_if_only_headers_are_required_does_not_affect_local_builds": "docs"
     },
     "frameworks": "arduino",
