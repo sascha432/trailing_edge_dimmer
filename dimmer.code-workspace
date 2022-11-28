@@ -16,6 +16,7 @@
             "MOSFET",
             "POTI",
             "PRESCALER",
+            "RESTORESTATE",
             "UART",
             "VREF"
         ],
