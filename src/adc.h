@@ -5,13 +5,13 @@
 #pragma once
 
 #include <Arduino.h>
+#include <wiring_private.h>
 #include "helpers.h"
 #include "dimmer.h"
 
 #if !defined(__AVR_ATmega328P__) && !defined(__AVR_ATmega328PB__)
 #error check if compatible with MCU
 #endif
-
 
 constexpr int kNumBitsRequired(uint32_t value, int n = 0) {
     return value ? kNumBitsRequired(value >> 1, n + 1) : n;
@@ -31,34 +31,34 @@ public:
     // max. ADC readings that fit into sum_t
     static constexpr size_t kMaxReadings = (sizeof(sum_t) << 3) - kADCBits;
 
-#if HAVE_NTC
-    static constexpr uint8_t kHaveNtc = 1;
-    static constexpr uint8_t kNumReadNtc = 6;       // total readings per cycle = (1 << kNumReadNtc)
-    static_assert(kNumReadNtc >= kAveragePrecisionBits && kNumReadNtc <= kMaxReadings, "invalid value");
-#else
-    static constexpr uint8_t kHaveNtc = 0;
-#endif
-#if HAVE_EXT_VCC || HAVE_READ_VCC
-    static constexpr uint8_t kHaveReadVcc = 1;
-    static constexpr uint8_t kNumReadVcc = 6;       // total readings per cycle = (1 << kNumReadVcc)
-    static_assert(kNumReadVcc >= kAveragePrecisionBits && kNumReadVcc <= kMaxReadings, "invalid value");
-#else
-    static constexpr uint8_t kHaveReadVcc = 0;
-#endif
-#if HAVE_READ_INT_TEMP
-    static constexpr uint8_t kReadIntTemp = 1;
-    static constexpr uint8_t kNumReadTemp = 6;      // total readings per cycle = (1 << kNumReadTemp)
-    static_assert(kNumReadTemp >= kAveragePrecisionBits && kNumReadTemp <= kMaxReadings, "invalid value");
-#else
-    static constexpr uint8_t kReadIntTemp = 0;
-#endif
-#if HAVE_POTI
-    static constexpr uint8_t kHavePoti = 1;
-    static constexpr uint8_t kNumReadPoti = 8;      // total readings per cycle = (1 << kNumReadPoti)
-    static_assert(kNumReadPoti >= kAveragePrecisionBits && kNumReadPoti <= kMaxReadings, "invalid value");
-#else
-    static constexpr uint8_t kHavePoti = 0;
-#endif
+    #if HAVE_NTC
+        static constexpr uint8_t kHaveNtc = 1;
+        static constexpr uint8_t kNumReadNtc = 6;       // total readings per cycle = (1 << kNumReadNtc)
+        static_assert(kNumReadNtc >= kAveragePrecisionBits && kNumReadNtc <= kMaxReadings, "invalid value");
+    #else
+        static constexpr uint8_t kHaveNtc = 0;
+    #endif
+    #if HAVE_EXT_VCC || HAVE_READ_VCC
+        static constexpr uint8_t kHaveReadVcc = 1;
+        static constexpr uint8_t kNumReadVcc = 6;       // total readings per cycle = (1 << kNumReadVcc)
+        static_assert(kNumReadVcc >= kAveragePrecisionBits && kNumReadVcc <= kMaxReadings, "invalid value");
+    #else
+        static constexpr uint8_t kHaveReadVcc = 0;
+    #endif
+    #if HAVE_READ_INT_TEMP
+        static constexpr uint8_t kReadIntTemp = 1;
+        static constexpr uint8_t kNumReadTemp = 6;      // total readings per cycle = (1 << kNumReadTemp)
+        static_assert(kNumReadTemp >= kAveragePrecisionBits && kNumReadTemp <= kMaxReadings, "invalid value");
+    #else
+        static constexpr uint8_t kReadIntTemp = 0;
+    #endif
+    #if HAVE_POTI
+        static constexpr uint8_t kHavePoti = 1;
+        static constexpr uint8_t kNumReadPoti = 8;      // total readings per cycle = (1 << kNumReadPoti)
+        static_assert(kNumReadPoti >= kAveragePrecisionBits && kNumReadPoti <= kMaxReadings, "invalid value");
+    #else
+        static constexpr uint8_t kHavePoti = 0;
+    #endif
 
     static constexpr uint8_t kMaxPositon = kHaveNtc + kHaveReadVcc + kReadIntTemp + kHavePoti;
     static constexpr uint8_t kPosNTC = std::max(0, kHaveNtc - 1);
@@ -66,15 +66,13 @@ public:
     static constexpr uint8_t kPosIntTemp = kPosVCC + kReadIntTemp;
     static constexpr uint8_t kPosPoti = kPosIntTemp + kHavePoti;
 
-#if HAVE_POTI
-    static constexpr uint8_t kPosLast = kPosPoti;
-#else
-    static constexpr uint8_t kPosLast = kMaxPositon - 1;
-#endif
-
+    #if HAVE_POTI
+        static constexpr uint8_t kPosLast = kPosPoti;
+    #else
+        static constexpr uint8_t kPosLast = kMaxPositon - 1;
+    #endif
 
     static_assert(kMaxPositon > 0, "nothing to do for the ADC");
-
 
     static constexpr int kCpuMhz = F_CPU / 1000000UL;
 
@@ -122,6 +120,8 @@ public:
         return _Reference;
     }
 
+#if DIMMER_USE_ADC_INTERRUPT
+
     ADCHandler() : _values{}, _scheduleNext(false) {}
 
     ~ADCHandler() {
@@ -131,10 +131,10 @@ public:
     // initialize ADC
     inline void begin() {
         end();
-#if DEBUG
-        memset(&_duration[0], 0, sizeof(_duration));
-        memset(&_count[0], 0, sizeof(_count));
-#endif
+        #if DEBUG
+            memset(&_duration[0], 0, sizeof(_duration));
+            memset(&_count[0], 0, sizeof(_count));
+        #endif
         ADCSRB = kADCSRB_FreeRunning;
     }
 
@@ -287,5 +287,95 @@ private:
     uint16_t _intCounter;
 #endif
 };
+
+#else
+
+    ADCHandler() {}
+
+    inline void setInternalTemp() {
+        ADMUX = kADMUX_Reference<kADMUX_InternalTemperature>();
+        delay(20);
+    }
+
+    inline void setInternalVCC() {
+        ADMUX = kADMUX_Reference<kADMUX_InternalVCC>();
+        delay(20);
+    }
+
+    template<uint8_t _Pin = PIN_A0>
+    void setPinAndAVCC() {
+        ADMUX = kADMUX_Reference<kADMUX_AVCC, _Pin>();
+        delay(20);
+    }
+
+    template<uint8_t _Pin = PIN_A0>
+    void setPinAndVRef11() {
+        ADMUX = kADMUX_Reference<kADMUX_VREF11, _Pin>();
+        delay(20);
+    }
+
+    // analog read for selected ADC source
+    uint16_t __analogRead() {
+	    sbi(ADCSRA, ADSC);
+        while (bit_is_set(ADCSRA, ADSC)) {
+        }
+        return ADC;
+    }
+
+    // returns average ADC reading multiplied by 64 (or left shifted by 6)
+    // values 0 - 65535
+    uint16_t __getValues() {
+        uint16_t value = std::min<uint16_t>(__analogRead(), 1023);
+        uint8_t count = 8;
+        while(--count) {
+            delay(1);
+            value += __analogRead();
+        }
+        return value * 8;
+    }
+
+#if HAVE_NTC
+    uint16_t getNTCValue() {
+        setPinAndAVCC<NTC_PIN>();
+        return __getValues();
+    }
+    float getNTC_ADCValueAsFloat() {
+        return getNTCValue() / 64.0;
+    }
+#endif
+
+#if HAVE_READ_INT_TEMP
+    uint16_t getIntTempValue() {
+        setInternalTemp();
+        return __getValues();
+    }
+    float getIntTemp_ADCValueAsFloat() {
+        return getIntTempValue() / 64.0;
+    }
+#endif
+
+#if HAVE_POTI
+    uint16_t getPotiValue() {
+        setPinAndAVCC<POTI_PIN>();
+        return __getValues();
+    }
+    float getPoti_ADCValueAsFloat() {
+        return getPotiValue() / 64.0;
+    }
+#endif
+
+#if HAVE_EXT_VCC || HAVE_READ_VCC
+    uint16_t getVCCValue() {
+        setInternalVCC();
+        return __getValues();
+    }
+    float getVCC_ADCValueAsFloat() {
+        return getVCCValue() / 64.0;
+    }
+#endif
+
+};
+
+#endif
 
 extern ADCHandler _adc;

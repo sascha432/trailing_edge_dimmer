@@ -6,6 +6,8 @@
 
 ADCHandler _adc;
 
+#if DIMMER_USE_ADC_INTERRUPT
+
 ISR(ADC_vect)
 {
     _adc.adc_handler(ADC);
@@ -92,3 +94,5 @@ void ADCHandler::restart()
 #endif
     }
 }
+
+#endif
