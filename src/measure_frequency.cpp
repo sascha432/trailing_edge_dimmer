@@ -26,8 +26,13 @@ ISR(TIMER1_OVF_vect)
 
 void FrequencyMeasurement::calc_min_max()
 {
-    uint24_t _min = 0;
-    uint24_t _max = 0;
+    uint24_t _min;
+    uint24_t _max;
+    #if DEBUG_FREQUENCY_MEASUREMENT
+        uint8_t stage1 = 0;
+        uint8_t stage2 = 0;
+        int16_t count = _count;
+    #endif
 
     _frequency = 0;
 
@@ -47,38 +52,62 @@ void FrequencyMeasurement::calc_min_max()
                 num++;
             }
         }
+        #if DEBUG_FREQUENCY_MEASUREMENT
+            stage1 = num;
+        #endif
 
         if (num > DIMMER_ZC_MIN_VALID_SAMPLES) {
 
             // stage 2
 
             _min = sum / num;
+            _max = _min;
             // allow up to DIMMER_ZC_INTERVAL_MAX_DEVIATION % deviation from the filtered avg. value
             uint16_t limit = _min * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
             _min = _min - limit;
             _max = _max + limit;
+
+            #if DEBUG_FREQUENCY_MEASUREMENT
+                sei();
+            #endif
 
             // filter again with new min/max
             sum = 0;
             num = 0;
             for(int i = 0; i < _count; i++) {
                 auto diff = _ticks[i + 1].diff(_ticks[i]);
+                #if DEBUG_FREQUENCY_MEASUREMENT
+                    char ch = '-';
+                #endif
                 if (diff >= _min && diff <= _max) {
                     sum += diff;
                     num++;
+                    #if DEBUG_FREQUENCY_MEASUREMENT
+                        ch = '+';
+                    #endif
                 }
+                #if DEBUG_FREQUENCY_MEASUREMENT
+                    Serial.printf_P(PSTR("+REM=%lu%c\n"), (long)diff, ch);
+                    Serial.flush();
+                #endif
             }
+            #if DEBUG_FREQUENCY_MEASUREMENT
+                stage2 = num;
+            #endif
 
             if (num > DIMMER_ZC_MIN_VALID_SAMPLES) {
                 auto ticks = (sum / static_cast<float>(num));
                 _frequency = 500000.0 / clockCyclesToMicroseconds(ticks);
-                Serial.printf_P(PSTR("+REM=f-sync=%f,valid=%u\n"), _frequency, num);
+                #if DEBUG_FREQUENCY_MEASUREMENT
+                    Serial.printf_P(PSTR("+REM=f-sync=%f,c=%u,s1=%u,s2=%u,mi=%lu,ma=%lu\n"), _frequency, count, stage1, stage2, (long)_min, (long)_max);
+                #endif
                 return;
             } 
-
         }
     }
-    Serial.println(F("+REM=f-sync failed\n"));
+    #if DEBUG_FREQUENCY_MEASUREMENT
+        Serial.printf_P(PSTR("+REM=f-sync failed,c=%u,s1=%u,s2=%u,mi=%lu,ma=%lu\n"), count, stage1, stage2, (long)_min, (long)_max);
+    #endif
 }
 
 void FrequencyMeasurement::zc_measure_handler(uint16_t lo, uint16_t hi)
@@ -130,7 +159,9 @@ bool FrequencyMeasurement::run()
     if (measure == nullptr) {
         _D(5, debug_printf("measuring...\n"));
         dimmer.end();
-        _adc.end();
+        #if DIMMER_USE_ADC_INTERRUPT
+            _adc.end();
+        #endif
 
         // give everything some time to settle before starting the measurement
         delay(100);

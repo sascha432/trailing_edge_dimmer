@@ -67,7 +67,7 @@ ISR(TIMER1_COMPB_vect)
 
 // measure timer overflow interrupt
 MeasureTimer timer2;
-static uint8_t startUpCounter;
+static uint8_t startUpCounter = 0;
 constexpr uint8_t kMinStartupCounter = 10; // number of valid events before starting the dimmer
 
 ISR(TIMER2_OVF_vect)
@@ -81,29 +81,29 @@ ISR(TIMER2_OVF_vect)
     if (queues.check_temperature.timer > 0) {
         queues.check_temperature.timer--;
     }
-    // send artificial event if dimmer is running
-    if (startUpCounter > kMinStartupCounter) {
-        auto ticks = timer2.get_no_cli();
-        if (ticks > dimmer.halfwave_ticks_prescaler1 + dimmer.halfwave_ticks_prescaler1 * DIMMER_ZC_INTERVAL_MAX_DEVIATION) {
-            // change TCNT1 to the time when it should have been occurred
-            dimmer.zc_interrupt_handler(TCNT1, ticks);
-        }
-    }
+    // // send artificial event if dimmer is running
+    // if (startUpCounter > kMinStartupCounter) {
+    //     auto ticks = timer2.get_no_cli();
+    //     if (ticks > dimmer.halfwave_ticks_prescaler1) {
+    //         // change TCNT1 to the time when it should have been occurred
+    //         dimmer.zc_interrupt_handler(TCNT1, ticks);
+    //     }
+    // }
 }
 
-static bool is_ticks_within_range(uint24_t ticks) 
-{
-    uint24_t _min = dimmer.halfwave_ticks_prescaler1;
-    uint24_t _max;
-    // allow up to DIMMER_ZC_INTERVAL_MAX_DEVIATION % deviation from the filtered avg. value
-    uint16_t limit = _min * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
-    _min = _min - limit;
-    _max = _max + limit;
+// static bool is_ticks_within_range(uint24_t ticks) 
+// {
+//     uint24_t _min = dimmer.halfwave_ticks_prescaler1;
+//     uint24_t _max = _min;
+//     // allow up to DIMMER_ZC_INTERVAL_MAX_DEVIATION % deviation from the filtered avg. value
+//     uint16_t limit = _min * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
+//     _min = _min - limit;
+//     _max = _max + limit;
 
-    // check if ticks is within the range
-    // ticks is the clock cycles since the last
-    return (ticks >= _min && ticks <= _max);
-}
+//     // check if ticks is within the range
+//     // ticks is the clock cycles since the last
+//     return (ticks >= _min && ticks <= _max);
+// }
 
 void DimmerBase::begin()
 {
@@ -137,32 +137,37 @@ void DimmerBase::begin()
     startUpCounter = 0;
     timer2.begin(); // timer2 runs at clock speed 
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
-        // clear timers
-        auto ticks = timer2.get_clear_no_cli();
-        TCNT1 = 0;
-        // ignore first zc interrupt
-        if (startUpCounter++ == 0) {
-            return;
-        }
-        // check if interrupt is in valid range
-        if (!is_ticks_within_range(ticks)) {
-            // restart the test
-            startUpCounter = 0;
-            return;
-        }
-        // start the dimmer if we got kMinStartupCounter valid signals in a row
-        if (startUpCounter++ == kMinStartupCounter) {
 
-            attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
-                uint24_t ticks = timer2.get_clear_no_cli();
-                uint16_t counter = TCNT1;
-                dimmer.zc_interrupt_handler(counter, ticks);
-            }, DIMMER_ZC_INTERRUPT_MODE);
+        uint24_t ticks = timer2.get_clear_no_cli();
+        uint16_t counter = TCNT1;
+        dimmer.zc_interrupt_handler(counter, ticks);
 
-            // clear timers
-            auto ticks = timer2.get_clear_no_cli();
-            TCNT1 = 0;
-        }
+        // // clear timers
+        // auto ticks = timer2.get_clear_no_cli();
+        // TCNT1 = 0;
+        // // ignore first zc interrupt
+        // if (startUpCounter++ == 0) {
+        //     return;
+        // }
+        // // check if interrupt is in valid range
+        // if (!is_ticks_within_range(ticks)) {
+        //     // restart the test
+        //     startUpCounter = 0;
+        //     return;
+        // }
+        // // start the dimmer if we got kMinStartupCounter valid signals in a row
+        // if (startUpCounter++ == kMinStartupCounter) {
+
+        //     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
+        //         uint24_t ticks = timer2.get_clear_no_cli();
+        //         uint16_t counter = TCNT1;
+        //         dimmer.zc_interrupt_handler(counter, ticks);
+        //     }, DIMMER_ZC_INTERRUPT_MODE);
+
+        //     // clear timers
+        //     timer2.get_clear_no_cli();
+        //     TCNT1 = 0;
+        // }
     }, DIMMER_ZC_INTERRUPT_MODE);
 
     _D(5, debug_printf("starting timer\n"));
@@ -192,11 +197,11 @@ void DimmerBase::end()
 
 void DimmerBase::zc_interrupt_handler(uint16_t counter, uint24_t ticks)
 {
-    if (!is_ticks_within_range(ticks)) {
-        // event was too early
-        sync_event.invalid_signals++;
-        return;
-    }
+    // if (!is_ticks_within_range(ticks)) {
+    //     // event was too early
+    //     sync_event.invalid_signals++;
+    //     return;
+    // }
 
     Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareB>();
     OCR1B = dimmer_config.zero_crossing_delay_ticks;

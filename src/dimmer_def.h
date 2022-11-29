@@ -14,6 +14,11 @@
 #    define DEBUG 0
 #endif
 
+// enable debug code
+#ifndef DEBUG_FREQUENCY_MEASUREMENT
+#    define DEBUG_FREQUENCY_MEASUREMENT 0
+#endif
+
 // enable debug commands
 // ~1kb extra code size
 #ifndef DEBUG_COMMANDS
@@ -94,11 +99,11 @@
 #    define DIMMER_ZC_MIN_VALID_SAMPLES (DIMMER_ZC_MIN_SAMPLES / 2)
 #endif
 
-// max. deviation (+-0.75%). if the deviation is too low
-// too low filters too many events
-// to hight might lead to flickering
+// max. deviation 
+// if the deviation is too low too low filters too many events
+// too high might lead to flickering
 #ifndef DIMMER_ZC_INTERVAL_MAX_DEVIATION
-#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (0.75 / 100.0)
+#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (2.0 / 100.0)
 #endif
 
 // default mode
@@ -161,6 +166,12 @@
 // ~1642 byte code size
 #ifndef HIDE_DIMMER_INFO
 #    define HIDE_DIMMER_INFO 0
+#endif
+
+// the ADC interrupt takes a lot of cycles blocking interrupts, only for fast MCUs
+// ~360  byte less code
+#ifndef DIMMER_USE_ADC_INTERRUPT
+#    define DIMMER_USE_ADC_INTERRUPT 0
 #endif
 
 // potentiometer for testing purposes
@@ -248,7 +259,9 @@
 
 #    ifndef DIMMER_AVR_TEMP_TS_OFFSET
 #       define DIMMER_AVR_TEMP_TS_OFFSET 112
-#       define DIMMER_AVR_TEMP_TS_GAIN   156
+#    endif
+#    ifndef DIMMER_AVR_TEMP_TS_GAIN
+#       define DIMMER_AVR_TEMP_TS_GAIN 156
 #   endif
 
 #elif __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0

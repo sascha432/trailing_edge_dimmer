@@ -182,30 +182,32 @@ void loop()
     if (measure) {
         if (FrequencyMeasurement::run()) {
 
-            // read all values once before starting the dimmer
-            cli();
-            _adc.begin();
-            _adc.setPosition(0);
-            _adc.restart();
-            sei();
-            uint32_t endTime = millis() + 250;
-            while(millis() < endTime) {
-                if (_adc.canScheduleNext()) {
-                    _adc.next();
-                    if (_adc.getPosition() == _adc.getMaxPosition()) {
-                        break;
+            #if DIMMER_USE_ADC_INTERRUPT
+                // read all values once before starting the dimmer
+                cli();
+                _adc.begin();
+                _adc.setPosition(0);
+                _adc.restart();
+                sei();
+                uint32_t endTime = millis() + 250;
+                while(millis() < endTime) {
+                    if (_adc.canScheduleNext()) {
+                        _adc.next();
+                        if (_adc.getPosition() == _adc.getMaxPosition()) {
+                            break;
+                        }
                     }
                 }
-            }
-            _D(5, debug_printf("adc init time=%d count=%u\n", (int)(250 - (endTime - millis())), _adc.getPosition()));
-            _D(5, _adc.dump());
+                _D(5, debug_printf("adc init time=%d count=%u\n", (int)(250 - (endTime - millis())), _adc.getPosition()));
+                _D(5, _adc.dump());
+            #endif
 
             dimmer.begin();
             restore_level();
 
             register_mem.data.metrics.int_temp = get_internal_temperature();
             register_mem.data.metrics.ntc_temp = get_ntc_temperature();
-            register_mem.data.metrics.vcc = read_vcc();
+            read_vcc();
 
             Dimmer::DimmerEvent<DIMMER_EVENT_RESTART>::send(register_mem.data.metrics);
             // Dimmer::DimmerEvent<DIMMER_EVENT_RESTART>::send(register_mem_metrics_t{dimmer._get_frequency(), get_ntc_temperature(), get_internal_temperature(), read_vcc() });
@@ -219,9 +221,11 @@ void loop()
         return;
     }
 
-    if (_adc.canScheduleNext()) {
-        _adc.next();
-    }
+    #if DIMMER_USE_ADC_INTERRUPT
+        if (_adc.canScheduleNext()) {
+            _adc.next();
+        }
+    #endif
 
     // create non-volatile copy for read operations
     // reduces code size by ~30-40 byte
@@ -341,12 +345,12 @@ void loop()
     }
 
     if (queues.check_temperature.timer == 0) {
-        _adc.stop();
+        #if DIMMER_USE_ADC_INTERRUPT
+            _adc.stop();
+        #endif
         ATOMIC_BLOCK(ATOMIC_FORCEON) {
             queues.check_temperature.timer = Queues::kTemperatureCheckTimerOverflows;
         }
-
-        read_vcc();
 
         int16_t current_temp;
         #if HAVE_NTC
@@ -385,7 +389,7 @@ void loop()
                     conf.scheduleWriteConfig();
                 }
 
-                dimmer.fade_from_to(Dimmer::Channel::any, Dimmer::Level::current, Dimmer::Level::off, 10);
+                dimmer.set_level(Dimmer::Channel::any, Dimmer::Level::off);
 
                 Dimmer::DimmerEvent<DIMMER_EVENT_TEMPERATURE_ALERT>::send(dimmer_over_temperature_event_t{ static_cast<uint8_t>(current_temp), dimmer_config.max_temp });
             }
@@ -394,14 +398,19 @@ void loop()
 
         if (dimmer_config.report_metrics_interval && millis24 >= queues.report_metrics.timer) {
             queues.report_metrics.timer = millis24 + REPORT_METRICS_INTERVAL_MILLIS24(dimmer_config.report_metrics_interval);
+            register_mem.data.metrics.int_temp = get_internal_temperature();
+            register_mem.data.metrics.ntc_temp = get_ntc_temperature();
+            read_vcc();
             // Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT, dimmer_metrics_t>(dimmer_metrics_t{(uint8_t)current_temp, register_mem.data.metrics});
             Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT>::send(static_cast<uint8_t>(current_temp), register_mem.data.metrics);
         }
 
-        // restart reading adc values
-        ATOMIC_BLOCK(ATOMIC_FORCEON) {
-            _adc.setPosition(0);
-            _adc.restart();
-        }
+        #if DIMMER_USE_ADC_INTERRUPT
+            // restart reading adc values
+            ATOMIC_BLOCK(ATOMIC_FORCEON) {
+                _adc.setPosition(0);
+                _adc.restart();
+            }
+        #endif
     }
 }
