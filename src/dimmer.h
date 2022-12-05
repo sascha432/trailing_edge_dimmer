@@ -31,7 +31,6 @@ struct dimmer_fade_t {
 
 struct dimmer_channel_t {
     uint8_t channel;
-    uint8_t state;
     uint16_t ticks;
 };
 
@@ -224,6 +223,8 @@ namespace Dimmer {
         #endif
         dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks
         dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels
+        Level::type levels[Channel::size()];
+        Level::type levels_buffer[Channel::size()];
         TickType halfwave_ticks;
         uint24_t halfwave_ticks_prescaler1;
         uint24_t halfwave_ticks_min;
