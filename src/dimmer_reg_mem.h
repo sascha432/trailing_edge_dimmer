@@ -366,7 +366,7 @@ struct __attribute_packed__ register_mem_metrics_t {
     float get_vcc() const;
     float get_int_temp() const;
     float get_ntc_temp() const;
-    float get_freqency() const;
+    float get_frequency() const;
 };
 
 struct __attribute_packed__ register_mem_channels_t
@@ -438,23 +438,54 @@ struct __attribute_packed__ dimmer_fading_complete_event_t
 
 static_assert(sizeof(dimmer_fading_complete_event_t) == 3, "check struct");
 
-struct __attribute_packed__ dimmer_channel_state_event_t {
-    union {
-        uint8_t channel_state;
-        struct {
-            uint8_t channel0: 1;
-            uint8_t channel1: 1;
-            uint8_t channel2: 1;
-            uint8_t channel3: 1;
-            uint8_t channel4: 1;
-            uint8_t channel5: 1;
-            uint8_t channel6: 1;
-            uint8_t channel7: 1;
+#if DIMMER_CHANNEL_COUNT > 8
+
+    struct __attribute_packed__ dimmer_channel_state_event_t {
+        union {
+            uint16_t channel_state;
+            struct {
+                uint8_t channel0: 1;
+                uint8_t channel1: 1;
+                uint8_t channel2: 1;
+                uint8_t channel3: 1;
+                uint8_t channel4: 1;
+                uint8_t channel5: 1;
+                uint8_t channel6: 1;
+                uint8_t channel8: 1;
+                uint8_t channel9: 1;
+                uint8_t channel10: 1;
+                uint8_t channel11: 1;
+                uint8_t channel12: 1;
+                uint8_t channel13: 1;
+                uint8_t channel14: 1;
+                uint8_t channel15: 1;
+            };
         };
     };
-};
 
-static_assert(sizeof(dimmer_channel_state_event_t) == 1, "check struct");
+    static_assert(sizeof(dimmer_channel_state_event_t) == 2, "check struct");
+
+#else
+
+    struct __attribute_packed__ dimmer_channel_state_event_t {
+        union {
+            uint8_t channel_state;
+            struct {
+                uint8_t channel0: 1;
+                uint8_t channel1: 1;
+                uint8_t channel2: 1;
+                uint8_t channel3: 1;
+                uint8_t channel4: 1;
+                uint8_t channel5: 1;
+                uint8_t channel6: 1;
+                uint8_t channel7: 1;
+            };
+        };
+    };
+
+    static_assert(sizeof(dimmer_channel_state_event_t) == 1, "check struct");
+
+#endif
 
 struct __attribute_packed__ dimmer_sync_event_t {
     uint16_t invalid_signals;
@@ -692,7 +723,7 @@ inline float register_mem_metrics_t::get_ntc_temp() const {
     return NAN;
 }
 
-inline float register_mem_metrics_t::get_freqency() const {
+inline float register_mem_metrics_t::get_frequency() const {
     if (has_frequency()) {
         return frequency;
     }
