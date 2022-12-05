@@ -14,6 +14,7 @@
             "HALFWAVE",
             "MILLIS",
             "MOSFET",
+            "MOSFETS",
             "POTI",
             "PRESCALER",
             "RESTORESTATE",

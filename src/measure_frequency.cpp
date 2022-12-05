@@ -60,12 +60,7 @@ void FrequencyMeasurement::calc_min_max()
 
             // stage 2
 
-            _min = sum / num;
-            _max = _min;
-            // allow up to DIMMER_ZC_INTERVAL_MAX_DEVIATION % deviation from the filtered avg. value
-            uint16_t limit = _min * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
-            _min = _min - limit;
-            _max = _max + limit;
+            _calc_halfwave_min_max(sum / num, _min, _max);
 
             #if DEBUG_FREQUENCY_MEASUREMENT
                 sei();

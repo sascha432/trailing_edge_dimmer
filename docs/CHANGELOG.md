@@ -2,6 +2,8 @@
 
 ## 2.2.3-dev
 
+ - NOTE: currently the dimmer firmware is running on the ZC interrupt, not the predicted signal
+ - Option to disable the ADC interrupt, to avoid blocking interrupts during the calculation
  - Auto restart if the dimmer was shut down due to invalid zero crossing signals
  - Improved ZC filtering and prediction
  - Added custom_copy_hex_file to platformio.ini. Multiple locations can be specified

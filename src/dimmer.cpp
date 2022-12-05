@@ -4,6 +4,7 @@
 
 #include "helpers.h"
 #include "dimmer.h"
+#include "measure_frequency.h"
 #include "i2c_slave.h"
 
 #include <string.h>
@@ -91,19 +92,12 @@ ISR(TIMER2_OVF_vect)
     // }
 }
 
-// static bool is_ticks_within_range(uint24_t ticks) 
-// {
-//     uint24_t _min = dimmer.halfwave_ticks_prescaler1;
-//     uint24_t _max = _min;
-//     // allow up to DIMMER_ZC_INTERVAL_MAX_DEVIATION % deviation from the filtered avg. value
-//     uint16_t limit = _min * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
-//     _min = _min - limit;
-//     _max = _max + limit;
-
-//     // check if ticks is within the range
-//     // ticks is the clock cycles since the last
-//     return (ticks >= _min && ticks <= _max);
-// }
+bool DimmerBase::is_ticks_within_range(uint24_t ticks) 
+{
+    // check if ticks is within the range
+    // ticks is the clock cycles since the last
+    return (ticks >= halfwave_ticks_min && ticks <= halfwave_ticks_max);
+}
 
 void DimmerBase::begin()
 {
@@ -112,6 +106,7 @@ void DimmerBase::begin()
     }
     halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / register_mem.data.metrics.frequency);
     halfwave_ticks_prescaler1 = ((F_CPU / 2.0) / register_mem.data.metrics.frequency);
+    FrequencyMeasurement::_calc_halfwave_min_max(halfwave_ticks_prescaler1, halfwave_ticks_min, halfwave_ticks_max);
 
     queues.scheduled_calls = {};
     sync_event = { 0 , Timer<1>::ticksToMicros(halfwave_ticks_prescaler1) };
@@ -138,9 +133,11 @@ void DimmerBase::begin()
     timer2.begin(); // timer2 runs at clock speed 
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
 
-        uint24_t ticks = timer2.get_clear_no_cli();
-        uint16_t counter = TCNT1;
-        dimmer.zc_interrupt_handler(counter, ticks);
+        dimmer.zc_interrupt_handler(0, 0);
+
+        // uint24_t ticks = timer2.get_clear_no_cli();
+        // uint16_t counter = TCNT1;
+        // dimmer.zc_interrupt_handler(counter, ticks);
 
         // // clear timers
         // auto ticks = timer2.get_clear_no_cli();

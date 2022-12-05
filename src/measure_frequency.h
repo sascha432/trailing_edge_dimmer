@@ -57,6 +57,8 @@ public:
     static void cleanup();
     static bool run();
 
+    static void _calc_halfwave_min_max(uint24_t ticks, uint24_t &hMin, uint24_t &hMax);
+
 private:
     void calc_min_max();
 
@@ -89,4 +91,12 @@ inline float FrequencyMeasurement::get_frequency() const
 inline void FrequencyMeasurement::detach_handler() 
 {
     detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
+}
+
+inline void FrequencyMeasurement::_calc_halfwave_min_max(uint24_t ticks, uint24_t &hMin, uint24_t &hMax)
+{
+    // allow up to DIMMER_ZC_INTERVAL_MAX_DEVIATION % deviation from the filtered avg. value
+    uint16_t limit = ticks * DIMMER_ZC_INTERVAL_MAX_DEVIATION;
+    hMin = ticks - limit;
+    hMax = ticks + limit;
 }

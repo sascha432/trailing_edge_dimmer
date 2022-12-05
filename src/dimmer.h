@@ -226,6 +226,8 @@ namespace Dimmer {
         dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels
         TickType halfwave_ticks;
         uint24_t halfwave_ticks_prescaler1;
+        uint24_t halfwave_ticks_min;
+        uint24_t halfwave_ticks_max;
         uint8_t channel_state;                                                  // bitset of the channel state
         bool toggle_state;
         dimmer_sync_event_t sync_event;
@@ -247,6 +249,7 @@ namespace Dimmer {
         void begin();
         void end();
         void zc_interrupt_handler(uint16_t counter, uint24_t ticks);
+        bool is_ticks_within_range(uint24_t ticks);
 
         inline void set_frequency(float freq) {
             register_mem.data.metrics.frequency = freq;
@@ -377,6 +380,7 @@ namespace Dimmer {
         #endif
 
         void _calculate_channels();
+        static void _calc_halfwave_min_max(uint24_t ticks, uint24_t &hMin, uint24_t &hMax);
 
         register_mem_cfg_t &_config;
         register_mem_t &_register_mem;
