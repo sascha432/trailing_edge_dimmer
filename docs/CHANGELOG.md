@@ -3,6 +3,7 @@
 ## 2.2.3-dev
 
  - NOTE: currently the dimmer firmware is running on the ZC interrupt, not the predicted signal
+ - Fixed rare flickering when turning a channel off by adding double buffering to the channel levels
  - Option to disable the ADC interrupt, to avoid blocking interrupts during the calculation
  - Auto restart if the dimmer was shut down due to invalid zero crossing signals
  - Improved ZC filtering and prediction

@@ -68,8 +68,8 @@ ISR(TIMER1_COMPB_vect)
 
 // measure timer overflow interrupt
 MeasureTimer timer2;
-static uint8_t startUpCounter = 0;
-constexpr uint8_t kMinStartupCounter = 10; // number of valid events before starting the dimmer
+// static uint8_t startUpCounter = 0;
+// constexpr uint8_t kMinStartupCounter = 10; // number of valid events before starting the dimmer
 
 ISR(TIMER2_OVF_vect)
 {
@@ -122,15 +122,13 @@ void DimmerBase::begin()
     }
 
     cli();
-    startUpCounter = 0;
+    // startUpCounter = 0;
     timer2.begin(); // timer2 runs at clock speed 
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
 
-        dimmer.zc_interrupt_handler(0, 0);
-
-        // uint24_t ticks = timer2.get_clear_no_cli();
-        // uint16_t counter = TCNT1;
-        // dimmer.zc_interrupt_handler(counter, ticks);
+        uint24_t ticks = timer2.get_clear_no_cli();
+        uint16_t counter = TCNT1;
+        dimmer.zc_interrupt_handler(counter, ticks);
 
         // // clear timers
         // auto ticks = timer2.get_clear_no_cli();
@@ -200,8 +198,6 @@ void DimmerBase::zc_interrupt_handler(uint16_t counter, uint24_t ticks)
     Timer<1>::clear_flags<Timer<1>::kFlagsCompareB>();
 
     sync_event.invalid_signals = 0;
-
-    memcpy(ordered_channels, ordered_channels_buffer, sizeof(ordered_channels));
     sei();
 
     _apply_fading();
@@ -219,18 +215,15 @@ bool DimmerBase::is_ticks_within_range(uint24_t ticks)
 // turn mosfets for active channels on
 void DimmerBase::_start_halfwave()
 {
-    TCNT1 = 0;
-    OCR1A = 0;
-    OCR1B = halfwave_ticks;
-    Timer<1>::clear_flags<Timer<1>::kFlagsCompareAB>();
+    // copying the data and checking if the signal is valid has a fixed number of clock cycles and can be 
+    // compensated by the zero crossing delay during calibration
 
-    Channel::type i;
-    toggle_state = _config.bits.leading_edge ? DIMMER_MOSFET_OFF_STATE : DIMMER_MOSFET_ON_STATE;
+    // copy double buffer before starting the halfwave
+    memcpy(ordered_channels, ordered_channels_buffer, sizeof(ordered_channels));
+    // copy double buffered levels
+    memcpy(levels, levels_buffer, sizeof(levels));
 
-    #if DIMMER_MAX_CHANNELS > 1
-        channel_ptr = 0;
-    #endif
-
+    // TODO: starting the halfwave will increase the counter which can only be reset by a valid zero crossing event
     // if (++sync_event.invalid_signals >= DIMMER_OUT_OF_SYNC_LIMIT) {
     //     Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareAB>();
     //     end();
@@ -238,33 +231,53 @@ void DimmerBase::_start_halfwave()
     //     queues.scheduled_calls.sync_event = true;
     //     return;
     // }
-    
-    // dimmed channels
+
+    // reset timer for the halfwave
+    TCNT1 = 0;
+    // next dimming event
+    OCR1A = 0;
+    // next predicted zero crossing event
+    OCR1B = halfwave_ticks;
+    // clear any pending interrupts
+    Timer<1>::clear_flags<Timer<1>::kFlagsCompareAB>();
+
+    toggle_state = _config.bits.leading_edge ? DIMMER_MOSFET_OFF_STATE : DIMMER_MOSFET_ON_STATE;
+
+    #if DIMMER_MAX_CHANNELS > 1
+        channel_ptr = 0;
+    #endif
+
+    // switch channels on in prioritized order
     OCR1A = ordered_channels[0].ticks;
-    for(i = 0; ordered_channels[i].ticks; i++) {
+    for(Channel::type i = 0; ordered_channels[i].ticks; i++) {
         _set_mosfet_gate(ordered_channels[i].channel, toggle_state);
     }
+
     // channels that are fully on or off
     DIMMER_CHANNEL_LOOP(j) {
-        if (_get_level(j) == Level::off) {
+        // those 2 states usually do not change every halfwave and have a lower priority
+        if (levels[j] == Level::off) {
             _set_mosfet_gate(j, !toggle_state);
         }
-        else if (_get_level(j) == Level::max) {
+        else if (levels[j] >= Level::max) {
             _set_mosfet_gate(j, toggle_state);
         }
     }
+    // toggle state for the compare a interrupt
     toggle_state = !toggle_state;
 
-    // next predicted zero crossing event
+    // TODO: next predicted zero crossing event
     // Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareB>();
+
+    // TODO: disable predicted zero crossing timer
     Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareB>();
 
-    if (ordered_channels[0].ticks) { // any channel dimmed?
+    if (ordered_channels[0].ticks && ordered_channels[0].ticks <= Dimmer::TickTypeMax) { // any channel dimmed?
         // run compare a interrupt to switch MOSFETs
         Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareA>();
     }
     else {
-        // nothing to do this halfwave
+        // nothing to do this halfwave, make cure compare a does not run
         Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareA>();
     }
 }
@@ -275,19 +288,31 @@ void DimmerBase::compare_interrupt()
 
         _set_mosfet_gate(ordered_channels[0].channel, toggle_state);
         Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareA>();
-        // Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareB>();
 
     #else
+        // this code needs to run as fast as possible
         ChannelStateType *channel = &ordered_channels[channel_ptr++];
         ChannelStateType *next_channel = channel;
         ++next_channel;
         for(;;) {
-            _set_mosfet_gate(channel->channel, toggle_state);    // turn off current channel
+            _set_mosfet_gate(channel->channel, toggle_state);    // toggle current channel
+
+            if (channel->ticks == 0) {
+                Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareA>();
+                //TODO remove debug code
+                sei();
+                Serial.printf_P(PSTR("+REM=err_cmp_a,ch=%u,t=%u,p=%u\n"), channel->channel, channel->ticks, channel_ptr);
+                DIMMER_CHANNEL_LOOP(j) {
+                    ChannelStateType *channel = &ordered_channels[j];
+                    Serial.printf_P(PSTR("+REM=ch=%u,t=%u\n"), channel->channel, channel->ticks);
+                }
+                // end();
+                break;
+            }
 
             if (next_channel->ticks == 0) {
-                // no more channels to change, disable timers
+                // no more channels to change, disable compare a interrupt
                 Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareA>();
-                // Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareB>();
                 break;
             }
             else if (next_channel->ticks > channel->ticks) {
@@ -295,7 +320,7 @@ void DimmerBase::compare_interrupt()
                 OCR1A = std::max<uint16_t>(TCNT1 + Dimmer::Timer<1>::extraTicks, next_channel->ticks);  // make sure to trigger an interrupt even if the time slot is in the past by using TCNT1 + 1 as minimum
                 break;
             }
-            //
+            // next channel that is on
             channel = next_channel;
             channel_ptr++;
             next_channel++;
@@ -323,22 +348,24 @@ static inline void dimmer_bubble_sort(ChannelStateType channels[], Channel::type
 void DimmerBase::_calculate_channels()
 {
     ChannelStateType ordered_channels[Channel::size() + 1];
+    Level::type levels_tmp[Channel::size()];
     Channel::type count = 0;
     uint8_t new_channel_state = 0;
 
     DIMMER_CHANNEL_LOOP(i) {
         auto level = DIMMER_LINEAR_LEVEL(_get_level(i), i);
+        levels_tmp[i] = level; // keep ordered channels and levels in sync
         if (level >= Level::max) {
             new_channel_state |= (1 << i);
         }
         else if (level > Level::off) {
             new_channel_state |= (1 << i);
-            ordered_channels[count].ticks = _get_ticks(i, level);
+            ordered_channels[count].ticks = _get_ticks(i, level); // this always returns the min, number of ticks
             ordered_channels[count].channel = i;
             count++;
         }
     }
-    ordered_channels[count] = {};
+    ordered_channels[count] = {}; // end marker
 
     #if DIMMER_MAX_CHANNELS > 1
         dimmer_bubble_sort(ordered_channels, count);
@@ -350,6 +377,7 @@ void DimmerBase::_calculate_channels()
         queues.scheduled_calls.send_channel_state = true;
     }
     memcpy(ordered_channels_buffer, ordered_channels, sizeof(ordered_channels_buffer));
+    memcpy(levels_buffer, levels_tmp, sizeof(levels_buffer));
     sei();
 }
 
@@ -466,7 +494,8 @@ void DimmerBase::_apply_fading()
                         queues.fading_completed_events.resetTimer();
                     }
                 #endif
-            } else {
+            } 
+            else {
                 _set_level(i, fade.level);
             }
             #if DEBUG
