@@ -19,6 +19,8 @@
             "POTI",
             "PRESCALER",
             "RESTORESTATE",
+            "TCNT1",
+            "TCNT2",
             "UART",
             "VREF"
         ],

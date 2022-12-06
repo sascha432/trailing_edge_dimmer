@@ -86,7 +86,7 @@ void _dimmer_i2c_on_receive(int length)
                         uint8_t numChannels = 8;
                         uint8_t start = 0;
                         if (length-- > 0) {
-                            numChannels = (uint8_t)Wire.read();
+                            numChannels = Wire.read();
                             start = numChannels & 0x0f;
                             numChannels >>= 4;
                         }
@@ -188,7 +188,7 @@ void _dimmer_i2c_on_receive(int length)
                     Serial.printf_P(PSTR("+REM=zc=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
                 case DIMMER_COMMAND_SET_ZC_DELAY:
-                    if (length-- >= (int)sizeof(register_mem.data.cfg.zero_crossing_delay_ticks)) {
+                    if (length-- >= static_cast<int>(sizeof(register_mem.data.cfg.zero_crossing_delay_ticks))) {
                         Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.cfg.zero_crossing_delay_ticks), sizeof(register_mem.data.cfg.zero_crossing_delay_ticks));
                     }
                     Serial.printf_P(PSTR("+REM=zc=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
@@ -218,16 +218,24 @@ void _dimmer_i2c_on_receive(int length)
                         break;
 
                     case DIMMER_COMMAND_DUMP_CHANNELS: {
-                            auto &tmp = dimmer.ordered_channels;
+                            decltype(dimmer.ordered_channels) tmp;
+                            decltype(dimmer.levels_buffer) tmp2;
+                            ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                                memcpy(tmp, dimmer.ordered_channels, sizeof(tmp));
+                                memcpy(tmp2, dimmer.levels_buffer, sizeof(tmp2));
+                            }
                             Serial.print(F("+REM="));
                             if (tmp[0].ticks) {
                                 for(Dimmer::Channel::type i = 0; tmp[i].ticks; i++) {
-                                    Serial.printf_P(PSTR("%u=%u(%u) "), tmp[i].channel, tmp[i].ticks, dimmer._get_level(tmp[i].channel));
+                                    Serial.printf_P(PSTR("%u=%u(%u) "), tmp[i].channel, tmp[i].ticks, tmp2[tmp[i].channel]);
                                 }
                                 Serial.println();
                             }
                             else {
                                 Serial.println(F("No channels active"));
+                            }
+                            DIMMER_CHANNEL_LOOP(i) {
+                                Serial.printf_P(PSTR("+REM=ch=%u,l=%u/%u\n"), i, tmp2[i], dimmer._get_level(i));
                             }
                         }
                         break;
@@ -235,7 +243,7 @@ void _dimmer_i2c_on_receive(int length)
                             Serial.print(F("+REM="));
                             auto ptr = Dimmer::RegisterMemory::raw::begin();
                             for(uint8_t addr = DIMMER_REGISTER_START_ADDR; addr < DIMMER_REGISTER_END_ADDR; addr++, ptr++) {
-                                //1Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
+                                //Serial.printf_P(PSTR("+REM=[%02x]: %u (%#02x)\n"), addr, *ptr, *ptr);
                                 if (addr % 4 == 0) {
                                     Serial.printf_P(PSTR("[%02x]"), addr);
                                 }
@@ -367,7 +375,6 @@ void _dimmer_i2c_on_receive(int length)
         }
     }
 }
-
 
 void _dimmer_i2c_on_request()
 {

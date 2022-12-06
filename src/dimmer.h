@@ -51,6 +51,11 @@ namespace Dimmer {
     using LevelType = dimmer_level_t;
     using TickType = uint16_t;
     using TickMultiplierType = uint32_t;
+    #if DIMMER_MAX_CHANNELS > 8
+        using StateType = uint16_t;
+    #else
+        using StateType = uint8_t;
+    #endif
 
     enum class ModeType {
         TRAILING_EDGE,
@@ -216,23 +221,25 @@ namespace Dimmer {
     };
 
     struct dimmer_t {
-        Level::type level[Channel::size()];                                     // current level
+        Level::type levels_buffer[Channel::size()];                             // single buffer for levels since they are used only when the halfwave starts
         dimmer_fade_t fading[Channel::size()];                                  // calculated fading data
         #if DIMMER_MAX_CHANNELS > 1
-            Channel::type channel_ptr;
+            Channel::type channel_ptr;                                          // internal pointer used between interrupts
         #endif
-        dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks
-        dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels
-        Level::type levels[Channel::size()];
-        Level::type levels_buffer[Channel::size()];
+        // for double bufferring. the calculation is done on the stack and copied into the first buffer
+        // before the half wave starts the first buffer is copied into the second buffer, which is used inside the interrupts
+        ChannelStateType ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks, second buffer
+        ChannelStateType ordered_channels_buffer[Channel::size() + 1];          // next dimming levels, first buffer
         TickType halfwave_ticks;
-        uint24_t halfwave_ticks_prescaler1;
-        uint24_t halfwave_ticks_min;
-        uint24_t halfwave_ticks_max;
-        uint8_t channel_state;                                                  // bitset of the channel state
-        bool toggle_state;
-        dimmer_sync_event_t sync_event;
+        StateType channel_state;                                                // bitset of the channel state
+        bool toggle_state;                                                      // next state of the mosfets
 
+        #if ENABLE_ZC_PREDICTION
+            uint24_t halfwave_ticks_prescaler1;
+            uint24_t halfwave_ticks_min;
+            uint24_t halfwave_ticks_max;
+            dimmer_sync_event_t sync_event;
+        #endif
         #if HAVE_FADE_COMPLETION_EVENT
             Level::type fading_completed[Channel::size()];
         #endif
@@ -249,8 +256,10 @@ namespace Dimmer {
 
         void begin();
         void end();
-        void zc_interrupt_handler(uint16_t counter, uint24_t ticks);
-        bool is_ticks_within_range(uint24_t ticks);
+        void zc_interrupt_handler(uint24_t ticks);
+        #if ENABLE_ZC_PREDICTION
+            bool is_ticks_within_range(uint24_t ticks);
+        #endif
 
         inline void set_frequency(float freq) {
             register_mem.data.metrics.frequency = freq;
@@ -327,13 +336,7 @@ namespace Dimmer {
         }
 
         inline Level::type _normalize_level(Level::type level) const {
-            if (level < Level::off) {
-                return Level::off;
-            }
-            if (level > Level::max) {
-                return Level::max;
-            }
-            return level;
+            return std::clamp(level, Level::off, Level::max);
         }
 
         void compare_interrupt();

@@ -25,6 +25,13 @@
 #    define DEBUG_COMMANDS 1
 #endif
 
+// enable zero crossing prediction and error correction. requires re-calibration of the zero crossing since the 
+// clock cycles change if enabled
+// TODO unstable at the moment
+#ifndef ENABLE_ZC_PREDICTION
+#    define ENABLE_ZC_PREDICTION 0
+#endif
+
 // pin for the zero crossing signal
 #ifndef ZC_SIGNAL_PIN
 #    error ZC_SIGNAL_PIN not defined

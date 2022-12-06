@@ -11,23 +11,25 @@
 #include <stdlib.h>
 #include <avr/io.h>
 
-#define PIN_D2_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
-#define PIN_D2_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
-#define PIN_D2_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PIND)), "I" (2))
-#define PIN_D2_IS_SET()                                 ((_SFR_IO_ADDR(PIND) & _BV(2)) != 0)
-#define PIN_D2_IS_CLEAR()                               ((_SFR_IO_ADDR(PIND) & _BV(2)) == 0)
+// old debug code
 
-#define PIN_D8_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
-#define PIN_D8_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
-#define PIN_D8_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (0))
-#define PIN_D8_IS_SET()                                 ((_SFR_IO_ADDR(PINB) & _BV(0)) != 0)
-#define PIN_D8_IS_CLEAR()                               ((_SFR_IO_ADDR(PINB) & _BV(0)) == 0)
+// #define PIN_D2_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
+// #define PIN_D2_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
+// #define PIN_D2_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PIND)), "I" (2))
+// #define PIN_D2_IS_SET()                                 ((_SFR_IO_ADDR(PIND) & _BV(2)) != 0)
+// #define PIN_D2_IS_CLEAR()                               ((_SFR_IO_ADDR(PIND) & _BV(2)) == 0)
 
-#define PIN_D11_SET()                                   asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
-#define PIN_D11_CLEAR()                                 asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
-#define PIN_D11_TOGGLE()                                asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (3))
-#define PIN_D11_IS_SET()                                ((_SFR_IO_ADDR(PINB) & _BV(3)) != 0)
-#define PIN_D11_IS_CLEAR()                              ((_SFR_IO_ADDR(PINB) & _BV(3)) == 0)
+// #define PIN_D8_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
+// #define PIN_D8_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
+// #define PIN_D8_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (0))
+// #define PIN_D8_IS_SET()                                 ((_SFR_IO_ADDR(PINB) & _BV(0)) != 0)
+// #define PIN_D8_IS_CLEAR()                               ((_SFR_IO_ADDR(PINB) & _BV(0)) == 0)
+
+// #define PIN_D11_SET()                                   asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
+// #define PIN_D11_CLEAR()                                 asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
+// #define PIN_D11_TOGGLE()                                asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (3))
+// #define PIN_D11_IS_SET()                                ((_SFR_IO_ADDR(PINB) & _BV(3)) != 0)
+// #define PIN_D11_IS_CLEAR()                              ((_SFR_IO_ADDR(PINB) & _BV(3)) == 0)
 
 using namespace Dimmer;
 
@@ -68,8 +70,6 @@ ISR(TIMER1_COMPB_vect)
 
 // measure timer overflow interrupt
 MeasureTimer timer2;
-// static uint8_t startUpCounter = 0;
-// constexpr uint8_t kMinStartupCounter = 10; // number of valid events before starting the dimmer
 
 ISR(TIMER2_OVF_vect)
 {
@@ -82,14 +82,14 @@ ISR(TIMER2_OVF_vect)
     if (queues.check_temperature.timer > 0) {
         queues.check_temperature.timer--;
     }
-    // // send artificial event if dimmer is running
-    // if (startUpCounter > kMinStartupCounter) {
-    //     auto ticks = timer2.get_no_cli();
-    //     if (ticks > dimmer.halfwave_ticks_prescaler1) {
-    //         // change TCNT1 to the time when it should have been occurred
-    //         dimmer.zc_interrupt_handler(TCNT1, ticks);
-    //     }
-    // }
+    #if ENABLE_ZC_PREDICTION
+        // send artificial event in case the event is not received within the range
+        // in case the zero crossing fire already, the event is ignored
+        auto ticks = timer2.get_no_cli();
+        if (ticks > dimmer.halfwave_ticks_prescaler1) {
+            dimmer.zc_interrupt_handler(ticks);
+        }
+    #endif
 }
 
 void DimmerBase::begin()
@@ -98,11 +98,13 @@ void DimmerBase::begin()
         return;
     }
     halfwave_ticks = ((F_CPU / Timer<1>::prescaler / 2.0) / register_mem.data.metrics.frequency);
-    halfwave_ticks_prescaler1 = ((F_CPU / 2.0) / register_mem.data.metrics.frequency);
-    FrequencyMeasurement::_calc_halfwave_min_max(halfwave_ticks_prescaler1, halfwave_ticks_min, halfwave_ticks_max);
+    #if ENABLE_ZC_PREDICTION
+        halfwave_ticks_prescaler1 = ((F_CPU / 2.0) / register_mem.data.metrics.frequency);
+        FrequencyMeasurement::_calc_halfwave_min_max(halfwave_ticks_prescaler1, halfwave_ticks_min, halfwave_ticks_max);
+        sync_event = { 0 , Timer<1>::ticksToMicros(halfwave_ticks_prescaler1) };
+    #endif
 
     queues.scheduled_calls = {};
-    sync_event = { 0 , Timer<1>::ticksToMicros(halfwave_ticks_prescaler1) };
 
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
@@ -122,40 +124,12 @@ void DimmerBase::begin()
     }
 
     cli();
-    // startUpCounter = 0;
     timer2.begin(); // timer2 runs at clock speed 
     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
 
-        uint24_t ticks = timer2.get_clear_no_cli();
-        uint16_t counter = TCNT1;
-        dimmer.zc_interrupt_handler(counter, ticks);
-
-        // // clear timers
-        // auto ticks = timer2.get_clear_no_cli();
-        // TCNT1 = 0;
-        // // ignore first zc interrupt
-        // if (startUpCounter++ == 0) {
-        //     return;
-        // }
-        // // check if interrupt is in valid range
-        // if (!is_ticks_within_range(ticks)) {
-        //     // restart the test
-        //     startUpCounter = 0;
-        //     return;
-        // }
-        // // start the dimmer if we got kMinStartupCounter valid signals in a row
-        // if (startUpCounter++ == kMinStartupCounter) {
-
-        //     attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
-        //         uint24_t ticks = timer2.get_clear_no_cli();
-        //         uint16_t counter = TCNT1;
-        //         dimmer.zc_interrupt_handler(counter, ticks);
-        //     }, DIMMER_ZC_INTERRUPT_MODE);
-
-        //     // clear timers
-        //     timer2.get_clear_no_cli();
-        //     TCNT1 = 0;
-        // }
+        uint24_t ticks = timer2.get_clear_no_cli(); // this is not used with ENABLE_ZC_PREDICTION disabled
+        dimmer.zc_interrupt_handler(ticks);
+        
     }, DIMMER_ZC_INTERRUPT_MODE);
 
     _D(5, debug_printf("starting timer\n"));
@@ -183,13 +157,18 @@ void DimmerBase::end()
     sei();
 }
 
-void DimmerBase::zc_interrupt_handler(uint16_t counter, uint24_t ticks)
+void DimmerBase::zc_interrupt_handler(uint24_t ticks)
 {
-    // if (!is_ticks_within_range(ticks)) {
-    //     // event was too early
-    //     sync_event.invalid_signals++;
-    //     return;
-    // }
+    #if ENABLE_ZC_PREDICTION
+        // check if the ticks since the last call are in range
+        if (!is_ticks_within_range(ticks)) {
+            // invalid signal
+            sync_event.invalid_signals++;
+            return;
+        }
+        // the signal seems valid, reset counter
+        sync_event.invalid_signals = 0;
+    #endif
 
     // enable timer for delayed zero crossing
     Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareB>();
@@ -197,7 +176,6 @@ void DimmerBase::zc_interrupt_handler(uint16_t counter, uint24_t ticks)
     OCR1B += TCNT1;
     Timer<1>::clear_flags<Timer<1>::kFlagsCompareB>();
 
-    sync_event.invalid_signals = 0;
     sei();
 
     _apply_fading();
@@ -205,12 +183,14 @@ void DimmerBase::zc_interrupt_handler(uint16_t counter, uint24_t ticks)
     _D(10, Serial.println(F("zc int")));
 }
 
-bool DimmerBase::is_ticks_within_range(uint24_t ticks) 
-{
-    // check if ticks is within the range
-    // ticks is the clock cycles since the last
-    return (ticks >= halfwave_ticks_min && ticks <= halfwave_ticks_max);
-}
+#if ENABLE_ZC_PREDICTION
+    bool DimmerBase::is_ticks_within_range(uint24_t ticks) 
+    {
+        // check if ticks is within the range
+        // ticks is the clock cycles since the last
+        return (ticks >= halfwave_ticks_min && ticks <= halfwave_ticks_max);
+    }
+#endif
 
 // turn mosfets for active channels on
 void DimmerBase::_start_halfwave()
@@ -218,19 +198,20 @@ void DimmerBase::_start_halfwave()
     // copying the data and checking if the signal is valid has a fixed number of clock cycles and can be 
     // compensated by the zero crossing delay during calibration
 
-    // copy double buffer before starting the halfwave
-    memcpy(ordered_channels, ordered_channels_buffer, sizeof(ordered_channels));
-    // copy double buffered levels
-    memcpy(levels, levels_buffer, sizeof(levels));
+    #if ENABLE_ZC_PREDICTION
+        // increase counter for an invalid signal. the counter is reset somewhere else
+        // at this point the signal might be invalid or not
+        if (++sync_event.invalid_signals >= DIMMER_OUT_OF_SYNC_LIMIT) {
+            Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareAB>();
+            end();
+            // store counter and send event. dimmer needs to be reset to continue
+            queues.scheduled_calls.sync_event = true;
+            return;
+        }
+    #endif
 
-    // TODO: starting the halfwave will increase the counter which can only be reset by a valid zero crossing event
-    // if (++sync_event.invalid_signals >= DIMMER_OUT_OF_SYNC_LIMIT) {
-    //     Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareAB>();
-    //     end();
-    //     // store counter and send event
-    //     queues.scheduled_calls.sync_event = true;
-    //     return;
-    // }
+    // double buffering makes sure that the levels stay the same during one half cycle even if they are modified between interrupts
+    memcpy(ordered_channels, ordered_channels_buffer, sizeof(ordered_channels));
 
     // reset timer for the halfwave
     TCNT1 = 0;
@@ -254,30 +235,30 @@ void DimmerBase::_start_halfwave()
     }
 
     // channels that are fully on or off
-    DIMMER_CHANNEL_LOOP(j) {
+    DIMMER_CHANNEL_LOOP(i) {
         // those 2 states usually do not change every halfwave and have a lower priority
-        if (levels[j] == Level::off) {
-            _set_mosfet_gate(j, !toggle_state);
+        if (levels_buffer[i] == Level::off) {
+            _set_mosfet_gate(i, !toggle_state);
         }
-        else if (levels[j] >= Level::max) {
-            _set_mosfet_gate(j, toggle_state);
+        else if (levels_buffer[i] >= Level::max) {
+            _set_mosfet_gate(i, toggle_state);
         }
     }
     // toggle state for the compare a interrupt
     toggle_state = !toggle_state;
 
-    // TODO: next predicted zero crossing event
-    // Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareB>();
-
-    // TODO: disable predicted zero crossing timer
-    Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareB>();
+    #if ENABLE_ZC_PREDICTION
+        Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareB>();
+    #else
+        Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareB>();
+    #endif
 
     if (ordered_channels[0].ticks && ordered_channels[0].ticks <= Dimmer::TickTypeMax) { // any channel dimmed?
         // run compare a interrupt to switch MOSFETs
         Timer<1>::int_mask_enable<Timer<1>::kIntMaskCompareA>();
     }
     else {
-        // nothing to do this halfwave, make cure compare a does not run
+        // nothing to do this halfwave, make sure compare a does not run
         Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareA>();
     }
 }
@@ -296,19 +277,6 @@ void DimmerBase::compare_interrupt()
         ++next_channel;
         for(;;) {
             _set_mosfet_gate(channel->channel, toggle_state);    // toggle current channel
-
-            if (channel->ticks == 0) {
-                Timer<1>::int_mask_disable<Timer<1>::kIntMaskCompareA>();
-                //TODO remove debug code
-                sei();
-                Serial.printf_P(PSTR("+REM=err_cmp_a,ch=%u,t=%u,p=%u\n"), channel->channel, channel->ticks, channel_ptr);
-                DIMMER_CHANNEL_LOOP(j) {
-                    ChannelStateType *channel = &ordered_channels[j];
-                    Serial.printf_P(PSTR("+REM=ch=%u,t=%u\n"), channel->channel, channel->ticks);
-                }
-                // end();
-                break;
-            }
 
             if (next_channel->ticks == 0) {
                 // no more channels to change, disable compare a interrupt
@@ -343,42 +311,46 @@ static inline void dimmer_bubble_sort(ChannelStateType channels[], Channel::type
    }
 }
 
+// copy data from register memory to buffers
 // calculate ticks for each channel and sort them
 // channels that are off or fully on won't be added
 void DimmerBase::_calculate_channels()
 {
-    ChannelStateType ordered_channels[Channel::size() + 1];
-    Level::type levels_tmp[Channel::size()];
+    ChannelStateType ordered_channels_tmp[Channel::size() + 1];
     Channel::type count = 0;
-    uint8_t new_channel_state = 0;
+    StateType new_channel_state = 0;
+
+    // copy levels from register memory
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        memcpy(levels_buffer, _register_mem.channels.level, sizeof(levels_buffer));
+    }
 
     DIMMER_CHANNEL_LOOP(i) {
-        auto level = DIMMER_LINEAR_LEVEL(_get_level(i), i);
-        levels_tmp[i] = level; // keep ordered channels and levels in sync
+        auto level = DIMMER_LINEAR_LEVEL(levels_buffer[i], i);
         if (level >= Level::max) {
             new_channel_state |= (1 << i);
         }
         else if (level > Level::off) {
             new_channel_state |= (1 << i);
-            ordered_channels[count].ticks = _get_ticks(i, level); // this always returns the min, number of ticks
-            ordered_channels[count].channel = i;
+            ordered_channels_tmp[count].ticks = _get_ticks(i, level); // this always returns the min, number of ticks
+            ordered_channels_tmp[count].channel = i;
             count++;
         }
     }
-    ordered_channels[count] = {}; // end marker
+    ordered_channels_tmp[count] = {}; // end marker
 
     #if DIMMER_MAX_CHANNELS > 1
-        dimmer_bubble_sort(ordered_channels, count);
+        dimmer_bubble_sort(ordered_channels_tmp, count);
     #endif
 
-    cli(); // copy double buffer with interrupts disabled
-    if (new_channel_state != channel_state) {
-        channel_state = new_channel_state;
-        queues.scheduled_calls.send_channel_state = true;
+    // copy double buffer with interrupts disabled
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        if (new_channel_state != channel_state) {
+            channel_state = new_channel_state;
+            queues.scheduled_calls.send_channel_state = true;
+        }
+        memcpy(ordered_channels_buffer, ordered_channels_tmp, sizeof(ordered_channels_buffer));
     }
-    memcpy(ordered_channels_buffer, ordered_channels, sizeof(ordered_channels_buffer));
-    memcpy(levels_buffer, levels_tmp, sizeof(levels_buffer));
-    sei();
 }
 
 void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
@@ -425,6 +397,12 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
 
     _D(5, debug_printf("fade_channel_from_to from=%d to=%d time=%f\n", from, to, time));
 
+    // get real level not what is stored in the register memory
+    Level::type current_level;
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        current_level = levels_buffer[channel];
+    }
+
     // stop fading at current level
     if (to == Level::freeze) {
         if (fade.count == 0) {
@@ -433,15 +411,19 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
         }
         fade.count = 1;
         fade.step = 0; // keep current level
-        fade.level = _normalize_level(_get_level(channel));
+        fade.level = _normalize_level(current_level);
         fade.targetLevel = fade.level;
+        // make sure the level is stored
+        set_channel_level(channel, fade.targetLevel);
         return;
     }
 
-    from = _normalize_level(from == Level::current ? _get_level(channel) : from);
+    from = _normalize_level(from == Level::current ? current_level : from);
     diff = _normalize_level(to) - from;
     if (diff == 0) {
         _D(5, debug_printf("fade normalized -> from=%d to=%d\n", from, to));
+        // make sure the level is stored
+        set_channel_level(channel, to);
         return;
     }
 
@@ -450,12 +432,14 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
         _D(5, debug_printf("Relative fading time %.3f\n", time));
     }
 
-    fade.count = register_mem.data.metrics.frequency * time * 2;
+    fade.count = register_mem.data.metrics.frequency * time * 2.0;
     if (fade.count == 0) {
         _D(5, debug_printf("count=%u time=%f\n", fade.count, time));
+        // make sure the level is stored
+        set_channel_level(channel, to);
         return;
     }
-    fade.step = diff / (float)fade.count;
+    fade.step = diff / static_cast<float>(fade.count);
     fade.level = from;
     fade.targetLevel = to;
 

@@ -334,15 +334,17 @@ void loop()
         conf._writeConfig(false);
     }
 
-    if (tmp_scheduled_calls.sync_event) {
-        Dimmer::DimmerEvent<DIMMER_EVENT_SYNC_EVENT>::send(dimmer.sync_event);
+    #if ENABLE_ZC_PREDICTION
+        if (tmp_scheduled_calls.sync_event) {
+            Dimmer::DimmerEvent<DIMMER_EVENT_SYNC_EVENT>::send(dimmer.sync_event);
 
-        Serial.printf_P(PSTR("+REM=lost,invalid=%u,time=%u,restarting\n"), dimmer.sync_event.invalid_signals, dimmer.sync_event.halfwave_micros);
+            Serial.printf_P(PSTR("+REM=lost,invalid=%u,time=%u,restarting\n"), dimmer.sync_event.invalid_signals, dimmer.sync_event.halfwave_micros);
 
-        // start new measurement
-        FrequencyMeasurement::run();
-        return;
-    }
+            // start new measurement
+            FrequencyMeasurement::run();
+            return;
+        }
+    #endif
 
     if (queues.check_temperature.timer == 0) {
         #if DIMMER_USE_ADC_INTERRUPT
