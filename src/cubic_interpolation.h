@@ -37,8 +37,8 @@ public:
         xyValueTypePtr getXValues() const;
         xyValueTypePtr getYValues() const;
 
-        void copyToConfig(register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel);
-        void createFromConfig(const register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel);
+        void copyToConfig(register_mem_cubic_int_t &cubicInt);
+        void createFromConfig(const register_mem_cubic_int_t &cubicInt);
 
     public:
         xyValueTypePtr _xValues;
@@ -137,14 +137,14 @@ inline void CubicInterpolation::copyFromConfig(const dimmer_config_cubic_int_t &
 {
     clear();
     DIMMER_CHANNEL_LOOP(channel) {
-        _channels[channel].createFromConfig(cubicInt.channels[channel], channel);
+        _channels[channel].createFromConfig(cubicInt.channels[channel]);
     }
 }
 
 inline void CubicInterpolation::copyToConfig(dimmer_config_cubic_int_t &cubicInt)
 {
     DIMMER_CHANNEL_LOOP(channel) {
-        _channels[channel].copyToConfig(cubicInt.channels[channel], channel);
+        _channels[channel].copyToConfig(cubicInt.channels[channel]);
     }
 }
 
@@ -158,7 +158,7 @@ inline void CubicInterpolation::clear()
 inline void CubicInterpolation::printConfig() const
 {
     DIMMER_CHANNEL_LOOP(channel) {
-        Serial.printf_P(PSTR("+REM=cubic_int,%u,i2ct=%02x%02x"), channel, DIMMER_I2C_ADDRESS, DIMMER_COMMAND_WRITE_CUBIC_INT, channel);
+        Serial.printf_P(PSTR("+REM=cubic_int,%u,i2ct=%02x%02x%02x"), channel, DIMMER_I2C_ADDRESS, DIMMER_COMMAND_WRITE_CUBIC_INT, channel);
         Serial.flush();
         uint8_t i;
         for(i = 0; i < _channels[channel].size(); i++) {

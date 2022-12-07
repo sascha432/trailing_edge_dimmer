@@ -104,7 +104,7 @@ double CubicInterpolation::_toY(dimmer_level_t level) const
     return std::min<double>(static_cast<uint16_t>(level) / ((DIMMER_MAX_LEVEL - 1) / 255.0), 255);
 }
 
-void CubicInterpolation::Channel::copyToConfig(register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel)
+void CubicInterpolation::Channel::copyToConfig(register_mem_cubic_int_t &cubicInt)
 {
     cubicInt = {};
     auto ptr = &cubicInt.points[0];
@@ -115,7 +115,7 @@ void CubicInterpolation::Channel::copyToConfig(register_mem_cubic_int_t &cubicIn
     }
 }
 
-void CubicInterpolation::Channel::createFromConfig(const register_mem_cubic_int_t &cubicInt, dimmer_channel_id_t channel)
+void CubicInterpolation::Channel::createFromConfig(const register_mem_cubic_int_t &cubicInt)
 {
     auto points = &cubicInt.points[0];
     uint8_t maxX = (points++)->x;

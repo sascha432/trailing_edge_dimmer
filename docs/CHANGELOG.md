@@ -3,6 +3,7 @@
 ## 2.2.3-dev
 
  - NOTE: currently the dimmer firmware is running on the ZC interrupt, not the predicted signal
+ - Fixed reading/writing cubic interpolation for multiple channels
  - 2.2.3 breaks binary compatibility with previous versions due to changes in some structures
  - Fixed rare flickering when turning a channel off by adding double buffering to the channel levels
  - Option to disable the ADC interrupt, to avoid blocking interrupts during the calculation

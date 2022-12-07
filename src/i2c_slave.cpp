@@ -339,12 +339,12 @@ void _dimmer_i2c_on_receive(int length)
                                         auto size = std::min<uint8_t>(DIMMER_CUBIC_INT_DATA_POINTS * 2, length);
                                         _D(5, debug_printf("write_cubic_int %u\n", length));
                                         if (Wire.readBytes(reinterpret_cast<uint8_t *>(&register_mem.data.ram.cubic_int.points), size) == size) {
-                                            cubicInterpolation.getChannel(channel).createFromConfig(register_mem.data.ram.cubic_int, channel);
+                                            cubicInterpolation.getChannel(channel).createFromConfig(register_mem.data.ram.cubic_int);
                                         }
                                     }
                                     else {
                                         _D(5, debug_printf("write_cubic_int clear\n"));
-                                        cubicInterpolation.getChannel(channel).createFromConfig(register_mem.data.ram.cubic_int, channel);
+                                        cubicInterpolation.getChannel(channel).createFromConfig(register_mem.data.ram.cubic_int);
                                     }
                                     // check if there is any data
                                     dimmer_config.bits.cubic_interpolation = false;
@@ -363,7 +363,7 @@ void _dimmer_i2c_on_receive(int length)
                     case DIMMER_COMMAND_READ_CUBIC_INT: {
                             uint8_t channel = Wire_read_uint8_t(length, 0xff);
                             if (channel < DIMMER_CHANNEL_COUNT) {
-                                cubicInterpolation.getChannel(channel).copyToConfig(register_mem.data.ram.cubic_int, channel);
+                                cubicInterpolation.getChannel(channel).copyToConfig(register_mem.data.ram.cubic_int);
                                 _D(5, debug_printf("read_cubic_int\n"));
                                 i2c_slave_set_register_address(length, DIMMER_REGISTER_CUBIC_INT_OFS, sizeof(register_mem.data.ram.cubic_int));
                             }
