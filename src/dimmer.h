@@ -273,7 +273,8 @@ namespace Dimmer {
         //
         // channel          Channel::min - Channel::max
         // level            Level::min - Level::max
-        void set_channel_level(Channel::type channel, Level::type level);
+        // calc_channels    run _calculate_channels()
+        void set_channel_level(Channel::type channel, Level::type level, bool calc_channels = true);
 
         // Set channel to level
         //

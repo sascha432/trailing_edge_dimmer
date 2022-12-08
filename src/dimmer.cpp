@@ -353,7 +353,7 @@ void DimmerBase::_calculate_channels()
     }
 }
 
-void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
+void DimmerBase::set_channel_level(ChannelType channel, Level::type level, bool calc_channels)
 {
     // _D(5, debug_printf("set_channel_level ch=%d level=%d\n", channel, level))
     _set_level(channel, _normalize_level(level));
@@ -370,7 +370,9 @@ void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
         }
     #endif
 
-    _calculate_channels();
+    if (calc_channels) {
+        _calculate_channels();
+    }
 
     _D(5, debug_printf("ch=%u level=%u ticks=%u zcdelay=%u\n", channel, _get_level(channel), _get_ticks(channel, level), _config.zero_crossing_delay_ticks));
 }
@@ -380,9 +382,11 @@ void DimmerBase::set_level(Channel::type channel, Level::type level)
     // _D(5, debug_printf("set_level ch=%d level=%d\n", channel, level))
     if (channel == Channel::any) {
         DIMMER_CHANNEL_LOOP(i) {
-            set_channel_level(i, level);
+            set_channel_level(i, level, false);
         }
-    } else {
+        _calculate_channels();
+    } 
+    else {
         set_channel_level(channel, level);
     }
 }
@@ -414,7 +418,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
         fade.level = _normalize_level(current_level);
         fade.targetLevel = fade.level;
         // make sure the level is stored
-        set_channel_level(channel, fade.targetLevel);
+        set_channel_level(channel, fade.targetLevel, false);
         return;
     }
 
@@ -423,7 +427,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
     if (diff == 0) {
         _D(5, debug_printf("fade normalized -> from=%d to=%d\n", from, to));
         // make sure the level is stored
-        set_channel_level(channel, to);
+        set_channel_level(channel, to, false);
         return;
     }
 
@@ -436,7 +440,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
     if (fade.count == 0) {
         _D(5, debug_printf("count=%u time=%f\n", fade.count, time));
         // make sure the level is stored
-        set_channel_level(channel, to);
+        set_channel_level(channel, to, false);
         return;
     }
     fade.step = diff / static_cast<float>(fade.count);
