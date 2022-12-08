@@ -321,7 +321,7 @@ void DimmerBase::_calculate_channels()
     StateType new_channel_state = 0;
 
     // copy levels from register memory
-    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         memcpy(levels_buffer, _register_mem.channels.level, sizeof(levels_buffer));
     }
 
@@ -344,7 +344,7 @@ void DimmerBase::_calculate_channels()
     #endif
 
     // copy double buffer with interrupts disabled
-    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         if (new_channel_state != channel_state) {
             channel_state = new_channel_state;
             queues.scheduled_calls.send_channel_state = true;
@@ -476,7 +476,7 @@ void DimmerBase::_apply_fading()
             if (--fade.count == 0) {
                 _set_level(i, fade.targetLevel);
                 #if HAVE_FADE_COMPLETION_EVENT
-                    fading_completed[i] = _get_level(i);
+                    fading_completed[i] = fade.targetLevel;
                     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
                         queues.scheduled_calls.send_fading_events = true;
                         queues.fading_completed_events.resetTimer();
