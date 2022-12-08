@@ -233,6 +233,7 @@ namespace Dimmer {
         TickType halfwave_ticks;
         StateType channel_state;                                                // bitset of the channel state
         bool toggle_state;                                                      // next state of the mosfets
+        volatile bool fading_locked;
 
         #if ENABLE_ZC_PREDICTION
             uint24_t halfwave_ticks_prescaler1;

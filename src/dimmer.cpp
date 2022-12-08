@@ -469,6 +469,13 @@ void DimmerBase::fade_from_to(Channel::type channel, Level::type from_level, Lev
 
 void DimmerBase::_apply_fading()
 {
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        if (fading_locked) {
+            return;
+        }
+        fading_locked = true;
+    }
+
     DIMMER_CHANNEL_LOOP(i) {
         dimmer_fade_t &fade = fading[i];
         if (fade.count) {
@@ -495,6 +502,10 @@ void DimmerBase::_apply_fading()
     }
 
     _calculate_channels();
+
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        fading_locked = false;
+    }
 }
 
 TickType DimmerBase::__get_ticks(Channel::type channel, Level::type level) const
