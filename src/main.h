@@ -49,6 +49,24 @@ struct dimmer_scheduled_calls_templ_t {
 using dimmer_scheduled_calls_t = dimmer_scheduled_calls_templ_t<volatile uint8_t>;
 using dimmer_scheduled_calls_nv_t = dimmer_scheduled_calls_templ_t<uint8_t>;
 
+struct dimmer_scheduled_levels_t {
+
+    enum class SetType {
+        NONE = 0,
+        SET = 1,
+        FADE = 2,
+    };
+
+    SetType type;
+    int16_t from;
+    int16_t to;
+    float time;
+
+    dimmer_scheduled_levels_t() : type(SetType::NONE), from(0), to(0), time(NAN) {}
+    dimmer_scheduled_levels_t(int16_t level) : type(SetType::SET), from(0), to(level), time(NAN) {}
+    dimmer_scheduled_levels_t(int16_t _from, uint16_t _to, float _time) : type(SetType::FADE), from(_from), to(_to), time(_time) {}
+};
+
 struct Queues {
 
     static constexpr int16_t kFadingCompletedEventTimerOverFlows = Dimmer::MeasureTimer::kMillisToOverflows(100);
@@ -86,6 +104,7 @@ struct Queues {
     } report_metrics;
 
     dimmer_scheduled_calls_t scheduled_calls{0};
+    dimmer_scheduled_levels_t levels[Dimmer::Channel::size()];
 };
 
 extern Queues queues;

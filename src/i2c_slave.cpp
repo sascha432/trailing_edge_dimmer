@@ -8,6 +8,7 @@
 #include "measure_frequency.h"
 #include "main.h"
 
+
 register_mem_union_t register_mem;
 
 inline uint8_t validate_register_address()
@@ -54,6 +55,7 @@ void _dimmer_i2c_on_receive(int length)
     register_mem.data.address = DIMMER_REGISTER_ADDRESS;
     register_mem.data.cmd.status = DIMMER_COMMAND_STATUS_OK;
     register_mem.data.cmd.read_length = 0;
+    // Serial.printf_P(PSTR("+REM=i2c=%u\n"),length);
     while(length-- > 0) {
         auto addr = register_mem.data.address;
         _D(5, debug_printf("I2C addr=%#02x data=%02x left=%d\n", addr, Wire.peek(), length));
@@ -96,11 +98,13 @@ void _dimmer_i2c_on_receive(int length)
                     break;
                 case DIMMER_COMMAND_SET_LEVEL:
                     _D(5, debug_printf("I2C set=%d ch=%d\n", register_mem.data.to_level, register_mem.data.channel));
-                    dimmer.set_level(register_mem.data.channel, register_mem.data.to_level);
+                    // dimmer.set_level(register_mem.data.channel, register_mem.data.to_level);
+                    queues.levels[register_mem.data.channel] = dimmer_scheduled_levels_t(register_mem.data.to_level);
                     break;
                 case DIMMER_COMMAND_FADE:
                     _D(5, debug_printf("I2C fade from=%d to=%d ch=%d t=%f\n", register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
-                    dimmer.fade_from_to(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
+                    // dimmer.fade_from_to(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
+                    queues.levels[register_mem.data.channel] = dimmer_scheduled_levels_t(register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
                     break;
                 case DIMMER_COMMAND_READ_NTC:
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_NTC_TEMP, sizeof(register_mem.data.metrics.ntc_temp));

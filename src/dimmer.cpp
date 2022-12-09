@@ -406,19 +406,21 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         current_level = levels_buffer[channel];
     }
+    // auto current_level = _get_level(channel);
+
+    // Serial.printf_P(PSTR("+REM=ch=%u,f=%d,t=%d,t=%f,l=%d\n"), channel, from, to, time, current_level);
 
     // stop fading at current level
     if (to == Level::freeze) {
-        if (fade.count == 0) {
-            // fading not in progress
-            return;
-        }
-        fade.count = 1;
-        fade.step = 0; // keep current level
-        fade.level = _normalize_level(current_level);
-        fade.targetLevel = fade.level;
-        // make sure the level is stored
-        set_channel_level(channel, fade.targetLevel, false);
+        // if (fade.count == 0) {
+        //     // fading not in progress
+        //     return;
+        // }
+        // fade.count = 1;
+        // fade.step = 0; // keep current level
+        // fade.level = _normalize_level(current_level);
+        // fade.targetLevel = fade.level;
+        set_channel_level(channel, fade.level, false);
         return;
     }
 

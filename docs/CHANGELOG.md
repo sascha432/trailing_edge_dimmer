@@ -3,6 +3,8 @@
 ## 2.2.3-dev
 
  - NOTE: currently the dimmer firmware is running on the ZC interrupt, not the predicted signal
+ - Increased serial rx buffer to 256 byte to avoid loosing data
+ - Moved set and fade level to main loop to speed up _dimmer_i2c_on_receive()
  - Fixed reading/writing cubic interpolation for multiple channels
  - 2.2.3 breaks binary compatibility with previous versions due to changes in some structures
  - Fixed rare flickering when turning a channel off by adding double buffering to the channel levels

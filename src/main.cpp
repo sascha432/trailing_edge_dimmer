@@ -227,6 +227,24 @@ void loop()
         }
     #endif
 
+    // apply level changes that have been received by i2c
+    for(uint8_t i = 0; i < Dimmer::Channel::size(); i++) {
+        cli();
+        auto level = queues.levels[i];
+        queues.levels[i].type = dimmer_scheduled_levels_t::SetType::NONE;
+        sei();
+        switch(level.type) {
+            case dimmer_scheduled_levels_t::SetType::SET:
+                dimmer.set_channel_level(i, level.to, false);
+                break;
+            case dimmer_scheduled_levels_t::SetType::FADE:
+                dimmer.fade_channel_from_to(i, level.from, level.to, level.time);
+                break;
+            case dimmer_scheduled_levels_t::SetType::NONE:
+                break;
+        }
+    }
+
     // create non-volatile copy for read operations
     // reduces code size by ~30-40 byte
     cli();
