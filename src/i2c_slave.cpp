@@ -14,7 +14,7 @@ register_mem_union_t register_mem;
 inline uint8_t validate_register_address()
 {
     uint8_t offset = register_mem.data.address - DIMMER_REGISTER_START_ADDR;
-    if (offset < (uint8_t)sizeof(register_mem_t)) {
+    if (offset < static_cast<uint8_t>(sizeof(register_mem_t))) {
         return offset;
     }
     return DIMMER_REGISTER_ADDRESS - DIMMER_REGISTER_START_ADDR;
@@ -98,13 +98,19 @@ void _dimmer_i2c_on_receive(int length)
                     break;
                 case DIMMER_COMMAND_SET_LEVEL:
                     _D(5, debug_printf("I2C set=%d ch=%d\n", register_mem.data.to_level, register_mem.data.channel));
-                    // dimmer.set_level(register_mem.data.channel, register_mem.data.to_level);
-                    queues.levels[register_mem.data.channel] = dimmer_scheduled_levels_t(register_mem.data.to_level);
+                    #if DIMMER_USE_QUEUE_LEVELS
+                        queues.levels[register_mem.data.channel] = dimmer_scheduled_levels_t(register_mem.data.to_level);
+                    #else
+                        dimmer.set_level(register_mem.data.channel, register_mem.data.to_level);
+                    #endif
                     break;
                 case DIMMER_COMMAND_FADE:
                     _D(5, debug_printf("I2C fade from=%d to=%d ch=%d t=%f\n", register_mem.data.from_level, register_mem.data.to_level, register_mem.data.channel, register_mem.data.time));
-                    // dimmer.fade_from_to(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
-                    queues.levels[register_mem.data.channel] = dimmer_scheduled_levels_t(register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
+                    #if DIMMER_USE_QUEUE_LEVELS
+                        queues.levels[register_mem.data.channel] = dimmer_scheduled_levels_t(register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
+                    #else
+                        dimmer.fade_from_to(register_mem.data.channel, register_mem.data.from_level, register_mem.data.to_level, register_mem.data.time);
+                    #endif
                     break;
                 case DIMMER_COMMAND_READ_NTC:
                     i2c_slave_set_register_address(length, DIMMER_REGISTER_NTC_TEMP, sizeof(register_mem.data.metrics.ntc_temp));

@@ -325,6 +325,12 @@
 #   define DIMMER_CUBIC_INTERPOLATION 0
 #endif
 
+// run set_level and fade_to in main loop
+// speeds up _dimmer_i2c_on_receive() and should be enabled if this method is called inside an ISR
+#ifndef DIMMER_USE_QUEUE_LEVELS
+#    define DIMMER_USE_QUEUE_LEVELS 0
+#endif
+
 #if DIMMER_CUBIC_INTERPOLATION
 #    define DIMMER_LINEAR_LEVEL(level, channel) (dimmer_config.bits.cubic_interpolation ? cubicInterpolation.getLevel(level, channel) : level)
 #    if DIMMER_CUBIC_INTERPOLATION

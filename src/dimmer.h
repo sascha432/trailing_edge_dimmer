@@ -233,7 +233,7 @@ namespace Dimmer {
         TickType halfwave_ticks;
         StateType channel_state;                                                // bitset of the channel state
         bool toggle_state;                                                      // next state of the mosfets
-        volatile bool fading_locked;
+        volatile bool calculate_channels_locked;
 
         #if ENABLE_ZC_PREDICTION
             uint24_t halfwave_ticks_prescaler1;
@@ -275,7 +275,7 @@ namespace Dimmer {
         // channel          Channel::min - Channel::max
         // level            Level::min - Level::max
         // calc_channels    run _calculate_channels()
-        void set_channel_level(Channel::type channel, Level::type level, bool calc_channels = true);
+        void set_channel_level(Channel::type channel, Level::type level);
 
         // Set channel to level
         //

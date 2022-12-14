@@ -104,7 +104,9 @@ struct Queues {
     } report_metrics;
 
     dimmer_scheduled_calls_t scheduled_calls{0};
-    dimmer_scheduled_levels_t levels[Dimmer::Channel::size()];
+    #if DIMMER_USE_QUEUE_LEVELS
+        dimmer_scheduled_levels_t levels[Dimmer::Channel::size()];
+    #endif
 };
 
 extern Queues queues;

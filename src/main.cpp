@@ -227,23 +227,36 @@ void loop()
         }
     #endif
 
-    // apply level changes that have been received by i2c
-    for(uint8_t i = 0; i < Dimmer::Channel::size(); i++) {
-        cli();
-        auto level = queues.levels[i];
-        queues.levels[i].type = dimmer_scheduled_levels_t::SetType::NONE;
-        sei();
-        switch(level.type) {
-            case dimmer_scheduled_levels_t::SetType::SET:
-                dimmer.set_channel_level(i, level.to, false);
-                break;
-            case dimmer_scheduled_levels_t::SetType::FADE:
-                dimmer.fade_channel_from_to(i, level.from, level.to, level.time);
-                break;
-            case dimmer_scheduled_levels_t::SetType::NONE:
-                break;
+    #if DIMMER_USE_QUEUE_LEVELS
+        // apply level changes that have been received by i2c
+        for(uint8_t i = 0; i < Dimmer::Channel::size(); i++) {
+            #if SERIAL_I2C_BRIDGE
+                // levels are only changed in SerialEvent, once at the end of each main loop
+                auto &level = queues.levels[i];
+            #else
+                cli();
+                auto level = queues.levels[i];
+                queues.levels[i].type = dimmer_scheduled_levels_t::SetType::NONE;
+                sei();
+            #endif
+            switch(level.type) {
+                case dimmer_scheduled_levels_t::SetType::SET:
+                    dimmer.set_channel_level(i, level.to);
+                    #if SERIAL_I2C_BRIDGE
+                        level.type = dimmer_scheduled_levels_t::SetType::NONE;
+                    #endif
+                    break;
+                case dimmer_scheduled_levels_t::SetType::FADE:
+                    dimmer.fade_channel_from_to(i, level.from, level.to, level.time);
+                    #if SERIAL_I2C_BRIDGE
+                        level.type = dimmer_scheduled_levels_t::SetType::NONE;
+                    #endif
+                    break;
+                case dimmer_scheduled_levels_t::SetType::NONE:
+                    break;
+            }
         }
-    }
+    #endif
 
     // create non-volatile copy for read operations
     // reduces code size by ~30-40 byte
@@ -397,7 +410,7 @@ void loop()
 
         #endif
 
-        if (dimmer_config.max_temp && current_temp > (int16_t)dimmer_config.max_temp) {
+        if (dimmer_config.max_temp && current_temp > static_cast<int16_t>(dimmer_config.max_temp)) {
 
             if (millis24 >= queues.check_temperature.report_next) {
 

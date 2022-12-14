@@ -11,48 +11,29 @@
 #include <stdlib.h>
 #include <avr/io.h>
 
-// old debug code
-
-// #define PIN_D2_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
-// #define PIN_D2_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTD)), "I" (2))
-// #define PIN_D2_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PIND)), "I" (2))
-// #define PIN_D2_IS_SET()                                 ((_SFR_IO_ADDR(PIND) & _BV(2)) != 0)
-// #define PIN_D2_IS_CLEAR()                               ((_SFR_IO_ADDR(PIND) & _BV(2)) == 0)
-
-// #define PIN_D8_SET()                                    asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
-// #define PIN_D8_CLEAR()                                  asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (0))
-// #define PIN_D8_TOGGLE()                                 asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (0))
-// #define PIN_D8_IS_SET()                                 ((_SFR_IO_ADDR(PINB) & _BV(0)) != 0)
-// #define PIN_D8_IS_CLEAR()                               ((_SFR_IO_ADDR(PINB) & _BV(0)) == 0)
-
-// #define PIN_D11_SET()                                   asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
-// #define PIN_D11_CLEAR()                                 asm volatile("cbi %0, %1" :: "I" (_SFR_IO_ADDR(PORTB)), "I" (3))
-// #define PIN_D11_TOGGLE()                                asm volatile("sbi %0, %1" :: "I" (_SFR_IO_ADDR(PINB)), "I" (3))
-// #define PIN_D11_IS_SET()                                ((_SFR_IO_ADDR(PINB) & _BV(3)) != 0)
-// #define PIN_D11_IS_CLEAR()                              ((_SFR_IO_ADDR(PINB) & _BV(3)) == 0)
-
 using namespace Dimmer;
 
 DimmerBase dimmer(register_mem.data);
 constexpr const uint8_t Dimmer::Channel::pins[Dimmer::Channel::size()];
 
 #if not HAVE_CHANNELS_INLINE_ASM
-volatile uint8_t *dimmer_pins_addr[Channel::size()];
-uint8_t dimmer_pins_mask[Channel::size()];
+
+    volatile uint8_t *dimmer_pins_addr[Channel::size()];
+    uint8_t dimmer_pins_mask[Channel::size()];
 
 #else
 
-#if __AVR_ATmega328P__
-static constexpr uint8_t kDimmerSignature[] = { 0x1e, 0x95, 0x0f, DIMMER_MOSFET_PINS };
-#else
-#error signature not defined
-#endif
+#    if __AVR_ATmega328P__
+        static constexpr uint8_t kDimmerSignature[] = { 0x1e, 0x95, 0x0f, DIMMER_MOSFET_PINS };
+#    else
+#        error signature not defined
+#   endif
 
-static constexpr int __memcmp(const uint8_t a[], const uint8_t b[], size_t len) {
-    return *a != *b ? -1 : len == 1 ? 0 : __memcmp(&a[1], &b[1], len - 1);
-}
-static_assert(sizeof(kInlineAssemblerSignature) == sizeof(kDimmerSignature), "invalid signature");
-static_assert(__memcmp(kInlineAssemblerSignature, kDimmerSignature, sizeof(kDimmerSignature)) == 0, "invalid signature");
+    static constexpr int __memcmp(const uint8_t a[], const uint8_t b[], size_t len) {
+        return *a != *b ? -1 : len == 1 ? 0 : __memcmp(&a[1], &b[1], len - 1);
+    }
+    static_assert(sizeof(kInlineAssemblerSignature) == sizeof(kDimmerSignature), "invalid signature");
+    static_assert(__memcmp(kInlineAssemblerSignature, kDimmerSignature, sizeof(kDimmerSignature)) == 0, "invalid signature");
 
 #endif
 
@@ -105,6 +86,9 @@ void DimmerBase::begin()
     #endif
 
     queues.scheduled_calls = {};
+    #if DIMMER_USE_QUEUE_LEVELS
+        queues.levels = {};
+    #endif
 
     toggle_state = DIMMER_MOSFET_OFF_STATE;
 
@@ -123,18 +107,18 @@ void DimmerBase::begin()
         pinMode(Channel::pins[i], OUTPUT);
     }
 
-    cli();
-    timer2.begin(); // timer2 runs at clock speed 
-    attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
+    ATOMIC_BLOCK(ATOMIC_FORCEON) {
+        timer2.begin(); // timer2 runs at clock speed 
+        attachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN), []() {
 
-        uint24_t ticks = timer2.get_clear_no_cli(); // this is not used with ENABLE_ZC_PREDICTION disabled
-        dimmer.zc_interrupt_handler(ticks);
-        
-    }, DIMMER_ZC_INTERRUPT_MODE);
+            uint24_t ticks = timer2.get_clear_no_cli(); // this is not used with ENABLE_ZC_PREDICTION disabled
+            dimmer.zc_interrupt_handler(ticks);
+            
+        }, DIMMER_ZC_INTERRUPT_MODE);
 
-    _D(5, debug_printf("starting timer\n"));
-    Timer<1>::begin<Timer<1>::kIntMaskAll, nullptr>();
-    sei();
+        _D(5, debug_printf("starting timer\n"));
+        Timer<1>::begin<Timer<1>::kIntMaskAll, nullptr>();
+    }
 }
 
 void DimmerBase::end()
@@ -145,6 +129,9 @@ void DimmerBase::end()
     _D(5, debug_printf("ending timer...\n"));
 
     queues.scheduled_calls = {};
+    #if DIMMER_USE_QUEUE_LEVELS
+        queues.levels = {};
+    #endif
 
     cli();
     detachInterrupt(digitalPinToInterrupt(ZC_SIGNAL_PIN));
@@ -311,11 +298,20 @@ static inline void dimmer_bubble_sort(ChannelStateType channels[], Channel::type
    }
 }
 
+// NOTE: this method is only called in _apply_fading()
 // copy data from register memory to buffers
 // calculate ticks for each channel and sort them
 // channels that are off or fully on won't be added
 void DimmerBase::_calculate_channels()
 {
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        // with cubic interpolation enabled, this method can take quite a while
+        if (calculate_channels_locked) {
+            return;
+        }
+        calculate_channels_locked = true;
+    }
+
     ChannelStateType ordered_channels_tmp[Channel::size() + 1];
     Channel::type count = 0;
     StateType new_channel_state = 0;
@@ -350,10 +346,12 @@ void DimmerBase::_calculate_channels()
             queues.scheduled_calls.send_channel_state = true;
         }
         memcpy(ordered_channels_buffer, ordered_channels_tmp, sizeof(ordered_channels_buffer));
+
+        calculate_channels_locked = false;
     }
 }
 
-void DimmerBase::set_channel_level(ChannelType channel, Level::type level, bool calc_channels)
+void DimmerBase::set_channel_level(ChannelType channel, Level::type level)
 {
     // _D(5, debug_printf("set_channel_level ch=%d level=%d\n", channel, level))
     _set_level(channel, _normalize_level(level));
@@ -370,10 +368,6 @@ void DimmerBase::set_channel_level(ChannelType channel, Level::type level, bool 
         }
     #endif
 
-    if (calc_channels) {
-        _calculate_channels();
-    }
-
     _D(5, debug_printf("ch=%u level=%u ticks=%u zcdelay=%u\n", channel, _get_level(channel), _get_ticks(channel, level), _config.zero_crossing_delay_ticks));
 }
 
@@ -382,9 +376,8 @@ void DimmerBase::set_level(Channel::type channel, Level::type level)
     // _D(5, debug_printf("set_level ch=%d level=%d\n", channel, level))
     if (channel == Channel::any) {
         DIMMER_CHANNEL_LOOP(i) {
-            set_channel_level(i, level, false);
+            set_channel_level(i, level);
         }
-        _calculate_channels();
     } 
     else {
         set_channel_level(channel, level);
@@ -412,15 +405,14 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
 
     // stop fading at current level
     if (to == Level::freeze) {
-        // if (fade.count == 0) {
-        //     // fading not in progress
-        //     return;
-        // }
-        // fade.count = 1;
-        // fade.step = 0; // keep current level
-        // fade.level = _normalize_level(current_level);
-        // fade.targetLevel = fade.level;
-        set_channel_level(channel, fade.level, false);
+        if (fade.count == 0) {
+            // fading not in progress
+            return;
+        }
+        fade.count = 1;
+        fade.step = 0; // keep current level
+        fade.level = _normalize_level(current_level);
+        fade.targetLevel = fade.level;
         return;
     }
 
@@ -429,7 +421,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
     if (diff == 0) {
         _D(5, debug_printf("fade normalized -> from=%d to=%d\n", from, to));
         // make sure the level is stored
-        set_channel_level(channel, to, false);
+        set_channel_level(channel, to);
         return;
     }
 
@@ -442,7 +434,7 @@ void DimmerBase::fade_channel_from_to(ChannelType channel, Level::type from, Lev
     if (fade.count == 0) {
         _D(5, debug_printf("count=%u time=%f\n", fade.count, time));
         // make sure the level is stored
-        set_channel_level(channel, to, false);
+        set_channel_level(channel, to);
         return;
     }
     fade.step = diff / static_cast<float>(fade.count);
@@ -471,15 +463,8 @@ void DimmerBase::fade_from_to(Channel::type channel, Level::type from_level, Lev
 
 void DimmerBase::_apply_fading()
 {
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        if (fading_locked) {
-            return;
-        }
-        fading_locked = true;
-    }
-
     DIMMER_CHANNEL_LOOP(i) {
-        dimmer_fade_t &fade = fading[i];
+        auto &fade = fading[i];
         if (fade.count) {
             fade.level += fade.step;
             if (--fade.count == 0) {
@@ -495,19 +480,10 @@ void DimmerBase::_apply_fading()
             else {
                 _set_level(i, fade.level);
             }
-            #if DEBUG
-                if (fade.count % 60 == 0) {
-                    _D(5, debug_printf("fading ch=%u lvl=%u ticks=%u\n", i, _get_level(i), _get_ticks(i, _get_level(i))));
-                }
-            #endif
         }
     }
 
     _calculate_channels();
-
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        fading_locked = false;
-    }
 }
 
 TickType DimmerBase::__get_ticks(Channel::type channel, Level::type level) const

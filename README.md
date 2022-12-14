@@ -21,7 +21,7 @@ Firmware for a trailing/leading edge dimmer written in C++ including schematics/
 
 [Change Log v2.2.3](docs/CHANGELOG.md)
 
-## Patching the Arduino libary
+## Patching the Arduino library
 
 The Arduino library requires a small patch. While building, an error will show up
 
