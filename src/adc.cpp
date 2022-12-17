@@ -8,6 +8,7 @@ ADCHandler _adc;
 
 #if DIMMER_USE_ADC_INTERRUPT
 
+// this will be executed every kADCSRA_ReadTimeMicros microseconds and blocks interrupts for some time
 ISR(ADC_vect)
 {
     _adc.adc_handler(ADC);

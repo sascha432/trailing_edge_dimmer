@@ -1,4 +1,4 @@
-// translates defines into constexpr to read the values with intellisense
+// translates defines into constexpr to read the values with intellisense for a quick lookup
 #include <stddef.h>
 #include <stdint.h>
 #include "dimmer_def.h"
@@ -54,9 +54,17 @@ static constexpr size_t __DIMMER_REGISTER_VCC = DIMMER_REGISTER_VCC;
 static constexpr size_t __DIMMER_REGISTER_RAM = DIMMER_REGISTER_RAM;
 static constexpr size_t __DIMMER_REGISTER_ADDRESS = DIMMER_REGISTER_ADDRESS;
 static constexpr size_t __DIMMER_REGISTER_END_ADDR = DIMMER_REGISTER_END_ADDR;
-static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_OFS = DIMMER_REGISTER_CUBIC_INT_OFS;
-static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAX_0 = DIMMER_REGISTER_CUBIC_INT_DATAX(0);
-static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAY_0 = DIMMER_REGISTER_CUBIC_INT_DATAY(0);
+#if DIMMER_CUBIC_INTERPOLATION
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_OFS = DIMMER_REGISTER_CUBIC_INT_OFS;
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAX_0 = DIMMER_REGISTER_CUBIC_INT_DATAX(0);
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAY_0 = DIMMER_REGISTER_CUBIC_INT_DATAY(0);
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAX_1 = DIMMER_REGISTER_CUBIC_INT_DATAX(1);
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAY_1 = DIMMER_REGISTER_CUBIC_INT_DATAY(1);
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAX_2 = DIMMER_REGISTER_CUBIC_INT_DATAX(2);
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAY_2 = DIMMER_REGISTER_CUBIC_INT_DATAY(2);
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAX_3 = DIMMER_REGISTER_CUBIC_INT_DATAX(3);
+    static constexpr size_t __DIMMER_REGISTER_CUBIC_INT_DATAY_3 = DIMMER_REGISTER_CUBIC_INT_DATAY(3);
+#endif
 static constexpr size_t __DIMMER_REGISTER_MEM_SIZE = DIMMER_REGISTER_MEM_SIZE;
 static constexpr size_t __DIMMER_EVENT_METRICS_REPORT = DIMMER_EVENT_METRICS_REPORT;
 static constexpr size_t __DIMMER_EVENT_TEMPERATURE_ALERT = DIMMER_EVENT_TEMPERATURE_ALERT;

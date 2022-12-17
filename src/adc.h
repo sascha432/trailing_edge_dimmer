@@ -97,6 +97,7 @@ public:
     static constexpr uint8_t kADCSRA_Prescaler128 = _BV(ADPS2) | _BV(ADPS1) | _BV(ADPS0);
 
     static constexpr uint8_t kADCSRA_PrescalerDefault = kADCSRA_Prescaler128;
+    static constexpr float kADCSRA_ReadTimeMicros =  (1000000.0 / F_CPU) * 128/*prescaler*/ * 14;
 
 
     static constexpr uint8_t kADCSRB_FreeRunning = 0;
@@ -168,11 +169,11 @@ public:
     // discard = number of readings to discard before counting
     inline void start(const uint8_t maxCount = kMaxShift, const uint16_t discard = kDefaultDiscard) {
         _ASSERTE(maxCount >= kAveragePrecisionBits && maxCount <= kMaxShift);
-#if DEBUG
-        _start = micros();
-        _intCounter = 0;
-        _count[_pos] = 0;
-#endif
+        #if DEBUG
+            _start = micros();
+            _intCounter = 0;
+            _count[_pos] = 0;
+        #endif
         _maxCount = 1U << maxCount;
         _shiftSum = maxCount - kAveragePrecisionBits;
         _counter = discard;
@@ -204,24 +205,24 @@ public:
     }
 
     inline void adc_handler(uint16_t value) {
-#if DEBUG
-        _intCounter++;
-#endif
+        #if DEBUG
+            _intCounter++;
+        #endif
         if (++_counter <= 0) {
             return;
         }
         _sum = _sum + value;
         if ((uint16_t)_counter >= _maxCount) {
-#if DEBUG
-            _duration[_pos] = micros() - _start;
-            _count[_pos] = _intCounter;
-#endif
+            #if DEBUG
+                _duration[_pos] = micros() - _start;
+                _count[_pos] = _intCounter;
+            #endif
             stop();
             _scheduleNext = true;
         }
     }
 
-    // select next positon and call restart
+    // select next position and call restart
     void next();
 
     // restart read cycle for current position
@@ -317,6 +318,7 @@ public:
     // analog read for selected ADC source
     uint16_t __analogRead() {
 	    sbi(ADCSRA, ADSC);
+        // this kADCSRA_ReadTimeMicros microseconds
         while (bit_is_set(ADCSRA, ADSC)) {
         }
         return ADC;

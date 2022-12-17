@@ -25,16 +25,69 @@ extern register_mem_union_t register_mem;
     extern uint8_t dimmer_pins_mask[::size_of(DIMMER_MOSFET_PINS)];
 #endif
 
+#if !DIMMER_USE_ADC_INTERRUPT && SERIAL_I2C_BRIDGE
+
+    // when reading the ADC, delay is used. this will stop reading events from the serial port
+    // if it is safe to do that during the delay(), use the enable function and disable it again when done reading the ADC
+
+    extern bool _read_serial_during_delay;
+
+    inline void enable_serial_read_during_delay() 
+    {
+        _read_serial_during_delay = true;
+    }
+
+    inline void disable_serial_read_during_delay() 
+    {
+        _read_serial_during_delay = false;
+    }
+
+#else
+
+    // dummy function
+    inline void enable_serial_read_during_delay() 
+    {
+    }
+
+    // dummy function
+    inline void disable_serial_read_during_delay() 
+    {
+    }
+
+#endif
+
 namespace Dimmer {
 
-    #if __AVR__
+    #if !DIMMER_USE_ADC_INTERRUPT && SERIAL_I2C_BRIDGE
+
+        inline bool can_yield() 
+        {
+            return _read_serial_during_delay;
+        }
+
+        // delay with processing incoming serial data once per millisecond
+        // avoids dropping data during long delays
+        void delay(uint32_t ms);
+
+    #else
 
         static constexpr bool can_yield() 
         {
             return true;
         }
 
-        static inline void optimistic_yield(uint32_t) 
+        __attribute_always_inline__
+        inline void delay(uint32_t ms) 
+        {
+            ::delay(ms);
+        }
+
+
+    #endif
+
+    #if __AVR__
+
+        inline void optimistic_yield(uint32_t) 
         {
             yield();
         }
@@ -115,7 +168,7 @@ namespace Dimmer {
     // timer 2 running to prescaler 1 to predict the next zc crossing event
     struct MeasureTimer : Timers::TimerBase<2, 1> {
 
-        using TickType = uint32_t;
+        using TickType = uint24_t;
 
         // start timer using the overflow interrupt
         void begin();
@@ -145,7 +198,7 @@ namespace Dimmer {
     
     inline MeasureTimer::TickType MeasureTimer::get_timer() 
     {
-        // similar to micros() but more precise depending on the MCU frequency
+        // similar to micros() but more precise depending on the MCU frequency and the timer 2 prescaler (ideally 1)
         auto tmp_overflow = _overflow;
         auto tmp_counter = TCNT2;
         if (TimerBase::get_flag<kFlagsOverflow>() && tmp_counter < 255) { 
@@ -207,7 +260,7 @@ namespace Dimmer {
         }
     };
 
-    struct FadingCompletionEvent : dimmer_fading_complete_event_t {
+    struct __attribute_packed__ FadingCompletionEvent : dimmer_fading_complete_event_t {
 
         using dimmer_fading_complete_event_t::dimmer_fading_complete_event_t;
 
@@ -216,6 +269,8 @@ namespace Dimmer {
         {}
 
     };
+
+    static_assert(sizeof(FadingCompletionEvent) == sizeof(dimmer_fading_complete_event_t), "invalid size");
 
     struct dimmer_t {
         Level::type levels_buffer[Channel::size()];                             // single buffer for levels since they are used only when the halfwave starts
@@ -239,8 +294,10 @@ namespace Dimmer {
             uint24_t halfwave_ticks_max;
             // last value to calculate difference
             uint24_t last_ticks;
-            // keeps track if the frequency changes to adjust halfwave_ticks_timer2
+            // keeps track of frequency changes to adjust the timer (use method DimmerBase:.set_halfwave_ticks() to update all values)
+            // the value should be equal to halfwave_ticks_timer2 but might suffer from temperature drift (or changes in the mains frequency)
             float halfwave_ticks_integral;
+            // 
             dimmer_sync_event_t sync_event;
         #endif
         #if HAVE_FADE_COMPLETION_EVENT
@@ -264,6 +321,7 @@ namespace Dimmer {
             bool is_ticks_within_range(uint24_t ticks);
         #endif
 
+        void set_halfwave_ticks(uint24_t ticks);
         void set_frequency(float freq);
         void set_mode(ModeType mode);
 
@@ -377,6 +435,7 @@ namespace Dimmer {
                 uint16_t zc_signals;
                 uint16_t next_cycle;
                 uint16_t valid_signals;
+                uint16_t invalid_signals;
                 uint16_t pred_signals;
                 uint16_t start_halfwave;
                 MeasureTimer::TickType last_time;
@@ -511,23 +570,6 @@ namespace Dimmer {
             _send(reinterpret_cast<const uint8_t *>(&data), static_cast<uint8_t>(sizeof(data)));
         }
     };
-
-    #if SERIAL_I2C_BRIDGE
-
-        // delay with processing incoming events once per millisecond
-        // can be called ms = 0 to process events
-        // must not be used with locked interrupts or inside an ISR
-        void delay(uint32_t ms) ;
-
-    #else
-
-        __attribute_always_inline__
-        inline void delay(uint32_t ms) 
-        {
-            ::delay(ms);
-        }
-
-    #endif
 
 }
 

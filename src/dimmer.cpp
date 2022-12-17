@@ -14,6 +14,9 @@
 using namespace Dimmer;
 
 DimmerBase dimmer(register_mem.data);
+#if !DIMMER_USE_ADC_INTERRUPT && SERIAL_I2C_BRIDGE
+    bool _read_serial_during_delay = false;
+#endif
 constexpr const uint8_t Dimmer::Channel::pins[Channel::size()];
 
 #if not HAVE_CHANNELS_INLINE_ASM
@@ -77,6 +80,17 @@ ISR(TIMER2_OVF_vect)
     #endif
 }
 
+void DimmerBase::set_halfwave_ticks(uint24_t ticks)
+{
+    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+        halfwave_ticks_timer2 = ticks;
+        FrequencyMeasurement::_calc_halfwave_min_max(halfwave_ticks_timer2, halfwave_ticks_min, halfwave_ticks_max);
+        halfwave_ticks = ticks / Timer<1>::prescaler;
+        set_frequency((F_CPU / 2.0) / ticks);
+        sync_event.halfwave_micros = Timer<1>::ticksToMicros(halfwave_ticks);
+    }
+}
+
 void DimmerBase::begin()
 {
     #if DEBUG_ZC_PREDICTION
@@ -91,7 +105,7 @@ void DimmerBase::begin()
         halfwave_ticks_timer2 = ((F_CPU / 2.0) / register_mem.data.metrics.frequency);
         halfwave_ticks_integral = halfwave_ticks_timer2;
         FrequencyMeasurement::_calc_halfwave_min_max(halfwave_ticks_timer2, halfwave_ticks_min, halfwave_ticks_max);
-        sync_event = { 0 , Timer<1>::ticksToMicros(halfwave_ticks) /* reports only the frequency during startup or restart */ };
+        sync_event = { 0 , Timer<1>::ticksToMicros(halfwave_ticks) };
     #endif
 
     #if DEBUG_ZC_PREDICTION
@@ -187,6 +201,7 @@ void DimmerBase::zc_interrupt_handler(uint24_t ticks)
             sync_event.invalid_signals++;
 
             #if DEBUG_ZC_PREDICTION
+                debug_pred.invalid_signals++;
                 debug_pred.times[debug_pred.pos++] = -dur;
                 if (debug_pred.pos >= kTimeStorage) {
                     debug_pred.pos = 0;
@@ -209,6 +224,13 @@ void DimmerBase::zc_interrupt_handler(uint24_t ticks)
     Timer<1>::clear_flags<Timer<1>::kFlagsCompareB>();
 
     sei();
+
+    #if ENABLE_ZC_PREDICTION
+        // slowly adjust the ticks in case the clock cycles change due to heat
+        // TODO just a test if it changes over time, compare to halfwave_ticks_timer2
+        constexpr auto kHalfwaveNumber = 120.0;
+        halfwave_ticks_integral = ((halfwave_ticks_integral * kHalfwaveNumber) + dur) / (kHalfwaveNumber + 1.0);
+    #endif
     
     // apply fading with interrupts enabled
     _apply_fading();
@@ -333,13 +355,12 @@ namespace Dimmer {
 
     void delay(uint32_t ms) 
     {
-        // should be a constexpr and optimized out on most MCUs
-        // if not defined, check dimmer.h
+        // use delay if interrupts are disabled
         if (!can_yield()) {
+            ::delay(ms);
             return;
         }
         uint32_t start = micros();
-        serialEvent();
         while (ms > 0) {
             // if not defined, check dimmer.h
             optimistic_yield(1000);

@@ -140,20 +140,20 @@ void setup()
 
     void Dimmer::DimmerBase::send_fading_completion_events()
     {
-        FadingCompletionEvent buffer[Dimmer::Channel::size()];
+        FadingCompletionEvent buffer[Channel::size()];
         auto ptr = buffer;
 
         DIMMER_CHANNEL_LOOP(i) {
-            if (dimmer.fading_completed[i] != Dimmer::Level::invalid) {
+            if (dimmer.fading_completed[i] != Level::invalid) {
                 *ptr++ = { i, dimmer.fading_completed[i] };
-                dimmer.fading_completed[i] = Dimmer::Level::invalid;
+                dimmer.fading_completed[i] = Level::invalid;
             }
         }
         sei();
 
         if (ptr != buffer) {
             // _D(5, debug_printf("sending fading completion event for %u channel(s)\n", ptr - buffer));
-            Dimmer::DimmerEvent<DIMMER_EVENT_FADING_COMPLETE>::send(buffer, static_cast<uint8_t>(reinterpret_cast<const uint8_t *>(ptr) - reinterpret_cast<const uint8_t *>(buffer)));
+            DimmerEvent<DIMMER_EVENT_FADING_COMPLETE>::send(buffer, static_cast<uint8_t>(reinterpret_cast<const uint8_t *>(ptr) - reinterpret_cast<const uint8_t *>(buffer)));
         }
     }
 
@@ -223,6 +223,7 @@ void loop()
 
     #if DIMMER_USE_ADC_INTERRUPT
         if (_adc.canScheduleNext()) {
+            ::delay(1);
             _adc.next();
         }
     #endif
@@ -384,8 +385,9 @@ void loop()
         }
 
         int16_t current_temp;
+        enable_serial_read_during_delay();
         #if HAVE_NTC
-
+            
             register_mem.data.metrics.ntc_temp = get_ntc_temperature();
             if (!isnan(register_mem.data.metrics.ntc_temp)) {
                 current_temp = register_mem.data.metrics.ntc_temp;
@@ -407,6 +409,7 @@ void loop()
             #error No temperature sensor available
 
         #endif
+        disable_serial_read_during_delay();
 
         if (register_mem.data.cfg.max_temp && current_temp > static_cast<int16_t>(register_mem.data.cfg.max_temp)) {
 
@@ -429,15 +432,17 @@ void loop()
 
         if (register_mem.data.cfg.report_metrics_interval && millis24 >= queues.report_metrics.timer) {
             queues.report_metrics.timer = millis24 + REPORT_METRICS_INTERVAL_MILLIS24(register_mem.data.cfg.report_metrics_interval);
+            enable_serial_read_during_delay();
             register_mem.data.metrics.int_temp = get_internal_temperature();
             register_mem.data.metrics.ntc_temp = get_ntc_temperature();
             /*register_mem.data.metrics.vcc = */read_vcc();
+            disable_serial_read_during_delay();
             Dimmer::DimmerEvent<DIMMER_EVENT_METRICS_REPORT>::send(static_cast<uint8_t>(current_temp), register_mem.data.metrics);
 
             #if DEBUG_ZC_PREDICTION
                 // display the zc prediction values
                 Serial.flush();
-                Serial.printf_P(PSTR("+REM=zc=%u,n=%u,v=%u,p=%u,s=%u,i=%u\n"), dimmer.debug_pred.zc_signals, dimmer.debug_pred.next_cycle, dimmer.debug_pred.valid_signals, dimmer.debug_pred.pred_signals, dimmer.debug_pred.start_halfwave, dimmer.sync_event.invalid_signals);
+                Serial.printf_P(PSTR("+REM=zc=%u,n=%u,v=%u,p=%u,s=%u,i=%u\n"), dimmer.debug_pred.zc_signals, dimmer.debug_pred.next_cycle, dimmer.debug_pred.valid_signals, dimmer.debug_pred.pred_signals, dimmer.debug_pred.start_halfwave, dimmer.debug_pred.invalid_signals);
                 Serial.flush();
                 Serial.print(F("+REM="));
                 uint32_t avg = 0;
@@ -450,7 +455,11 @@ void loop()
                     Serial.print((long)tmp);
                     Serial.print(',');
                 }
-                Serial.println(avg / static_cast<float>(dimmer.kTimeStorage), 3);
+                Serial.print(avg / static_cast<float>(dimmer.kTimeStorage), 3);
+                Serial.print(',');
+                Serial.print(dimmer.halfwave_ticks_integral, 3);
+                Serial.print(',');
+                Serial.println((F_CPU / 2) / dimmer.halfwave_ticks_integral, 3);
                 Serial.flush();
             #endif
         }

@@ -159,7 +159,7 @@ bool FrequencyMeasurement::run()
         #endif
 
         // give everything some time to settle before starting the measurement
-        delay(100);
+        ::delay(100);
 
         measure = new FrequencyMeasurement();
         if (measure) {
