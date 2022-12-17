@@ -15,7 +15,7 @@ ISR(ADC_vect)
 
 void ADCHandler::next()
 {
-    if (_pos >= kMaxPositon) {
+    if (_pos >= kMaxPosition) {
         return;
     }
     if (_counter > 0) {
@@ -36,7 +36,7 @@ void ADCHandler::next()
 
 void ADCHandler::dump()
 {
-    for(uint8_t i = 0; i < kMaxPositon; i++) {
+    for(uint8_t i = 0; i < kMaxPosition; i++) {
         Serial.printf_P(PSTR("%u: v=%u ø=%.2f d=%uus t=%u c=%u\n"), i, _values[i], _values[i] / 64.0, _duration[i], (uint16_t)(_duration[i] / _count[i]), _count[i]);
         Serial.flush();
     }
@@ -58,40 +58,40 @@ void ADCHandler::restart()
 
     _scheduleNext = false;
     switch(_pos) {
-#if HAVE_NTC
-        case kPosNTC:
-            setPinAndAVCC<NTC_PIN>();
-            start(kNumReadNtc, kDiscard);
-            break;
-#endif
-#if HAVE_EXT_VCC
-        case kPosVCC:
-            setPinAndVRef11<VCC_PIN>();
-            start(kNumReadVcc, kDiscardVRef11);
-            break;
-#elif HAVE_READ_VCC
-        case kPosVCC:
-            setInternalVCC();
-            start(kNumReadVcc, kDiscard);
-            break;
-#endif
-#if HAVE_READ_INT_TEMP
-        case kPosIntTemp:
-            setInternalTemp();
-            start(kNumReadTemp, kDiscardVRef11);
-            break;
-#endif
-#if HAVE_POTI
-        case kPosPoti:
-            setPinAndAVCC<POTI_PIN>();
-            start(kNumReadPoti, kDiscard);
-            break;
-#endif
-#if DEBUG && 0
-        default:
-            debug_printf("invalid position %d\n", _pos);
-            break;
-#endif
+        #if HAVE_NTC
+            case kPosNTC:
+                setPinAndAVCC<NTC_PIN>();
+                start(kNumReadNtc, kDiscard);
+                break;
+        #endif
+        #if HAVE_EXT_VCC
+            case kPosVCC:
+                setPinAndVRef11<VCC_PIN>();
+                start(kNumReadVcc, kDiscardVRef11);
+                break;
+        #elif HAVE_READ_VCC
+            case kPosVCC:
+                setInternalVCC();
+                start(kNumReadVcc, kDiscard);
+                break;
+        #endif
+        #if HAVE_READ_INT_TEMP
+            case kPosIntTemp:
+                setInternalTemp();
+                start(kNumReadTemp, kDiscardVRef11);
+                break;
+        #endif
+        #if HAVE_POTI
+            case kPosPoti:
+                setPinAndAVCC<POTI_PIN>();
+                start(kNumReadPoti, kDiscard);
+                break;
+        #endif
+        #if DEBUG && 0
+            default:
+                debug_printf("invalid position %d\n", _pos);
+                break;
+        #endif
     }
 }
 

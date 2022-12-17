@@ -13,7 +13,7 @@ CubicInterpolation cubicInterpolation;
 
 void CubicInterpolation::printState() const
 {
-    if (dimmer_config.bits.cubic_interpolation) {
+    if (register_mem.data.cfg.bits.cubic_interpolation) {
         DIMMER_CHANNEL_LOOP(i) {
             Serial.print(_channels[i].size());
             Serial.print((i == (DIMMER_CHANNEL_COUNT - 1)) ? ',' : '/');

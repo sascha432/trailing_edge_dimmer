@@ -29,7 +29,12 @@
 // clock cycles change if enabled
 // TODO unstable at the moment
 #ifndef ENABLE_ZC_PREDICTION
-#    define ENABLE_ZC_PREDICTION 0
+#    define ENABLE_ZC_PREDICTION 1
+#endif
+
+// enable serial debug output
+#ifndef DEBUG_ZC_PREDICTION
+#    define DEBUG_ZC_PREDICTION 1
 #endif
 
 // pin for the zero crossing signal
@@ -93,7 +98,7 @@
 // keep dimmer enabled when loosing the ZC signal for up to DIMMER_OUT_OF_SYNC_LIMIT half waves
 // once the signal is lost, it will start to drift and get out of sync. adjust the time limit to keep the drift below 100-200µs
 #ifndef DIMMER_OUT_OF_SYNC_LIMIT
-#    define DIMMER_OUT_OF_SYNC_LIMIT 2000
+#    define DIMMER_OUT_OF_SYNC_LIMIT 1000
 #endif
 
 // min. number of samples to collect, should be more than 100. it requires 3 byte per sample and is released after the measurement is done
@@ -110,7 +115,7 @@
 // if the deviation is too low too low filters too many events
 // too high might lead to flickering
 #ifndef DIMMER_ZC_INTERVAL_MAX_DEVIATION
-#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (2.0 / 100.0)
+#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (1.0 / 100.0)
 #endif
 
 // default mode
@@ -332,7 +337,7 @@
 #endif
 
 #if DIMMER_CUBIC_INTERPOLATION
-#    define DIMMER_LINEAR_LEVEL(level, channel) (dimmer_config.bits.cubic_interpolation ? cubicInterpolation.getLevel(level, channel) : level)
+#    define DIMMER_LINEAR_LEVEL(level, channel) (register_mem.data.cfg.bits.cubic_interpolation ? cubicInterpolation.getLevel(level, channel) : level)
 #    if DIMMER_CUBIC_INTERPOLATION
 #        ifndef DIMMER_INTERPOLATION_METHOD
 #            define DIMMER_INTERPOLATION_METHOD CatmullSpline

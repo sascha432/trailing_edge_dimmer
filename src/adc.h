@@ -10,10 +10,11 @@
 #include "dimmer.h"
 
 #if !defined(__AVR_ATmega328P__) && !defined(__AVR_ATmega328PB__)
-#error check if compatible with MCU
+#    error check if compatible with MCU
 #endif
 
-constexpr int kNumBitsRequired(uint32_t value, int n = 0) {
+constexpr int kNumBitsRequired(uint32_t value, int n = 0) 
+{
     return value ? kNumBitsRequired(value >> 1, n + 1) : n;
 }
 
@@ -60,7 +61,7 @@ public:
         static constexpr uint8_t kHavePoti = 0;
     #endif
 
-    static constexpr uint8_t kMaxPositon = kHaveNtc + kHaveReadVcc + kReadIntTemp + kHavePoti;
+    static constexpr uint8_t kMaxPosition = kHaveNtc + kHaveReadVcc + kReadIntTemp + kHavePoti;
     static constexpr uint8_t kPosNTC = std::max(0, kHaveNtc - 1);
     static constexpr uint8_t kPosVCC = kPosNTC + kHaveReadVcc;
     static constexpr uint8_t kPosIntTemp = kPosVCC + kReadIntTemp;
@@ -69,10 +70,10 @@ public:
     #if HAVE_POTI
         static constexpr uint8_t kPosLast = kPosPoti;
     #else
-        static constexpr uint8_t kPosLast = kMaxPositon - 1;
+        static constexpr uint8_t kPosLast = kMaxPosition - 1;
     #endif
 
-    static_assert(kMaxPositon > 0, "nothing to do for the ADC");
+    static_assert(kMaxPosition > 0, "nothing to do for the ADC");
 
     static constexpr int kCpuMhz = F_CPU / 1000000UL;
 
@@ -99,7 +100,7 @@ public:
 
 
     static constexpr uint8_t kADCSRB_FreeRunning = 0;
-    static constexpr uint8_t kADCSRB_AnalogComperator = _BV(ADTS0);
+    static constexpr uint8_t kADCSRB_AnalogComparator = _BV(ADTS0);
 
     static constexpr uint8_t kADMUX_AREF = 0;
     static constexpr uint8_t kADMUX_AVCC = _BV(REFS0);
@@ -232,61 +233,60 @@ public:
         return _values[pos];
     }
 
-#if HAVE_NTC
-    uint16_t getNTCValue() const {
-        return _values[kPosNTC];
-    }
-    float getNTC_ADCValueAsFloat() const {
-        return getNTCValue() / 64.0;
-    }
-#endif
+    #if HAVE_NTC
+        uint16_t getNTCValue() const {
+            return _values[kPosNTC];
+        }
+        float getNTC_ADCValueAsFloat() const {
+            return getNTCValue() / 64.0;
+        }
+    #endif
 
-#if HAVE_READ_INT_TEMP
-    uint16_t getIntTempValue() const {
-        return _values[kPosIntTemp];
-    }
-    float getIntTemp_ADCValueAsFloat() const {
-        return getIntTempValue() / 64.0;
-    }
-#endif
+    #if HAVE_READ_INT_TEMP
+        uint16_t getIntTempValue() const {
+            return _values[kPosIntTemp];
+        }
+        float getIntTemp_ADCValueAsFloat() const {
+            return getIntTempValue() / 64.0;
+        }
+    #endif
 
-#if HAVE_POTI
-    uint16_t getPotiValue() const {
-        return _values[kPosPoti];
-    }
-    float getPoti_ADCValueAsFloat() const {
-        return getPotiValue() / 64.0;
-    }
-#endif
+    #if HAVE_POTI
+        uint16_t getPotiValue() const {
+            return _values[kPosPoti];
+        }
+        float getPoti_ADCValueAsFloat() const {
+            return getPotiValue() / 64.0;
+        }
+    #endif
 
-#if HAVE_EXT_VCC || HAVE_READ_VCC
-    uint16_t getVCCValue() const {
-        return _values[kPosVCC];
-    }
-    float getVCC_ADCValueAsFloat() const {
-        return getVCCValue() / 64.0;
-    }
-#endif
+    #if HAVE_EXT_VCC || HAVE_READ_VCC
+        uint16_t getVCCValue() const {
+            return _values[kPosVCC];
+        }
+        float getVCC_ADCValueAsFloat() const {
+            return getVCCValue() / 64.0;
+        }
+    #endif
 
-#if DEBUG
-    void dump();
-#endif
+    #if DEBUG
+        void dump();
+    #endif
 
-private:
-    uint16_t _values[kMaxPositon];
-    int16_t _counter;
-    uint16_t _maxCount;
-    sum_t _sum;
-    uint8_t _shiftSum;
-    uint8_t _pos;
-    bool _scheduleNext;
-#if DEBUG
-    uint32_t _start;
-    uint16_t _duration[kMaxPositon];
-    uint16_t _count[kMaxPositon];
-    uint16_t _intCounter;
-#endif
-};
+    private:
+        uint16_t _values[kMaxPosition];
+        int16_t _counter;
+        uint16_t _maxCount;
+        sum_t _sum;
+        uint8_t _shiftSum;
+        uint8_t _pos;
+        bool _scheduleNext;
+    #if DEBUG
+        uint32_t _start;
+        uint16_t _duration[kMaxPosition];
+        uint16_t _count[kMaxPosition];
+        uint16_t _intCounter;
+    #endif
 
 #else
 
@@ -334,48 +334,48 @@ private:
         return value * 8;
     }
 
-#if HAVE_NTC
-    uint16_t getNTCValue() {
-        setPinAndAVCC<NTC_PIN>();
-        return __getValues();
-    }
-    float getNTC_ADCValueAsFloat() {
-        return getNTCValue() / 64.0;
-    }
-#endif
+    #if HAVE_NTC
+        uint16_t getNTCValue() {
+            setPinAndAVCC<NTC_PIN>();
+            return __getValues();
+        }
+        float getNTC_ADCValueAsFloat() {
+            return getNTCValue() / 64.0;
+        }
+    #endif
 
-#if HAVE_READ_INT_TEMP
-    uint16_t getIntTempValue() {
-        setInternalTemp();
-        return __getValues();
-    }
-    float getIntTemp_ADCValueAsFloat() {
-        return getIntTempValue() / 64.0;
-    }
-#endif
+    #if HAVE_READ_INT_TEMP
+        uint16_t getIntTempValue() {
+            setInternalTemp();
+            return __getValues();
+        }
+        float getIntTemp_ADCValueAsFloat() {
+            return getIntTempValue() / 64.0;
+        }
+    #endif
 
-#if HAVE_POTI
-    uint16_t getPotiValue() {
-        setPinAndAVCC<POTI_PIN>();
-        return __getValues();
-    }
-    float getPoti_ADCValueAsFloat() {
-        return getPotiValue() / 64.0;
-    }
-#endif
+    #if HAVE_POTI
+        uint16_t getPotiValue() {
+            setPinAndAVCC<POTI_PIN>();
+            return __getValues();
+        }
+        float getPoti_ADCValueAsFloat() {
+            return getPotiValue() / 64.0;
+        }
+    #endif
 
-#if HAVE_EXT_VCC || HAVE_READ_VCC
-    uint16_t getVCCValue() {
-        setInternalVCC();
-        return __getValues();
-    }
-    float getVCC_ADCValueAsFloat() {
-        return getVCCValue() / 64.0;
-    }
+    #if HAVE_EXT_VCC || HAVE_READ_VCC
+        uint16_t getVCCValue() {
+            setInternalVCC();
+            return __getValues();
+        }
+        float getVCC_ADCValueAsFloat() {
+            return getVCCValue() / 64.0;
+        }
+    #endif
+
 #endif
 
 };
-
-#endif
 
 extern ADCHandler _adc;

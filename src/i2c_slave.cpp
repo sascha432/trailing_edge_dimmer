@@ -357,11 +357,11 @@ void _dimmer_i2c_on_receive(int length)
                                         cubicInterpolation.getChannel(channel).createFromConfig(register_mem.data.ram.cubic_int);
                                     }
                                     // check if there is any data
-                                    dimmer_config.bits.cubic_interpolation = false;
+                                    register_mem.data.cfg.bits.cubic_interpolation = false;
                                     DIMMER_CHANNEL_LOOP(channel) {
                                         _D(5, debug_printf("write_cubic_int channel=%u size=%u\n"), channel, cubicInterpolation.getChannel(channel).size());
                                         if (cubicInterpolation.getChannel(channel).size()) {
-                                            dimmer_config.bits.cubic_interpolation = true;
+                                            register_mem.data.cfg.bits.cubic_interpolation = true;
                                             break;
                                         }
                                     }

@@ -5,6 +5,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <util/atomic.h>
 #include "timers.h"
 #include "helpers.h"
 #include "int24_types.h"
@@ -40,8 +41,8 @@ struct __attribute__((packed)) FadingCompletionEvent_t {
 };
 
 #if not HAVE_CHANNELS_INLINE_ASM
-extern volatile uint8_t *dimmer_pins_addr[::size_of(DIMMER_MOSFET_PINS)];
-extern uint8_t dimmer_pins_mask[::size_of(DIMMER_MOSFET_PINS)];
+    extern volatile uint8_t *dimmer_pins_addr[::size_of(DIMMER_MOSFET_PINS)];
+    extern uint8_t dimmer_pins_mask[::size_of(DIMMER_MOSFET_PINS)];
 #endif
 
 namespace Dimmer {
@@ -73,8 +74,8 @@ namespace Dimmer {
 
     template<>
     struct Timer<1> : Timers::TimerBase<1, DIMMER_TIMER1_PRESCALER> {
-        static constexpr uint8_t __extraTicks = 48 / prescaler;
-        static constexpr uint8_t extraTicks = __extraTicks == 0 ? 1 : __extraTicks;     // add 48 clock cycles but at least one tick
+        static constexpr uint8_t __extraTicks = 54 / prescaler;
+        static constexpr uint8_t extraTicks = __extraTicks < 6 ? 6 : __extraTicks;     // add __extraTicks clock cycles but at least 6
     };
 
     #ifdef DIMMER_TIMER2_PRESCALER
@@ -83,84 +84,60 @@ namespace Dimmer {
         };
     #endif
 
+    // timer 1 using prescaler 1 to get the most precise mains frequency during the measurement cycle
     struct FrequencyTimer : Timers::TimerBase<1, 1> {
-        static inline void begin() {
-            TimerBase::clear_counter();
-            TimerBase::begin<kIntMaskOverflow>();
-            TimerBase::clear_flags<kFlagsOverflow>();
-        }
+        static void begin();
     };
 
+    inline void FrequencyTimer::begin() 
+    {
+        TimerBase::clear_counter();
+        TimerBase::begin<kIntMaskOverflow>();
+        TimerBase::clear_flags<kFlagsOverflow>();
+    }
+
+    // timer 2 running to prescaler 1 to predict the next zc crossing event
     struct MeasureTimer : Timers::TimerBase<2, 1> {
 
-        // MeasureTimer() : _overflow(0), _counter16(0), _counter32(0) {}
+        using TickType = uint32_t;
 
-        inline void begin() {
-            TimerBase::begin<TimerBase::kFlagsOverflow>();
-        }
+        // start timer using the overflow interrupt
+        void begin();
+        // end timer
+        void end();
 
-        inline void end() {
-            TimerBase::end<TimerBase::kFlagsOverflow>();
-        }
+        // get clock cycles
+        // interrupts must be disabled when calling from outside an ISR
+        TickType get_timer();
 
-        inline void start() {
-            TimerBase::int_mask_enable<kIntMaskOverflow>();
-        }
-
-        inline void stop() {
-            TimerBase::int_mask_enable<kIntMaskOverflow>();
-        }
-
-        inline void reset() {
-            TCNT2 = 0;
-            TimerBase::clear_flags<TimerBase::kFlagsOverflow>();
-            _overflow = 0;
-        }
-
-        // get ticks since last reset and reset counter
-        // interrupts are being disabled and restored
-        inline uint24_t get() {
-            uint8_t oldSREG = SREG;
-            cli();
-            uint8_t tmp = TCNT2;
-            if (TimerBase::get_flag<kFlagsOverflow>() && TCNT2 < 255) {
-                _overflow++;
-                TimerBase::clear_flags<kFlagsOverflow>();
-            }
-            uint16_t tmp2 = _overflow;
-            SREG = oldSREG;
-            return ((uint24_t)tmp2 << 8) | tmp;
-        }
-
-        // get ticks since last reset
-        // interrupts must be disabled
-        inline uint24_t get_no_cli() {
-            uint8_t tmp = TCNT2;
-            if (TimerBase::get_flag<kFlagsOverflow>() && TCNT2 < 255) {
-                _overflow++;
-                TimerBase::clear_flags<kFlagsOverflow>();
-            }
-            return __uint24_from_ui16_ui8(_overflow, tmp);
-        }
-
-        // get ticks since lasts reset and reset counter
-        // interrupts must be disabled
-        inline uint24_t get_clear_no_cli() {
-            uint8_t tmp = TCNT2;
-            if (TimerBase::get_flag<kFlagsOverflow>() && TCNT2 < 255) {
-                _overflow++;
-            }
-            TCNT2 = 0;
-            TimerBase::clear_flags<kFlagsOverflow>();
-            auto tmp2 = __uint24_from_ui16_ui8(_overflow, tmp);
-            _overflow = 0;
-            return tmp2;
-        }
-
-        volatile uint16_t _overflow;
+        volatile Dimmer::TickType _overflow;
     };
 
-    static_assert(DIMMER_CHANNEL_COUNT == ::size_of(DIMMER_MOSFET_PINS), "channel count mismatch");
+    inline void MeasureTimer::begin() 
+    {
+        TCNT2 = 0;
+        TimerBase::begin<TimerBase::kIntMaskOverflow>();
+        TimerBase::clear_flags<TimerBase::kFlagsOverflow>();
+        // TCNT2 won't reach 256 while resetting the overflow, interrupts can be enabled
+        _overflow = 0;
+    }
+
+    inline void MeasureTimer::end() 
+    {
+        TimerBase::end<TimerBase::kIntMaskOverflow>();
+    }
+    
+    inline MeasureTimer::TickType MeasureTimer::get_timer() 
+    {
+        // similar to micros() but more precise depending on the MCU frequency
+        auto tmp_overflow = _overflow;
+        auto tmp_counter = TCNT2;
+        if (TimerBase::get_flag<kFlagsOverflow>() && tmp_counter < 255) { 
+            // we got an overflow during reading TCNT2
+            tmp_overflow++;
+        }
+        return (tmp_counter | (static_cast<TickType>(tmp_overflow) << 8)) * TimerBase::prescaler;
+    }
 
     struct Channel {
         using type = ChannelType;
@@ -175,9 +152,6 @@ namespace Dimmer {
         }
     };
 
-    static_assert(Channel::size() <= 16, "limited to 16 channels");
-    static_assert(Channel::size() <= DIMMER_MAX_CHANNELS, "increase DIMMER_MAX_CHANNELS");
-
     struct Level {
         using type = LevelType;
         static constexpr type size = DIMMER_MAX_LEVEL;
@@ -188,8 +162,6 @@ namespace Dimmer {
         static constexpr type current = -1;
         static constexpr type freeze = -1;
     };
-
-    static_assert(Level::size >= 255, "at least 255 levels required");
 
     static constexpr float kZCFilterFrequencyDeviation = DIMMER_ZC_INTERVAL_MAX_DEVIATION;
 
@@ -209,6 +181,11 @@ namespace Dimmer {
 
     static constexpr uint8_t kOnSwitchCounterMax = 0xfe;
 
+    // do basic parameter checks
+    static_assert(DIMMER_CHANNEL_COUNT == ::size_of(DIMMER_MOSFET_PINS), "channel count mismatch");
+    static_assert(Channel::size() <= 16, "limited to 16 channels");
+    static_assert(Channel::size() <= DIMMER_MAX_CHANNELS, "increase DIMMER_MAX_CHANNELS");
+    static_assert(Level::size >= 255, "at least 255 levels required");
     static_assert(kMaxTicksPerHalfWave < LevelTypeMax, "Increase prescaler to reduce ticks per halfwave");
     static_assert(Level::max > 63, "64 or more levels required");
     static_assert(Level::max <= LevelTypeMax, "Max. level exceeds type size");
@@ -232,13 +209,18 @@ namespace Dimmer {
         ChannelStateType ordered_channels_buffer[Channel::size() + 1];          // next dimming levels, first buffer
         TickType halfwave_ticks;
         StateType channel_state;                                                // bitset of the channel state
-        bool toggle_state;                                                      // next state of the mosfets
+        volatile bool toggle_state;                                             // next state of the mosfets
         volatile bool calculate_channels_locked;
 
         #if ENABLE_ZC_PREDICTION
-            uint24_t halfwave_ticks_prescaler1;
+            // avg, min and max. clock cycles
+            uint24_t halfwave_ticks_timer2;
             uint24_t halfwave_ticks_min;
             uint24_t halfwave_ticks_max;
+            // last value to calculate difference
+            uint24_t last_ticks;
+            // keeps track if the frequency changes to adjust halfwave_ticks_timer2
+            float halfwave_ticks_integral;
             dimmer_sync_event_t sync_event;
         #endif
         #if HAVE_FADE_COMPLETION_EVENT
@@ -262,13 +244,8 @@ namespace Dimmer {
             bool is_ticks_within_range(uint24_t ticks);
         #endif
 
-        inline void set_frequency(float freq) {
-            register_mem.data.metrics.frequency = freq;
-        }
-
-        inline void set_mode(ModeType mode) {
-            _config.bits.leading_edge = (mode == ModeType::LEADING_EDGE);
-        }
+        void set_frequency(float freq);
+        void set_mode(ModeType mode);
 
         // Set channel to level
         //
@@ -297,9 +274,7 @@ namespace Dimmer {
         // channel          Channel::min - Channel::max
         // to_level         Level::min - Level::max
         // time             time for fading from Level::min to Level::max in seconds
-        inline void fade_channel_to(Channel::type channel, Level::type to_level, float time) {
-            fade_channel_from_to(channel, Level::current, to_level, time, false);
-        }
+        void fade_channel_to(Channel::type channel, Level::type to_level, float time);
 
         // Change level for one or all channels from current level to "to_level" within "time"
         //
@@ -315,31 +290,18 @@ namespace Dimmer {
         //
         void send_fading_completion_events();
 
+        //
+        // apply fading (interrupts enabled) and calculate new levels
+        // depending on the number of channels and cubic interpolation, this method can be slow when calling calls _calculate_channels()
+        //
         void _apply_fading();
 
-        inline TickType _get_ticks_per_halfwave() const {
-            return halfwave_ticks;
-        }
-
+        TickType _get_ticks_per_halfwave() const;
         TickType __get_ticks(Channel::type channel, Level::type level) const;
-
-        inline TickType _get_ticks(Channel::type channel, Level::type level) {
-            return _config.bits.leading_edge ?
-                (_get_ticks_per_halfwave() - __get_ticks(channel, level)) :
-                __get_ticks(channel, level);
-        }
-
-        inline uint16_t _get_level(Channel::type channel) const {
-            return _register_mem.channels.level[channel];
-        }
-
-        inline void _set_level(Channel::type channel, Level::type level) {
-            _register_mem.channels.level[channel] = level;
-        }
-
-        inline Level::type _normalize_level(Level::type level) const {
-            return std::clamp(level, Level::off, Level::max);
-        }
+        TickType _get_ticks(Channel::type channel, Level::type level);
+        uint16_t _get_level(Channel::type channel) const;
+        void _set_level(Channel::type channel, Level::type level);
+        Level::type _normalize_level(Level::type level) const;
 
         void compare_interrupt();
 
@@ -347,9 +309,7 @@ namespace Dimmer {
         void _timer_remove();
         void _start_halfwave();
         void _delay_halfwave();
-        inline float _get_frequency() const {
-            return register_mem.data.metrics.frequency;
-        }
+        float _get_frequency() const;
 
         #if HAVE_CHANNELS_INLINE_ASM
             inline void _set_all_mosfet_gates(bool state) {
@@ -390,8 +350,80 @@ namespace Dimmer {
 
         register_mem_cfg_t &_config;
         register_mem_t &_register_mem;
+
+        #if DEBUG_ZC_PREDICTION
+            static constexpr uint8_t kTimeStorage = 16;
+            struct {
+                uint16_t zc_signals;
+                uint16_t next_cycle;
+                uint16_t valid_signals;
+                uint16_t pred_signals;
+                uint16_t start_halfwave;
+                MeasureTimer::TickType last_time;
+                MeasureTimer::TickType times[kTimeStorage];
+                uint8_t pos;
+            } debug_pred;
+        #endif
     };
 
+    inline void DimmerBase::set_frequency(float freq) 
+    {
+        register_mem.data.metrics.frequency = freq;
+    }
+
+    inline void DimmerBase::set_mode(ModeType mode) 
+    {
+        _config.bits.leading_edge = (mode == ModeType::LEADING_EDGE);
+    }
+
+    inline void DimmerBase::fade_channel_to(Channel::type channel, Level::type to_level, float time) 
+    {
+        fade_channel_from_to(channel, Level::current, to_level, time, false);
+    }
+
+    inline TickType DimmerBase::_get_ticks_per_halfwave() const 
+    {
+        return halfwave_ticks;
+    }
+
+    inline TickType DimmerBase::_get_ticks(Channel::type channel, Level::type level) 
+    {
+        return _config.bits.leading_edge ?
+            (_get_ticks_per_halfwave() - __get_ticks(channel, level)) :
+            __get_ticks(channel, level);
+    }
+
+    inline uint16_t DimmerBase::_get_level(Channel::type channel) const 
+    {
+        return _register_mem.channels.level[channel];
+    }
+
+    inline void DimmerBase::_set_level(Channel::type channel, Level::type level) 
+    {
+        _register_mem.channels.level[channel] = level;
+    }
+
+    inline Level::type DimmerBase::_normalize_level(Level::type level) const 
+    {
+        return std::clamp(level, Level::off, Level::max);
+    }
+
+
+    inline float DimmerBase::_get_frequency() const 
+    {
+        return register_mem.data.metrics.frequency;
+    }
+
+    #if ENABLE_ZC_PREDICTION
+        inline bool DimmerBase::is_ticks_within_range(uint24_t ticks) 
+        {
+            // check if ticks is within the range
+            // ticks is the clock cycles since the last
+            return (ticks >= halfwave_ticks_min && ticks <= halfwave_ticks_max);
+        }
+    #endif
+
+    // i2c response template
     template<uint8_t _Event>
     struct DimmerEvent {
 
@@ -429,8 +461,7 @@ namespace Dimmer {
 
 }
 
+
 using dimmer_t = Dimmer::dimmer_t;
 
 extern Dimmer::DimmerBase dimmer;
-
-#define dimmer_config register_mem.data.cfg

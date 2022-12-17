@@ -42,7 +42,7 @@
 using uint24_t = __uint24;
 using int24_t = __int24;
 
-// equivalent of uint24_t value = lo | (uint24_t)uint16_value << 16;
+// avoid cast to unsigned long
 inline __attribute_always_inline__ static uint24_t __uint24_from_ui16_ui8(const uint16_t hi, const uint8_t lo) {
     return lo | static_cast<uint24_t>(hi) << 16;
 }
@@ -57,7 +57,7 @@ inline __attribute_always_inline__ static uint24_t __uint24_from_shr8_ui32(const
 class uint24_t;
 class int24_t;
 
-// equivalent of uint24_t value = lo | (uint24_t)uint16_value << 16;
+// avoid cast to unsigned long
 static uint24_t __uint24_from_ui16_ui8(const uint16_t hi, const uint8_t lo);
 
 // equivalent of uint24_t value = uint32_value >> 8;
