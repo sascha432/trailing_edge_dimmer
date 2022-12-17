@@ -25,7 +25,7 @@ void CubicInterpolation::printState() const
 
 #if HAVE_CUBIC_INT_PRINT_TABLE
 
-void CubicInterpolation::printTable(dimmer_channel_id_t channelNum, uint8_t levelStepSize) const
+void CubicInterpolation::printTable(Dimmer::Channel::type channelNum, uint8_t levelStepSize) const
 {
     Serial.printf_P(PSTR("+REM=ch%d="), channelNum);
     auto &channel = _channels[channelNum];
@@ -43,7 +43,7 @@ void CubicInterpolation::printTable(dimmer_channel_id_t channelNum, uint8_t leve
             if (i != 0) {
                 Serial.print(',');
             }
-            Serial.print(static_cast<dimmer_level_t>(channel.getYValues()[i]));
+            Serial.print(static_cast<Dimmer::Level::type>(channel.getYValues()[i]));
         }
         Serial.print(F("],l=["));
         double step = 255.0 / ((DIMMER_MAX_LEVEL - 1) / (levelStepSize + 1.0));
@@ -63,10 +63,10 @@ void CubicInterpolation::printTable(dimmer_channel_id_t channelNum, uint8_t leve
 
 #if HAVE_CUBIC_INT_TEST_PERFORMANCE
 
-void CubicInterpolation::testPerformance(dimmer_channel_id_t channel) const
+void CubicInterpolation::testPerformance(Dimmer::Channel::type channel) const
 {
     uint32_t maxTime = 0;
-    for(dimmer_level_t level = 0; level < DIMMER_MAX_LEVEL; level++) {
+    for(Dimmer::Level::type level = 0; level < DIMMER_MAX_LEVEL; level++) {
         auto start = micros();
         auto levelOut = getLevel(level, channel);
         unsigned dur = micros() - start;
@@ -80,13 +80,13 @@ void CubicInterpolation::testPerformance(dimmer_channel_id_t channel) const
 
 #endif
 
-uint8_t CubicInterpolation::getInterpolatedLevels(dimmer_level_t *dstPtr, dimmer_level_t *endPtr, dimmer_level_t startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const
+uint8_t CubicInterpolation::getInterpolatedLevels(Dimmer::Level::type *dstPtr, Dimmer::Level::type *endPtr, Dimmer::Level::type startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const
 {
     uint16_t stepSize = (step + 1U);
-    dimmer_level_t endLevel = startLevel + (levelCount * stepSize);
+    Dimmer::Level::type endLevel = startLevel + (levelCount * stepSize);
     uint8_t size = 0;
     Serial.printf("+REM=start=%u,end=%u,step=%u\n", startLevel, endLevel, stepSize);
-    for (dimmer_level_t level = startLevel; (level < endLevel) && (dstPtr < endPtr); level += stepSize) {
+    for (Dimmer::Level::type level = startLevel; (level < endLevel) && (dstPtr < endPtr); level += stepSize) {
         *dstPtr++ = _toLevel(Interpolation::DIMMER_INTERPOLATION_METHOD(xValues, yValues, dataPointCount, _toY(level)));
         size += sizeof(*dstPtr);
         Serial.printf("+REM=level=%u,%f out=%u\n", level, _toY(level), *(dstPtr - 1));
@@ -94,12 +94,12 @@ uint8_t CubicInterpolation::getInterpolatedLevels(dimmer_level_t *dstPtr, dimmer
     return size;
 }
 
-dimmer_level_t CubicInterpolation::_toLevel(double y) const
+Dimmer::Level::type CubicInterpolation::_toLevel(double y) const
 {
-    return std::clamp<dimmer_level_t>((y * ((DIMMER_MAX_LEVEL - 1) / 255.0) + 0.5 /*round*/), 0, DIMMER_MAX_LEVEL - 1);
+    return std::clamp<Dimmer::Level::type>((y * ((DIMMER_MAX_LEVEL - 1) / 255.0) + 0.5 /*round*/), 0, DIMMER_MAX_LEVEL - 1);
 }
 
-double CubicInterpolation::_toY(dimmer_level_t level) const
+double CubicInterpolation::_toY(Dimmer::Level::type level) const
 {
     return std::min<double>(static_cast<uint16_t>(level) / ((DIMMER_MAX_LEVEL - 1) / 255.0), 255);
 }

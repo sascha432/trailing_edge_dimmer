@@ -3,7 +3,9 @@
 ## 2.2.3-dev
 
  - NOTE: currently the dimmer firmware is running on the ZC interrupt, not the predicted signal
- - Increased serial rx buffer to 256 byte to avoid loosing data (UART mode only)
+ - Added a delay function that processes incoming UART events during calling the Dimmer::delay() function (replacement for ::delay())
+ - Fixed issues with prediction using uint24_t by replacing it with uint32_t (probably missing uint24_t casts leading to unsigned long/uint32_t)
+ - Increased serial RX buffer to 256 byte to avoid loosing data (UART mode only)
  - Option to set and fade levels in main loop to speed up _dimmer_i2c_on_receive()
  - Fixed reading/writing cubic interpolation for multiple channels
  - 2.2.3 breaks binary compatibility with previous versions due to changes in some structures

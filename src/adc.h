@@ -294,24 +294,24 @@ public:
 
     inline void setInternalTemp() {
         ADMUX = kADMUX_Reference<kADMUX_InternalTemperature>();
-        delay(20);
+        Dimmer::delay(20);
     }
 
     inline void setInternalVCC() {
         ADMUX = kADMUX_Reference<kADMUX_InternalVCC>();
-        delay(20);
+        Dimmer::delay(20);
     }
 
     template<uint8_t _Pin = PIN_A0>
     void setPinAndAVCC() {
         ADMUX = kADMUX_Reference<kADMUX_AVCC, _Pin>();
-        delay(20);
+        Dimmer::delay(20);
     }
 
     template<uint8_t _Pin = PIN_A0>
     void setPinAndVRef11() {
         ADMUX = kADMUX_Reference<kADMUX_VREF11, _Pin>();
-        delay(20);
+        Dimmer::delay(20);
     }
 
     // analog read for selected ADC source
@@ -328,7 +328,7 @@ public:
         uint16_t value = std::min<uint16_t>(__analogRead(), 1023);
         uint8_t count = 8;
         while(--count) {
-            delay(1);
+            Dimmer::delay(1);
             value += __analogRead();
         }
         return value * 8;

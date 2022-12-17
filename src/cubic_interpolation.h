@@ -51,25 +51,25 @@ public:
 
     void printState() const;
     #if HAVE_CUBIC_INT_PRINT_TABLE
-        void printTable(dimmer_channel_id_t channel, uint8_t levelStepSize = 1) const;
+        void printTable(Dimmer::Channel::type channel, uint8_t levelStepSize = 1) const;
     #endif
     #if HAVE_CUBIC_INT_TEST_PERFORMANCE
-        void testPerformance(dimmer_channel_id_t channel) const;
+        void testPerformance(Dimmer::Channel::type channel) const;
     #endif
 
-    int16_t getLevel(dimmer_level_t level, dimmer_channel_id_t channel) const;
-    uint8_t getInterpolatedLevels(dimmer_level_t *dst, dimmer_level_t *endPtr, dimmer_level_t startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const;
+    int16_t getLevel(Dimmer::Level::type level, Dimmer::Channel::type channel) const;
+    uint8_t getInterpolatedLevels(Dimmer::Level::type *dst, Dimmer::Level::type *endPtr, Dimmer::Level::type startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const;
 
     void copyFromConfig(const dimmer_config_cubic_int_t &cubicInt);
     void copyToConfig(dimmer_config_cubic_int_t &cubicInt);
     void clear();
     void printConfig() const;
 
-    Channel &getChannel(dimmer_channel_id_t channel);
+    Channel &getChannel(Dimmer::Channel::type channel);
 
 private:
-    dimmer_level_t _toLevel(double y) const;
-    double _toY(dimmer_level_t level) const;
+    Dimmer::Level::type _toLevel(double y) const;
+    double _toY(Dimmer::Level::type level) const;
 
     Channel _channels[DIMMER_CHANNEL_COUNT];
 };
@@ -124,7 +124,7 @@ inline CubicInterpolation::CubicInterpolation() :
 {
 }
 
-inline dimmer_level_t CubicInterpolation::getLevel(dimmer_level_t level, dimmer_channel_id_t channelNum) const
+inline Dimmer::Level::type CubicInterpolation::getLevel(Dimmer::Level::type level, Dimmer::Channel::type channelNum) const
 {
     auto &channel = _channels[channelNum];
     if (channel.size()) {
@@ -172,7 +172,7 @@ inline void CubicInterpolation::printConfig() const
     }
 }
 
-inline CubicInterpolation::Channel &CubicInterpolation::getChannel(dimmer_channel_id_t channel)
+inline CubicInterpolation::Channel &CubicInterpolation::getChannel(Dimmer::Channel::type channel)
 {
     return _channels[channel];
 }

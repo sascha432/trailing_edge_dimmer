@@ -20,26 +20,6 @@ void remln(const __FlashStringHelper *str);
 
 extern register_mem_union_t register_mem;
 
-using dimmer_channel_id_t = int8_t;
-using dimmer_level_t = int16_t;
-
-struct dimmer_fade_t {
-    float level;
-    float step;
-    uint16_t count;
-    dimmer_level_t targetLevel;
-};
-
-struct dimmer_channel_t {
-    uint8_t channel;
-    uint16_t ticks;
-};
-
-struct __attribute__((packed)) FadingCompletionEvent_t {
-    dimmer_channel_id_t channel;
-    dimmer_level_t level;
-};
-
 #if not HAVE_CHANNELS_INLINE_ASM
     extern volatile uint8_t *dimmer_pins_addr[::size_of(DIMMER_MOSFET_PINS)];
     extern uint8_t dimmer_pins_mask[::size_of(DIMMER_MOSFET_PINS)];
@@ -47,9 +27,45 @@ struct __attribute__((packed)) FadingCompletionEvent_t {
 
 namespace Dimmer {
 
-    using ChannelType = dimmer_channel_id_t;
-    using ChannelStateType = dimmer_channel_t;
-    using LevelType = dimmer_level_t;
+    #if __AVR__
+
+        static constexpr bool can_yield() 
+        {
+            return true;
+        }
+
+        static inline void optimistic_yield(uint32_t) 
+        {
+            yield();
+        }
+
+
+    #endif
+
+    struct Channel {
+        using type = int8_t;
+        static constexpr type kSize = DIMMER_CHANNEL_COUNT;
+        static constexpr type min = 0;
+        static constexpr type max = kSize - 1;
+        static constexpr type any = -1;
+        static constexpr const uint8_t pins[kSize] = { DIMMER_MOSFET_PINS };
+
+        static constexpr type size() {
+            return kSize;
+        }
+    };
+
+    struct Level {
+        using type = int16_t;
+        static constexpr type size = DIMMER_MAX_LEVEL;
+        static constexpr type off = 0;
+        static constexpr type min = 0;
+        static constexpr type max = size;
+        static constexpr type invalid = -1;
+        static constexpr type current = -1;
+        static constexpr type freeze = -1;
+    };
+
     using TickType = uint16_t;
     using TickMultiplierType = uint32_t;
     #if DIMMER_MAX_CHANNELS > 8
@@ -63,8 +79,8 @@ namespace Dimmer {
         LEADING_EDGE
     };
 
-    static constexpr long LevelTypeMin = static_cast<LevelType>(1UL << ((sizeof(LevelType) << 3) - 1));
-    static constexpr long LevelTypeMax = (1UL << ((sizeof(LevelType) << 3) - 1));
+    static constexpr long LevelTypeMin = static_cast<Level::type>(1UL << ((sizeof(Level::type) << 3) - 1));
+    static constexpr long LevelTypeMax = (1UL << ((sizeof(Level::type) << 3) - 1));
     static constexpr TickType TickTypeMin = 0;
     static constexpr TickType TickTypeMax = ~0;
     static constexpr float kVRef = INTERNAL_VREF_1_1V;
@@ -139,30 +155,6 @@ namespace Dimmer {
         return (tmp_counter | (static_cast<TickType>(tmp_overflow) << 8)) * TimerBase::prescaler;
     }
 
-    struct Channel {
-        using type = ChannelType;
-        static constexpr type kSize = DIMMER_CHANNEL_COUNT;
-        static constexpr type min = 0;
-        static constexpr type max = kSize - 1;
-        static constexpr type any = -1;
-        static constexpr const uint8_t pins[kSize] = { DIMMER_MOSFET_PINS };
-
-        static constexpr type size() {
-            return kSize;
-        }
-    };
-
-    struct Level {
-        using type = LevelType;
-        static constexpr type size = DIMMER_MAX_LEVEL;
-        static constexpr type off = 0;
-        static constexpr type min = 0;
-        static constexpr type max = size;
-        static constexpr type invalid = -1;
-        static constexpr type current = -1;
-        static constexpr type freeze = -1;
-    };
-
     static constexpr float kZCFilterFrequencyDeviation = DIMMER_ZC_INTERVAL_MAX_DEVIATION;
 
     static constexpr uint8_t kMinFrequency = 48;
@@ -197,6 +189,23 @@ namespace Dimmer {
         static constexpr uint16_t kVersion = (kMajor << 10) | (kMinor << 5) | kRevision;
     };
 
+    struct dimmer_fade_t {
+        float level;
+        float step;
+        uint16_t count;
+        Level::type targetLevel;
+    };
+
+    struct dimmer_channel_t {
+        uint8_t channel;
+        uint16_t ticks;
+    };
+
+    struct __attribute__((packed)) FadingCompletionEvent_t {
+        Channel::type channel;
+        Level::type level;
+    };
+
     struct dimmer_t {
         Level::type levels_buffer[Channel::size()];                             // single buffer for levels since they are used only when the halfwave starts
         dimmer_fade_t fading[Channel::size()];                                  // calculated fading data
@@ -205,8 +214,8 @@ namespace Dimmer {
         #endif
         // for double bufferring. the calculation is done on the stack and copied into the first buffer
         // before the half wave starts the first buffer is copied into the second buffer, which is used inside the interrupts
-        ChannelStateType ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks, second buffer
-        ChannelStateType ordered_channels_buffer[Channel::size() + 1];          // next dimming levels, first buffer
+        dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks, second buffer
+        dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels, first buffer
         TickType halfwave_ticks;
         StateType channel_state;                                                // bitset of the channel state
         volatile bool toggle_state;                                             // next state of the mosfets
@@ -423,6 +432,39 @@ namespace Dimmer {
         }
     #endif
 
+    inline void DimmerBase::set_level(Channel::type channel, Level::type level)
+    {
+        // _D(5, debug_printf("set_level ch=%d level=%d\n", channel, level))
+        #if DIMMER_HAVE_SET_ALL_CHANNELS_AT_ONCE
+            if (channel == Channel::any) {
+                DIMMER_CHANNEL_LOOP(i) {
+                    set_channel_level(i, level);
+                }
+            } 
+            else 
+        #endif
+        {
+            set_channel_level(channel, level);
+        }
+    }
+
+    inline void DimmerBase::fade_from_to(Channel::type channel, Level::type from_level, Level::type to_level, float time, bool absolute_time)
+    {
+        _D(5, debug_printf("fade_from_to ch=%d from=%d to=%d time=%f\n", channel, from_level, to_level, time))
+        #if DIMMER_HAVE_SET_ALL_CHANNELS_AT_ONCE
+            if (channel == Channel::any) {
+                DIMMER_CHANNEL_LOOP(i) {
+                    fade_channel_from_to(i, from_level, to_level, time, absolute_time);
+                }
+            }
+            else 
+        #endif
+        {
+            fade_channel_from_to(channel, from_level, to_level, time, absolute_time);
+        }
+    }
+
+
     // i2c response template
     template<uint8_t _Event>
     struct DimmerEvent {
@@ -459,9 +501,23 @@ namespace Dimmer {
         }
     };
 
+    #if SERIAL_I2C_BRIDGE
+
+        // delay with processing incoming events once per millisecond
+        // can be called ms = 0 to process events
+        // must not be used with locked interrupts or inside an ISR
+        void delay(uint32_t ms) ;
+
+    #else
+
+        __attribute_always_inline__
+        inline void delay(uint32_t ms) 
+        {
+            ::delay(ms);
+        }
+
+    #endif
+
 }
-
-
-using dimmer_t = Dimmer::dimmer_t;
 
 extern Dimmer::DimmerBase dimmer;

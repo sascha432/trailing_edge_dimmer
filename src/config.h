@@ -94,8 +94,8 @@ public:
 
     EEPROM_config_t &config();
 
-    dimmer_level_t &level(dimmer_channel_id_t channel);
-    dimmer_level_t level(dimmer_channel_id_t channel) const;
+    Dimmer::Level::type &level(Dimmer::Channel::type channel);
+    Dimmer::Level::type level(Dimmer::Channel::type channel) const;
 
 private:
     friend void dimmer_i2c_slave_setup();
@@ -153,12 +153,12 @@ inline EEPROM_config_t &Config::config()
     return _config;
 }
 
-inline dimmer_level_t &Config::level(dimmer_channel_id_t channel)
+inline Dimmer::Level::type &Config::level(Dimmer::Channel::type channel)
 {
     return _config.channels.level[channel];
 }
 
-inline dimmer_level_t Config::level(dimmer_channel_id_t channel) const
+inline Dimmer::Level::type Config::level(Dimmer::Channel::type channel) const
 {
     return _config.channels.level[channel];
 }

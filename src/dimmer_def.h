@@ -43,17 +43,17 @@
 #endif
 
 // delay after receiving the zero crossing signal and the MOSFETs being turned on
-// if RISING is used, there is still a difference of about 20µs (1 channel @16MHz) until the MOSFETs turn on. this
-// value varies depending on the number of channels and CPU frequency
 //
 // this should be calibrated at a temperature close to the working temperature. the zc crossing detection being used
-// in revision 1.3 with power monitoring changes about 250ns/°C while some older ones vary up to 5µs/°C
-// if more precision is required, a temperature correction based on the NTC temperature can be added
+// in revision 1.3 with power monitoring changes about 250ns/°C while some older ones vary up to 5µs/°C. the threshold
+// should be +-20µs at working temperature. if more precision is required, a temperature correction based on the ATMega/NTC 
+// temperature can be added, but i highly recommend to use a proper zc detection with low temperature drift
 #ifndef DIMMER_ZC_DELAY_US
 #    define DIMMER_ZC_DELAY_US 144 // in µs
 #endif
 
 // zero crossing interrupt trigger mode
+// older versions use a pullup and are active low (FALLING), while newer use a transistor or mosfet to invert the level (active high, RISING)
 #ifndef DIMMER_ZC_INTERRUPT_MODE
 #    define DIMMER_ZC_INTERRUPT_MODE RISING
 // #    define DIMMER_ZC_INTERRUPT_MODE FALLING
@@ -77,8 +77,10 @@
 // https://github.com/sascha432/trailing_edge_dimmer/blob/bedf1d01b5e8d3531ac5dc090c64a4bc6f67bfd3/docs/images/min_on_time.png
 //
 #ifndef DIMMER_MIN_ON_TIME_US
-#    define DIMMER_MIN_ON_TIME_US 300
+#    define DIMMER_MIN_ON_TIME_US 384
 #endif
+
+static_assert(DIMMER_MIN_ON_TIME_US > 200, "DIMMER_MIN_ON_TIME_US too low");
 
 // default for DIMMER_REGISTER_MIN_OFF_TIME_TICKS
 // minimum time to turn MOSFETs off before the half wave ends
@@ -92,37 +94,58 @@
 // https://github.com/sascha432/trailing_edge_dimmer/blob/bedf1d01b5e8d3531ac5dc090c64a4bc6f67bfd3/docs/images/min_off_time.png
 //
 #ifndef DIMMER_MIN_OFF_TIME_US
-#    define DIMMER_MIN_OFF_TIME_US 300
+#    define DIMMER_MIN_OFF_TIME_US 304
 #endif
+
+static_assert(DIMMER_MIN_OFF_TIME_US > 200, "DIMMER_MIN_OFF_TIME_US too low");
+
 
 // keep dimmer enabled when loosing the ZC signal for up to DIMMER_OUT_OF_SYNC_LIMIT half waves
 // once the signal is lost, it will start to drift and get out of sync. adjust the time limit to keep the drift below 100-200µs
 #ifndef DIMMER_OUT_OF_SYNC_LIMIT
-#    define DIMMER_OUT_OF_SYNC_LIMIT 1000
+#    define DIMMER_OUT_OF_SYNC_LIMIT 2048UL
 #endif
 
-// min. number of samples to collect, should be more than 100. it requires 3 byte per sample and is released after the measurement is done
+static_assert(DIMMER_OUT_OF_SYNC_LIMIT > 16, "DIMMER_OUT_OF_SYNC_LIMIT too low");
+
+// min. number of samples to collect, should be more than 100. it requires 3 byte dynamic memory per sample and is released after the measurement is done
 #ifndef DIMMER_ZC_MIN_SAMPLES
 #    define DIMMER_ZC_MIN_SAMPLES 128
 #endif
 
 // valid samples after 2 stage filtering, should be at least 50% of DIMMER_ZC_MIN_SAMPLES
+// should be between 50 and 80%. most of the time you get 100% during the calibration cycle
 #ifndef DIMMER_ZC_MIN_VALID_SAMPLES
-#    define DIMMER_ZC_MIN_VALID_SAMPLES (DIMMER_ZC_MIN_SAMPLES / 2)
+#    define DIMMER_ZC_MIN_VALID_SAMPLES ((uint8_t)(DIMMER_ZC_MIN_SAMPLES / 1.75))
 #endif
 
-// max. deviation 
-// if the deviation is too low too low filters too many events
-// too high might lead to flickering
+static constexpr auto kValidSamplesPercent = DIMMER_ZC_MIN_VALID_SAMPLES * 100.0 / DIMMER_ZC_MIN_SAMPLES;
+static_assert(kValidSamplesPercent >= 50 && kValidSamplesPercent <= 80, "read comment for DIMMER_ZC_MIN_VALID_SAMPLES");
+
+// max. deviation per half cycle 
+// if the deviation is too low too low, it filters too many events leading to flickering. too high **might** lead to visible flickering
+// the maximum i measured was +-0.0718% with regular mains voltage and no filter, but the MCU might be stuck with interrupts disabled etc... 0.2% seem to be 
+// visible to the human eye when the dimming is at very low levels (0.1-0.5W for a 10W LED, some don't work well and flicker even at >1.5W)
+// 0.75% is low, if any issues with the calibration occurs, even 2% seems to work fine for the human eye depending on the LED and the level
+// during testing even a high power (15A) unfiltered induction motor starting up seems to have no effect on the dimmer, while without filtering
+// the zc crossing event was pretty useless leading to flickering even after the startup. in case the zero crossing does not provide a valid signal,
+// the dimmer shuts down and restarts the calibration process
 #ifndef DIMMER_ZC_INTERVAL_MAX_DEVIATION
-#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (1.0 / 100.0)
+#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (0.75 / 100.0)
 #endif
+
+static constexpr auto kDeviationPercent = DIMMER_ZC_INTERVAL_MAX_DEVIATION * 100;
+static_assert(kDeviationPercent >= 0.25 && kDeviationPercent <= 3, "read comment for DIMMER_ZC_INTERVAL_MAX_DEVIATION");
 
 // default mode
 // 1 trailing edge
 // 0 leading edge
 #ifndef DIMMER_TRAILING_EDGE
 #    define DIMMER_TRAILING_EDGE 1
+#endif
+
+#if DIMMER_TRAILING_EDGE == 0
+#    warning EXPERIMENTAL, requires re-calibration
 #endif
 
 // 1 inverts the output signal
@@ -141,6 +164,7 @@
 #endif
 
 // output pins as comma separated list
+// channels will be address from 0 to max.
 #ifndef DIMMER_MOSFET_PINS
 #    define DIMMER_MOSFET_PINS 6, 8, 9, 10
 #endif
@@ -150,13 +174,25 @@
 #    define DIMMER_CHANNEL_COUNT 4
 #endif
 
+// support for 0xff to set or fade all channels
+#ifndef DIMMER_HAVE_SET_ALL_CHANNELS_AT_ONCE
+#    define DIMMER_HAVE_SET_ALL_CHANNELS_AT_ONCE 0
+#endif
+
 // maximum number of different dimming levels
 // the range can be adjusted with range_begin and range_end
+// for most purposes 4096 or 8192 is enough. this provides a smooth dimming experience between 
+// any level over 1-2 minutes (absolute time 0-100%)
+// limited to < 32767, more than 16384 is not recommended
 #ifndef DIMMER_MAX_LEVEL
 #    define DIMMER_MAX_LEVEL 8192
 #endif
 
 // if set to 1, some code is being removed that is not required for more than 1 channel
+// more than 8 channels changes some internal structures and the I2C protocol. the controller must be compiled with the same settings
+// 1-8 = 4bit channel selection
+// 9-16 = 8bit channel selection
+// more than 16 channels need a modification of the structures
 #ifndef DIMMER_MAX_CHANNELS
 #    define DIMMER_MAX_CHANNELS 8
 #endif
@@ -165,6 +201,8 @@
 // prescaler 1 is used for measuring time
 
 // timer1, 16 bit, used for the ZC delay and turning MOSFETs on and off
+// all calculations are done in clock cycles divided by the prescaler and must be lower than ~64000 with a 16 bit timer
+// the prediction is running at clock speed and is limited to ~8 million cycles
 #ifndef DIMMER_TIMER1_PRESCALER
 #    define DIMMER_TIMER1_PRESCALER 8
 #endif
@@ -175,13 +213,14 @@
 #endif
 
 // do not display info during boot and disable DIMMER_COMMAND_PRINT_INFO
-// ~1642 byte code size
+// >1700 byte code size
 #ifndef HIDE_DIMMER_INFO
 #    define HIDE_DIMMER_INFO 0
 #endif
 
 // the ADC interrupt takes a lot of cycles blocking interrupts, only for fast MCUs
-// ~360  byte less code
+// ~360 byte less code
+// not recommended anymore due to code size and blocking
 #ifndef DIMMER_USE_ADC_INTERRUPT
 #    define DIMMER_USE_ADC_INTERRUPT 0
 #endif
@@ -214,6 +253,8 @@
 #ifndef DIMMER_TEMPERATURE_CHECK_INTERVAL
 #    define DIMMER_TEMPERATURE_CHECK_INTERVAL 1024UL
 #endif
+
+static constexpr auto kDimmerCheckIntervalCycles = microsecondsToClockCycles(DIMMER_TEMPERATURE_CHECK_INTERVAL * 1000);
 
 #ifndef HAVE_NTC
 #    define HAVE_NTC 1
