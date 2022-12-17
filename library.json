@@ -16,15 +16,11 @@
     },
     "dependencies": [
         {
-            "name": "external-repo",
+            "name": "libcrc16",
             "version": "https://github.com/sascha432/libcrc16.git"
         },
         {
-            "name": "external-repo",
-            "version": "https://github.com/sascha432/Arduino-Interpolation.git"
-        },
-        {
-            "name": "external-repo",
+            "name": "Arduino I2C UART Bridge",
             "version": "https://github.com/sascha432/i2c_uart_bridge.git"
         }
     ],
