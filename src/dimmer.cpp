@@ -352,7 +352,7 @@ namespace Dimmer {
     }
 
     __attribute_always_inline__
-    inline void bubble_sort(dimmer_channel_t channels[], Channel::type count)
+    inline void bubble_sort(ChannelType channels[], Channel::type count)
     {
         Channel::type i, j;
         if (count >= 2) {
@@ -360,7 +360,7 @@ namespace Dimmer {
             for (i = 0; i < count; i++) {
                 for (j = 0; j < count - i; j++) {
                     if (channels[j].ticks > channels[j + 1].ticks) {
-                        swap<dimmer_channel_t>(channels[j], channels[j + 1]);
+                        swap<ChannelType>(channels[j], channels[j + 1]);
                     }
                 }
             }
@@ -382,7 +382,7 @@ void DimmerBase::_calculate_channels()
         calculate_channels_locked = true;
     }
 
-    dimmer_channel_t ordered_channels_tmp[Channel::size() + 1];
+    ChannelType ordered_channels_tmp[Channel::size() + 1];
     Channel::type count = 0;
     StateType new_channel_state = 0;
 
@@ -403,7 +403,7 @@ void DimmerBase::_calculate_channels()
             count++;
         }
     }
-    ordered_channels_tmp[count] = {}; // end marker
+    ordered_channels_tmp[count] = nullptr; // end marker
 
     #if DIMMER_MAX_CHANNELS > 1
         bubble_sort(ordered_channels_tmp, count);
@@ -423,7 +423,6 @@ void DimmerBase::_calculate_channels()
 
 void DimmerBase::set_channel_level(Channel::type channel, Level::type level)
 {
-    // _D(5, debug_printf("set_channel_level ch=%d level=%d\n", channel, level))
     _set_level(channel, _normalize_level(level));
 
     fading[channel].count = 0; // disable fading for this channel
@@ -438,13 +437,13 @@ void DimmerBase::set_channel_level(Channel::type channel, Level::type level)
         }
     #endif
 
-    _D(5, debug_printf("ch=%u level=%u ticks=%u zcdelay=%u\n", channel, _get_level(channel), _get_ticks(channel, level), _config.zero_crossing_delay_ticks));
+    _D(5, debug_printf("ch=%u level=%u ticks=%u zcd=%u\n", channel, _get_level(channel), _get_ticks(channel, level), _config.zero_crossing_delay_ticks));
 }
 
 void DimmerBase::fade_channel_from_to(Channel::type channel, Level::type from, Level::type to, float time, bool absolute_time)
 {
     float diff;
-    dimmer_fade_t &fade = fading[channel];
+    auto &fade = fading[channel];
     #if HAVE_FADE_COMPLETION_EVENT
         fading_completed[channel] = Level::invalid;
     #endif
@@ -469,12 +468,12 @@ void DimmerBase::fade_channel_from_to(Channel::type channel, Level::type from, L
         }
         fade.count = 1;
         fade.step = 0; // keep current level
-        fade.level = _normalize_level(current_level);
+        fade.level = current_level;
         fade.targetLevel = fade.level;
         return;
     }
 
-    from = _normalize_level(from == Level::current ? current_level : from);
+    from = from == Level::current ? current_level : _normalize_level(from);
     diff = _normalize_level(to) - from;
     if (diff == 0) {
         _D(5, debug_printf("fade normalized -> from=%d to=%d\n", from, to));

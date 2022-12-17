@@ -3,7 +3,7 @@
 #
 
 #
-# ceate constants of the defines used in dimmer_protocol.h
+# create constants of the defines used in dimmer_protocol.h
 #
 
 import re

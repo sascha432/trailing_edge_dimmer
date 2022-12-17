@@ -140,7 +140,7 @@ void setup()
 
     void Dimmer::DimmerBase::send_fading_completion_events()
     {
-        FadingCompletionEvent_t buffer[Dimmer::Channel::size()];
+        FadingCompletionEvent buffer[Dimmer::Channel::size()];
         auto ptr = buffer;
 
         DIMMER_CHANNEL_LOOP(i) {

@@ -211,7 +211,7 @@ struct __attribute_packed__ config_options_t
     uint8_t restore_level: 1;
     uint8_t leading_edge: 1;
     uint8_t over_temperature_alert_triggered: 1;
-    uint8_t negative_zc_delay: 1;                            // currently not implemented: zc delay = halfwave length - zcdelay, effectively making zc delay negative
+    uint8_t negative_zc_delay: 1;                            // currently not implemented: zc delay = halfwave length - zc delay, effectively making zc delay negative
     uint8_t cubic_interpolation: 1;
     uint8_t ___reserved: 3;
 };
@@ -383,7 +383,7 @@ struct __attribute_packed__ register_mem_t
     register_mem_command_t cmd;
     union __attribute_packed__ {
         register_mem_channels_t channels;
-        uint16_t __reserved[8];
+        uint16_t __reserved[DIMMER_MAX_CHANNELS > 8 ? 16 : 8];
     };
     register_mem_cfg_t cfg;
     register_mem_errors_t errors;
@@ -438,7 +438,7 @@ struct __attribute_packed__ dimmer_fading_complete_event_t
 
 static_assert(sizeof(dimmer_fading_complete_event_t) == 3, "check struct");
 
-#if DIMMER_CHANNEL_COUNT > 8
+#if DIMMER_MAX_CHANNELS > 8
 
     struct __attribute_packed__ dimmer_channel_state_event_t {
         union {

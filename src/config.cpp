@@ -30,20 +30,20 @@ void Config::copyFromRegisterMem(register_mem_cfg_t &config)
 
 #if DIMMER_CUBIC_INTERPOLATION
 
-void Config::resetInterpolation()
-{
-    _config.cubic_int = {};
-}
+    void Config::resetInterpolation()
+    {
+        _config.cubic_int = {};
+    }
 
-void Config::copyToInterpolation() const
-{
-    cubicInterpolation.copyFromConfig(_config.cubic_int);
-}
+    void Config::copyToInterpolation() const
+    {
+        cubicInterpolation.copyFromConfig(_config.cubic_int);
+    }
 
-void Config::copyFromInterpolation()
-{
-    cubicInterpolation.copyToConfig(_config.cubic_int);
-}
+    void Config::copyFromInterpolation()
+    {
+        cubicInterpolation.copyToConfig(_config.cubic_int);
+    }
 
 #endif
 
@@ -58,16 +58,16 @@ void Config::resetConfig()
     register_mem.data.cfg.minimum_on_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_ON_TIME_US);
     register_mem.data.cfg.minimum_off_time_ticks = Dimmer::Timer<1>::microsToTicks(DIMMER_MIN_OFF_TIME_US);
 
-#if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0 && DIMMER_AVR_TEMP_TS_GAIN == 0
-    register_mem.data.cfg.internal_temp_calibration = atmega328p_read_ts_values();
-#else
-    register_mem.data.cfg.internal_temp_calibration.ts_offset = DIMMER_AVR_TEMP_TS_OFFSET;
-    register_mem.data.cfg.internal_temp_calibration.ts_gain = DIMMER_AVR_TEMP_TS_GAIN;
-#endif
+    #if __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0 && DIMMER_AVR_TEMP_TS_GAIN == 0
+        register_mem.data.cfg.internal_temp_calibration = atmega328p_read_ts_values();
+    #else
+        register_mem.data.cfg.internal_temp_calibration.ts_offset = DIMMER_AVR_TEMP_TS_OFFSET;
+        register_mem.data.cfg.internal_temp_calibration.ts_gain = DIMMER_AVR_TEMP_TS_GAIN;
+    #endif
 
-#ifdef NTC_TEMP_OFS
-    register_mem.data.cfg.ntc_temp_cal_offset = static_cast<float>(NTC_TEMP_OFS);
-#endif
+    #ifdef NTC_TEMP_OFS
+        register_mem.data.cfg.ntc_temp_cal_offset = static_cast<float>(NTC_TEMP_OFS);
+    #endif
     register_mem.data.cfg.report_metrics_interval = DIMMER_REPORT_METRICS_INTERVAL;
     register_mem.data.metrics.ntc_temp = NAN;
     register_mem.data.metrics.int_temp = Dimmer::kInvalidTemperature;
@@ -139,7 +139,7 @@ void Config::readConfig()
             // valid configuration
             if (temp_config.eeprom_cycle >= max_cycle) {
                 // if cycle is equal or greater max_cycle, the configuration is more recent
-                // remember max_cycle, positition and copy data
+                // remember max_cycle, position and copy data
                 max_cycle = temp_config.eeprom_cycle;
                 _eeprom_position = pos;
                 _config = temp_config;
@@ -185,13 +185,13 @@ void Config::readConfig()
 
 void Config::writeConfig()
 {
-    int32_t lastWrite = millis() - _eeprom_write_timer;
+    int32_t lastWrite = millis() - _eeprom_write_time;
     if (!queues.scheduled_calls.write_eeprom) { // no write scheduled
         ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
             queues.scheduled_calls.write_eeprom = true;
         };
         _D(5, debug_printf("scheduling eeprom write cycle, last write %d seconds ago\n", (int)(lastWrite / 1000U)));
-        _eeprom_write_timer = millis() + ((lastWrite > EEPROM_REPEATED_WRITE_DELAY) ? EEPROM_WRITE_DELAY : EEPROM_REPEATED_WRITE_DELAY);
+        _eeprom_write_time = millis() + ((lastWrite > EEPROM_REPEATED_WRITE_DELAY) ? EEPROM_WRITE_DELAY : EEPROM_REPEATED_WRITE_DELAY);
     }
     else {
         _D(5, debug_printf("eeprom write cycle already scheduled in %d seconds\n", (int)(lastWrite / -1000)));
@@ -237,7 +237,7 @@ void Config::_writeConfig(bool force)
         _D(5, debug_printf("configuration didn't change, skipping write cycle\n"));
         event.bytes_written = 0;
     }
-    _eeprom_write_timer = millis();
+    _eeprom_write_time = millis();
 
     ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
         queues.scheduled_calls.write_eeprom = false;

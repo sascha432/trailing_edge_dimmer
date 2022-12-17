@@ -29,6 +29,16 @@
 #define DIMMER_REGISTER_CH5_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 5)
 #define DIMMER_REGISTER_CH6_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 6)
 #define DIMMER_REGISTER_CH7_LEVEL           (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 7)
+#if DIMMER_MAX_CHANNELS > 8
+#    define DIMMER_REGISTER_CH8_LEVEL       (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 8)
+#    define DIMMER_REGISTER_CH9_LEVEL       (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 9)
+#    define DIMMER_REGISTER_CH10_LEVEL      (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 10)
+#    define DIMMER_REGISTER_CH11_LEVEL      (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 11)
+#    define DIMMER_REGISTER_CH12_LEVEL      (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 12)
+#    define DIMMER_REGISTER_CH13_LEVEL      (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 13)
+#    define DIMMER_REGISTER_CH14_LEVEL      (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 14)
+#    define DIMMER_REGISTER_CH15_LEVEL      (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_channels_t().level[0]) * 15)
+#endif
 #define DIMMER_REGISTER_CHANNELS_END        (DIMMER_REGISTER_CHANNELS_START + sizeof(register_mem_t().channels))
 #define DIMMER_REGISTER_OPTIONS             (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, options))
 #define DIMMER_REGISTER_MAX_TEMP            (DIMMER_REGISTER_START_ADDR + offsetof(register_mem_t, cfg) + offsetof(register_mem_cfg_t, max_temp))
@@ -95,10 +105,10 @@
 #define DIMMER_COMMAND_MEASURE_FREQ         0x94
 #define DIMMER_COMMAND_INIT_EEPROM          0x95
 #define DIMMER_COMMAND_INCR_ZC_DELAY        0x82
-#define DIMMER_COMMAND_DECR_ZC_DELAY        0x83
+#define DIMMER_COMMAND_DEC_ZC_DELAY         0x83
 #define DIMMER_COMMAND_SET_ZC_DELAY         0x84
 #define DIMMER_COMMAND_INCR_HW_TICKS        0x85
-#define DIMMER_COMMAND_DECR_HW_TICKS        0x86
+#define DIMMER_COMMAND_DEC_HW_TICKS         0x86
 #define DIMMER_COMMAND_SET_ZC_SYNC          0xec
 #define DIMMER_COMMAND_DUMP_CHANNELS        0xed
 #define DIMMER_COMMAND_DUMP_MEM             0xee

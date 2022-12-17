@@ -9,11 +9,14 @@
 #include <Arduino.h>
 #include "dimmer_def.h"
 #include <InterpolationLib.h>
+#include "dimmer.h"
 
 class CubicInterpolation {
 public:
     using xyValueType = INTERPOLATION_LIB_XYVALUES_TYPE;
     using xyValueTypePtr = xyValueType *;
+    using ChannelType = Dimmer::Channel::type;
+    using LevelType = Dimmer::Level::type;
 
 public:
     class Channel {
@@ -51,25 +54,25 @@ public:
 
     void printState() const;
     #if HAVE_CUBIC_INT_PRINT_TABLE
-        void printTable(Dimmer::Channel::type channel, uint8_t levelStepSize = 1) const;
+        void printTable(ChannelType channel, uint8_t levelStepSize = 1) const;
     #endif
     #if HAVE_CUBIC_INT_TEST_PERFORMANCE
-        void testPerformance(Dimmer::Channel::type channel) const;
+        void testPerformance(ChannelType channel) const;
     #endif
 
-    int16_t getLevel(Dimmer::Level::type level, Dimmer::Channel::type channel) const;
-    uint8_t getInterpolatedLevels(Dimmer::Level::type *dst, Dimmer::Level::type *endPtr, Dimmer::Level::type startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const;
+    int16_t getLevel(LevelType level, ChannelType channel) const;
+    uint8_t getInterpolatedLevels(LevelType *dst, LevelType *endPtr, LevelType startLevel, uint8_t levelCount, uint8_t step, uint8_t dataPointCount, xyValueTypePtr xValues, xyValueTypePtr yValues) const;
 
     void copyFromConfig(const dimmer_config_cubic_int_t &cubicInt);
     void copyToConfig(dimmer_config_cubic_int_t &cubicInt);
     void clear();
     void printConfig() const;
 
-    Channel &getChannel(Dimmer::Channel::type channel);
+    Channel &getChannel(ChannelType channel);
 
 private:
-    Dimmer::Level::type _toLevel(double y) const;
-    double _toY(Dimmer::Level::type level) const;
+    LevelType _toLevel(double y) const;
+    double _toY(LevelType level) const;
 
     Channel _channels[DIMMER_CHANNEL_COUNT];
 };
@@ -124,7 +127,7 @@ inline CubicInterpolation::CubicInterpolation() :
 {
 }
 
-inline Dimmer::Level::type CubicInterpolation::getLevel(Dimmer::Level::type level, Dimmer::Channel::type channelNum) const
+inline CubicInterpolation::LevelType CubicInterpolation::getLevel(LevelType level, ChannelType channelNum) const
 {
     auto &channel = _channels[channelNum];
     if (channel.size()) {
@@ -172,7 +175,7 @@ inline void CubicInterpolation::printConfig() const
     }
 }
 
-inline CubicInterpolation::Channel &CubicInterpolation::getChannel(Dimmer::Channel::type channel)
+inline CubicInterpolation::Channel &CubicInterpolation::getChannel(ChannelType channel)
 {
     return _channels[channel];
 }

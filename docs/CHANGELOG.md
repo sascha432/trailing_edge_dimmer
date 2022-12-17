@@ -3,6 +3,8 @@
 ## 2.2.3-dev
 
  - NOTE: currently the dimmer firmware is running on the ZC interrupt, not the predicted signal
+ - Option to set/face all channels with one command (DIMMER_HAVE_SET_ALL_CHANNELS_AT_ONCE; breaking change: disabled by default)
+ - Refactored some old code, more C++ style
  - Added a delay function that processes incoming UART events during calling the Dimmer::delay() function (replacement for ::delay())
  - Fixed issues with prediction using uint24_t by replacing it with uint32_t (probably missing uint24_t casts leading to unsigned long/uint32_t)
  - Increased serial RX buffer to 256 byte to avoid loosing data (UART mode only)
@@ -17,7 +19,7 @@
  - Creating dimmer_version.h from library.json
  - More options to configure the frequency measurement
  - library.json to include the library directly for headers only without being compiled
- - Added example of 16 channels `16ch_dimmer_p`
+ - Added example of 16 channels `16ch_dimmer_p` (requires to update structures and the master needs to be compiled with the same headers, see `dimmer.h`)
 
 ## 2.2.2
 
@@ -60,13 +62,13 @@
 - SerialTwoWire updated
 - Replaced crc16.cpp with a library
 - Changed default max. temperature to 75°C and metrics update interval to 5 seconds
-- Added environments for flashing the bootloader to ATMega328P and ATMega328PB @ 8MHz and BOD disabled
+- Added environments for flashing the boot loader to ATMega328P and ATMega328PB @ 8MHz and BOD disabled
 - Improved reading VCC and internal temperature
 
 ## 2.1.4
 
 - Added DIMMER_ZC_INTERRUPT to specify rising or falling interrupt triggering
-- Removed DIMMER_COMMAND_RESET since it was not working with several versions of the bootloader
+- Removed DIMMER_COMMAND_RESET since it was not working with several versions of the boot loader
 
 ## 2.1.3
 
@@ -105,7 +107,7 @@
 - Fixed empty configuration structure after reset without calling _write_config()
 - Fixed int overflow for temp_check_interval > 32
 - Fixed pin mode for NTC
-- Fixed fading with short time intervals and float not having enough precision for a sinle step
+- Fixed fading with short time intervals and float not having enough precision for a single step
 - Changed default values for ZC crossing delay and other timings to match my dimmer design
 - Changed DIMMER_TEMPERATURE_REPORT to DIMMER_METRICS_REPORT
 

@@ -1,17 +1,35 @@
 {
     "name": "trailing_edge_dimmer",
+    "description": "Header files for compiling the I2C master (AVR, ESP8266, ESP32 and Arduino compatible MCUs)",
     "version": "2.2.3",
     "authors": {
         "name": "sascha lammers",
         "maintainer": true
     },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/sascha432/trailing_edge_dimmer.git"
+    },
     "build": {
         "includeDir": "src",
-        "srcDir": "docs",
-        "srcDir_is_to_avoid_building_if_only_headers_are_required_does_not_affect_local_builds": "docs"
+        "srcFilter": "-<*.cpp>"
     },
+    "dependencies": [
+        {
+            "name": "external-repo",
+            "version": "https://github.com/sascha432/libcrc16.git"
+        },
+        {
+            "name": "external-repo",
+            "version": "https://github.com/sascha432/Arduino-Interpolation.git"
+        },
+        {
+            "name": "external-repo",
+            "version": "https://github.com/sascha432/i2c_uart_bridge.git"
+        }
+    ],
     "frameworks": "arduino",
     "platforms": [
-        "atmelavr"
+        "atmelavr", "espressif8266", "espressif32"
     ]
 }

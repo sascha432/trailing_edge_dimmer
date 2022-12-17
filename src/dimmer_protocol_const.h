@@ -1,5 +1,6 @@
 // created with environment "printdef"
 // run python ./scripts/create_const.py to convert this file to ./scripts/libs/fw_const_ver_MAJOR_MINOR_x.py
+#define DIMMER_MAX_CHANNELS                      8
 #define DIMMER_I2C_ADDRESS                       0x17
 #define DIMMER_I2C_MASTER_ADDRESS                0x18
 #define DIMMER_REGISTER_START_ADDR               0x80
@@ -72,10 +73,10 @@
 #define DIMMER_COMMAND_MEASURE_FREQ              0x94
 #define DIMMER_COMMAND_INIT_EEPROM               0x95
 #define DIMMER_COMMAND_INCR_ZC_DELAY             0x82
-#define DIMMER_COMMAND_DECR_ZC_DELAY             0x83
+#define DIMMER_COMMAND_DEC_ZC_DELAY              0x83
 #define DIMMER_COMMAND_SET_ZC_DELAY              0x84
 #define DIMMER_COMMAND_INCR_HW_TICKS             0x85
-#define DIMMER_COMMAND_DECR_HW_TICKS             0x86
+#define DIMMER_COMMAND_DEC_HW_TICKS              0x86
 #define DIMMER_COMMAND_SET_ZC_SYNC               0xec
 #define DIMMER_COMMAND_DUMP_CHANNELS             0xed
 #define DIMMER_COMMAND_DUMP_MEM                  0xee
@@ -86,3 +87,6 @@
 #define DIMMER_OPTIONS_TEMP_ALERT_TRIGGERED      0x04
 #define DIMMER_OPTIONS_NEGATIVE_ZC_DELAY         0x08
 #define DIMMER_EEPROM_FLAGS_CONFIG_UPDATED       0x01
+#define DIMMER_REGISTER_CUBIC_INT_OFS            (DIMMER_REGISTER_RAM)
+#define DIMMER_REGISTER_CUBIC_INT_DATAX(n)       (DIMMER_REGISTER_CUBIC_INT_OFS + ((n) * 2))
+#define DIMMER_REGISTER_CUBIC_INT_DATAY(n)       (DIMMER_REGISTER_CUBIC_INT_OFS + 1 + ((n) * 2))

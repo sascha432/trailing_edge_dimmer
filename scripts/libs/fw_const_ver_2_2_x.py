@@ -6,8 +6,8 @@ class DimmerConst(fw_const.DimmerConstBase):
         self.is_complete = True
         self.VERSION = '2.2.x'
         self.attr = {
-            'COMMAND_DECR_HW_TICKS': 0x86,
-            'COMMAND_DECR_ZC_DELAY': 0x83,
+            'COMMAND_DEC_HW_TICKS': 0x86,
+            'COMMAND_DEC_ZC_DELAY': 0x83,
             'COMMAND_DUMP_CHANNELS': 0xed,
             'COMMAND_DUMP_MEM': 0xee,
             'COMMAND_FADE': 0x11,

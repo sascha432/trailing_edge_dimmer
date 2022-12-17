@@ -189,33 +189,44 @@ namespace Dimmer {
         static constexpr uint16_t kVersion = (kMajor << 10) | (kMinor << 5) | kRevision;
     };
 
-    struct dimmer_fade_t {
+    struct FadingType {
         float level;
         float step;
         uint16_t count;
         Level::type targetLevel;
     };
 
-    struct dimmer_channel_t {
+    struct ChannelType {
         uint8_t channel;
         uint16_t ticks;
+
+        ChannelType &operator=(nullptr_t) {
+            channel = 0;
+            ticks = 0;
+            return *this;
+        }
     };
 
-    struct __attribute__((packed)) FadingCompletionEvent_t {
-        Channel::type channel;
-        Level::type level;
+    struct FadingCompletionEvent : dimmer_fading_complete_event_t {
+
+        using dimmer_fading_complete_event_t::dimmer_fading_complete_event_t;
+
+        FadingCompletionEvent(Channel::type _channel, Level::type _level) : 
+            dimmer_fading_complete_event_t({static_cast<uint8_t>(_channel), static_cast<uint16_t>(_level)}) 
+        {}
+
     };
 
     struct dimmer_t {
         Level::type levels_buffer[Channel::size()];                             // single buffer for levels since they are used only when the halfwave starts
-        dimmer_fade_t fading[Channel::size()];                                  // calculated fading data
+        FadingType fading[Channel::size()];                                  // calculated fading data
         #if DIMMER_MAX_CHANNELS > 1
             Channel::type channel_ptr;                                          // internal pointer used between interrupts
         #endif
         // for double bufferring. the calculation is done on the stack and copied into the first buffer
         // before the half wave starts the first buffer is copied into the second buffer, which is used inside the interrupts
-        dimmer_channel_t ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks, second buffer
-        dimmer_channel_t ordered_channels_buffer[Channel::size() + 1];          // next dimming levels, first buffer
+        ChannelType ordered_channels[Channel::size() + 1];                 // current dimming levels in ticks, second buffer
+        ChannelType ordered_channels_buffer[Channel::size() + 1];          // next dimming levels, first buffer
         TickType halfwave_ticks;
         StateType channel_state;                                                // bitset of the channel state
         volatile bool toggle_state;                                             // next state of the mosfets

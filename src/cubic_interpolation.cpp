@@ -25,7 +25,7 @@ void CubicInterpolation::printState() const
 
 #if HAVE_CUBIC_INT_PRINT_TABLE
 
-void CubicInterpolation::printTable(Dimmer::Channel::type channelNum, uint8_t levelStepSize) const
+void CubicInterpolation::printTable(ChannelType channelNum, uint8_t levelStepSize) const
 {
     Serial.printf_P(PSTR("+REM=ch%d="), channelNum);
     auto &channel = _channels[channelNum];
@@ -36,7 +36,7 @@ void CubicInterpolation::printTable(Dimmer::Channel::type channelNum, uint8_t le
             if (i != 0) {
                 Serial.print(',');
             }
-            Serial.print((uint8_t)channel.getXValues()[i]);
+            Serial.print(static_cast<uint8_t>(channel.getXValues()[i]));
         }
         Serial.print(F("],y=["));
         for (uint8_t i = 0; i < maxDataPoints; i++) {
@@ -63,20 +63,20 @@ void CubicInterpolation::printTable(Dimmer::Channel::type channelNum, uint8_t le
 
 #if HAVE_CUBIC_INT_TEST_PERFORMANCE
 
-void CubicInterpolation::testPerformance(Dimmer::Channel::type channel) const
-{
-    uint32_t maxTime = 0;
-    for(Dimmer::Level::type level = 0; level < DIMMER_MAX_LEVEL; level++) {
-        auto start = micros();
-        auto levelOut = getLevel(level, channel);
-        unsigned dur = micros() - start;
-        if (dur > maxTime) {
-            maxTime = dur;
-            Serial.printf_P(PSTR("+REM=level=%d,result=%d,time=%u\n"), level, levelOut, dur);
+    void CubicInterpolation::testPerformance(ChannelType channel) const
+    {
+        uint32_t maxTime = 0;
+        for(Dimmer::Level::type level = 0; level < DIMMER_MAX_LEVEL; level++) {
+            auto start = micros();
+            auto levelOut = getLevel(level, channel);
+            unsigned dur = micros() - start;
+            if (dur > maxTime) {
+                maxTime = dur;
+                Serial.printf_P(PSTR("+REM=level=%d,result=%d,time=%u\n"), level, levelOut, dur);
+            }
         }
+        Serial.printf_P(PSTR("+REM=channel=%u,maxtime=%lu\n"), channel, maxTime);
     }
-    Serial.printf_P(PSTR("+REM=channel=%u,maxtime=%lu\n"), channel, maxTime);
-}
 
 #endif
 

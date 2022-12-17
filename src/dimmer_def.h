@@ -190,9 +190,11 @@ static_assert(kDeviationPercent >= 0.25 && kDeviationPercent <= 3, "read comment
 
 // if set to 1, some code is being removed that is not required for more than 1 channel
 // more than 8 channels changes some internal structures and the I2C protocol. the controller must be compiled with the same settings
-// 1-8 = 4bit channel selection
-// 9-16 = 8bit channel selection
-// more than 16 channels need a modification of the structures
+//
+// IMPORTANT: dimmer_protocol_const.h and fw_const_ver_*.py (if the python tool is being used) need to be updated
+//  DIMMER_EVENT_CHANNEL_ON_OFF
+//  DIMMER_COMMAND_READ_CHANNELS
+//  struct dimmer_channel_state_event_t, register_mem_channels_t, register_mem_t
 #ifndef DIMMER_MAX_CHANNELS
 #    define DIMMER_MAX_CHANNELS 8
 #endif
@@ -213,7 +215,7 @@ static_assert(kDeviationPercent >= 0.25 && kDeviationPercent <= 3, "read comment
 #endif
 
 // do not display info during boot and disable DIMMER_COMMAND_PRINT_INFO
-// >1700 byte code size
+// ~1600 byte code size
 #ifndef HIDE_DIMMER_INFO
 #    define HIDE_DIMMER_INFO 0
 #endif
@@ -303,7 +305,10 @@ static constexpr auto kDimmerCheckIntervalCycles = microsecondsToClockCycles(DIM
 
 // default values for TS_OFFSET and TS_GAIN
 //
-// see datasheet for more infomation
+// see data sheet for more infomation
+// https://microchipdeveloper.com/8avr:avrtemp
+// https://microchipdeveloper.com/8avr:avradc
+// The voltage sensitivity is approximately 1 mV/°C, the accuracy of the temperature measurement is ±10°C.
 //
 // The values described in the table above are typical values. However, due to process variation the
 // temperature sensor output voltage varies from one chip to another. To be capable of achieving more
@@ -319,7 +324,7 @@ static constexpr auto kDimmerCheckIntervalCycles = microsecondsToClockCycles(DIM
 
 #elif __AVR_ATmega328P__ && MCU_IS_ATMEGA328PB == 0
 
-// Atmega328P only: DIMMER_AVR_TEMP_TS_GAIN = 0 reads the calibration values from the signature bytes
+// Atmega328P only: DIMMER_AVR_TEMP_TS_GAIN = 0 reads the internal calibration values from the signature bytes
 #    ifndef DIMMER_AVR_TEMP_TS_OFFSET
 #        define DIMMER_AVR_TEMP_TS_OFFSET 0
 #        define DIMMER_AVR_TEMP_TS_GAIN   0
@@ -392,6 +397,9 @@ static constexpr auto kDimmerCheckIntervalCycles = microsecondsToClockCycles(DIM
 #    define DIMMER_LINEAR_LEVEL(level, channel) level
 #endif
 
+// the performance depends on the actual points that have been defined, not the maximum
+// if the calculation cannot be performed within one half wave (~8.33-10ms), it will not update the values until all channels have been finished
+// 4 channels @ 8MHz and 4 demanding curves work well
 #ifndef DIMMER_CUBIC_INT_DATA_POINTS
 #   define DIMMER_CUBIC_INT_DATA_POINTS 8
 #endif

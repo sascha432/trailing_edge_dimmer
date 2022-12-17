@@ -254,8 +254,21 @@ Get ticks per microsecond for Timer 1 as float
 
 Read AC frequency as float
 
-    +I2CT=17,89,23
-    +I2CR=17,04
+```
++I2CT=17,89,23
++I2CR=17,04
+```
+
+```
++I2CA=1721557042
+        ^^^^^^^^ 32 bit IEEE-754 Floating Point
+```
+
+0x42705521 = 60.0831336975 Hz
+
+`float` in C, `c_float` or `struct.unpack('f')` in python
+
+[Online converter](https://www.h-schmidt.net/FloatConverter/IEEE754.html)
 
 ## Reading firmware version
 
@@ -264,14 +277,19 @@ Reading the firmware version is using the same transmission for all versions
 ```
 +I2CT=17,8a,02,b9
 +I2CR=17,02
-
-+I2CA=172608
 ```
 
 - bit 0-4 - Revision
 - bit 5-9 - Minor version
 - bit 10-14 - Major version
 - bit 15 - Reserved
+- extra data possible
+
+Version 2.1.x
+
+```
++I2CA=172608
+```
 
 ```
 v2.1.6
@@ -280,6 +298,27 @@ v2.1.6
         2      1      6
 ```
 
+Version 2.2.x sends some more information. The 2 byte are followed by the maximum brightness level (16 bit signed), the channel count (8bit), the start address of configuration in the register memory (8bit) and the length (8bit)
+
+See: `dimmer_config_info_t`
+
+```
++I2CA=17,43,08,00,20,04,9c,15
+         ^^ ^^       ^^ ^^ ^^
+               ^^ ^^
+               max. brightness level (0x2000 = 8192)
+         version     number of channels
+                        start address of the configuration (address 0x9c)
+                           length if the configuration (0x15 / 21 byte)
+```
+
+```
+0x0843
+[0][00010][00001][00110]
+        2      2      3
+```
+
+**NOTE**: This command is supported since version 2.x. To get the version number, only 2 bytes have to be read and the rest can be discarded
 
 ## Reading and writing the dimmer settings
 
@@ -296,11 +335,8 @@ v2.1.6
 - DIMMER_REGISTER_INT_TEMP_CAL_GAIN (uint8_t)
 - DIMMER_REGISTER_NTC_TEMP_OFS (int8, 0.25°C)
 - DIMMER_REGISTER_METRICS_INT (uint8, seconds, 0 = disabled)
-- DIMMER_REGISTER_ADJ_HW_CYCLES (int8, clock cycles to adjust half wave length)
 - DIMMER_REGISTER_RANGE_BEGIN (int16)
 - DIMMER_REGISTER_RANGE_END (int16)
-- DIMMER_REGISTER_SWITCH_ON_MIN_TIME (uint16)
-- DIMMER_REGISTER_SWITCH_ON_COUNT (uint8)
 
 #### Options
 
@@ -441,7 +477,7 @@ Increase zero crossing delay by 1 or the following byte value
 
     +I2CT=17,89,82[,<value>]
 
-### DIMMER_COMMAND_DECR_ZC_DELAY
+### DIMMER_COMMAND_DEC_ZC_DELAY
 
 Decrease zero crossing delay by 1 or the following byte value
 
@@ -459,7 +495,7 @@ Increase halfwave length by 1 or the following byte value
 
     +I2CT=17,89,85[,<value>]
 
-### DIMMER_COMMAND_DECR_HW_TICKS
+### DIMMER_COMMAND_DEC_HW_TICKS
 
 Decrease halfwave length by 1 or the following byte value
 
@@ -522,11 +558,13 @@ If the max. temperature was exceeded, the event DIMMER_EVENT_TEMPERATURE_ALERT i
 
 ## Fading completed (DIMMER_EVENT_FADING_COMPLETE)
 
-When fading to a new level has been completed, the event DIMMER_EVENT_FADING_COMPLETE is fired, the data structure is an array of dimmer_fading_complete_event_t with 1 to 8 elements
+When fading to a new level has been completed, the event DIMMER_EVENT_FADING_COMPLETE is fired, the data structure is an array of dimmer_fading_complete_event_t with 1 to 8(16) elements
 
 Channel 0 and 1 reached 0x1234 and fading is complete:
 
     +I2CT=18F2001234011234
+              ^^    ^^
+              channels 0 and 1
 
 Channel 0 reached level 0:
 
@@ -552,6 +590,8 @@ For example channel 0 and 2 are on
 All channels off
 
     +I2CT=18F500
+
+**NOTE**: If the dimmer has been compiled with more than 8 channels, this will return 2 bytes
 
 ## Restart completed (DIMMER_EVENT_RESTART)
 
@@ -608,8 +648,3 @@ Available only if HAVE_PRINT_METRICS is set to 1
 ### Turn print metrics off
 
     +I2CT=17,89,55,00
-
-### Read firmware version
-
-    +I2CT=17,8a,02,b9
-    +I2CR=17,02

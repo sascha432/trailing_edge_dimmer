@@ -213,7 +213,7 @@ class dimmer_sync_event_t(Structure):
     def __str__(self):
         global DIMMER
         if self.type==DIMMER.SYNC_EVENT_TYPE_.LOST:
-            return 'type=LOST halfcycles=%u' % (self.halfwave_counter)
+            return 'type=LOST half cycles=%u' % (self.halfwave_counter)
         elif self.type==DIMMER.SYNC_EVENT_TYPE_.SYNC:
             return 'type=SYNC difference=%u' % (self.sync_difference_cycles)
         return 'type=UNKNOWN'

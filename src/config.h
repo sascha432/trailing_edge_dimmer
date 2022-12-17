@@ -116,7 +116,7 @@ private:
 private:
     EEPROM_config_t _config;
     uint16_t _eeprom_position;
-    uint32_t _eeprom_write_timer;
+    uint32_t _eeprom_write_time;
 };
 
 constexpr uint32_t x = sizeof(EEPROM_config_t);
@@ -124,7 +124,7 @@ constexpr uint32_t x = sizeof(EEPROM_config_t);
 inline Config::Config() :
     _config(),
     _eeprom_position(0),
-    _eeprom_write_timer(-EEPROM_REPEATED_WRITE_DELAY)
+    _eeprom_write_time(-EEPROM_REPEATED_WRITE_DELAY)
 {
 }
 
@@ -145,7 +145,7 @@ inline uint32_t Config::getEEPROMWriteCount() const
 
 inline bool Config::isEEPROMWriteTimerExpired() const
 {
-    return (millis() >= _eeprom_write_timer);
+    return (millis() >= _eeprom_write_time);
 }
 
 inline EEPROM_config_t &Config::config()

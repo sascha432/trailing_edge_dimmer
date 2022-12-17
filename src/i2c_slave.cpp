@@ -8,7 +8,6 @@
 #include "measure_frequency.h"
 #include "main.h"
 
-
 register_mem_union_t register_mem;
 
 inline uint8_t validate_register_address()
@@ -42,6 +41,7 @@ void i2c_slave_set_register_address(int length, uint8_t address, int8_t read_len
     _D(5, debug_printf("I2C auto addr=%#02x read_len=%d\n", register_mem.data.address, read_length));
 }
 
+// read byte from I2C buffer or return default value if there is no data available
 uint8_t Wire_read_uint8_t(int &length, uint8_t default_value)
 {
     if (length-- > 0) {
@@ -85,7 +85,7 @@ void _dimmer_i2c_on_receive(int length)
             switch(register_mem.data.cmd.command) {
                 case DIMMER_COMMAND_READ_CHANNELS:
                     {
-                        uint8_t numChannels = 8;
+                        uint8_t numChannels;
                         uint8_t start = 0;
                         if (length-- > 0) {
                             numChannels = Wire.read();
@@ -193,7 +193,7 @@ void _dimmer_i2c_on_receive(int length)
                     register_mem.data.cfg.zero_crossing_delay_ticks += Wire_read_uint8_t(length, 1);
                     Serial.printf_P(PSTR("+REM=zc=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
-                case DIMMER_COMMAND_DECR_ZC_DELAY:
+                case DIMMER_COMMAND_DEC_ZC_DELAY:
                     register_mem.data.cfg.zero_crossing_delay_ticks -= Wire_read_uint8_t(length, 1);
                     Serial.printf_P(PSTR("+REM=zc=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
@@ -222,7 +222,7 @@ void _dimmer_i2c_on_receive(int length)
                         dimmer.halfwave_ticks += Wire_read_uint8_t(length, 1);
                         Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                         break;
-                    case DIMMER_COMMAND_DECR_HW_TICKS:
+                    case DIMMER_COMMAND_DEC_HW_TICKS:
                         dimmer.halfwave_ticks -= Wire_read_uint8_t(length, 1);
                         Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                         break;
