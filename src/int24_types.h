@@ -130,9 +130,7 @@ public:
     }
 
     operator uint32_t() const {
-        return _union_cref().ui24; // -O2 24358
-        //return static_cast<uint32_t>(_lo | (static_cast<uint16_t>(_mid) << 8) | (static_cast<uint32_t>(_hi) << 16)); // -O2 24424
-        // return static_cast<uint32_t>(_lo | (static_cast<uint32_t>(_hi16) << 8)); // -O2 24592
+        return _union_cref().ui24;
     }
 
     explicit operator int32_t() const __attribute_always_inline__ {
@@ -140,8 +138,7 @@ public:
     }
 
     explicit operator uint16_t() const {
-        return _union_cref().ui16; // -O2 24330
-        // return _lo || (static_cast<uint16_t>(_mid) << 8); // -O2 24352
+        return _union_cref().ui16;
     }
 
     explicit operator int16_t() const __attribute_always_inline__ {
@@ -170,8 +167,7 @@ public:
     #endif
 
     uint24_t &operator=(const uint32_t value) {
-        // _union_ref().ui24 = value;               // -O2 24318
-        _lo = static_cast<uint8_t>(value);          // -O2 24306
+        _lo = static_cast<uint8_t>(value);
         _mid = static_cast<uint16_t>(value) >> 8;
         _hi = static_cast<uint8_t>(value >> 16);
         return *this;
@@ -185,7 +181,7 @@ public:
     }
 
     #if !defined(__INTELLISENSE__)
-
+    
         uint24_t &operator=(const uint16_t value) {
             _lo = static_cast<uint8_t>(value);
             _mid = value >> 8;
@@ -233,7 +229,7 @@ public:
 
     template<typename _T>
     uint24_t &operator+=(_T value) {
-        _union_ref().ui24 -= value;
+        _union_ref().ui24 += value;
         return *this;
     }
 
@@ -257,7 +253,7 @@ public:
 
     template<typename _T>
     uint24_t &operator&=(_T value) {
-        _union_ref().ui24 |= value;
+        _union_ref().ui24 &= value;
         return *this;
     }
 
@@ -316,6 +312,10 @@ public:
 public:
     uint64_t __uint64() const __attribute_always_inline__ {
         return static_cast<uint64_t>(*this);
+    }
+
+    uint32_t __uint32() const __attribute_always_inline__ {
+        return static_cast<uint32_t>(*this);
     }
 
     uint32_t __uint32() const __attribute_always_inline__ {

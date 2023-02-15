@@ -72,30 +72,46 @@ ISR(TIMER2_OVF_vect)
     #if ENABLE_ZC_PREDICTION && 0
         // send artificial event in case the event is not received within the range
         // in case the zero crossing overlaps with this event, the event is filtered
-        auto ticks = timer2.get_timer();
-        if (ticks >= dimmer.halfwave_ticks_timer2) {
-            dimmer.zc_interrupt_handler(ticks);
-            dimmer.debug_pred.pred_signals++;
+        uint32_t ticks = timer2.get_timer();
+        uint32_t dur = ticks - dimmer.last_ticks;
+        if (dur >= dimmer.halfwave_ticks_timer2) {
+            dimmer.zc_interrupt_handler(timer2.get_timer(), false);
+            #if DEBUG_ZC_PREDICTION
+                dimmer.debug_pred.pred_signals++;
+            #endif
         }
     #endif
 }
 
-void DimmerBase::set_halfwave_ticks(uint24_t ticks)
-{
-    ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
-        halfwave_ticks_timer2 = ticks;
-        FrequencyMeasurement::_calc_halfwave_min_max(halfwave_ticks_timer2, halfwave_ticks_min, halfwave_ticks_max);
-        halfwave_ticks = ticks / Timer<1>::prescaler;
-        set_frequency((F_CPU / 2.0) / ticks);
-        sync_event.halfwave_micros = Timer<1>::ticksToMicros(halfwave_ticks);
+static constexpr uint8_t kMicrosThresholdInCycles = microsecondsToClockCycles(5) * MeasureTimer::prescaler;
+
+#if ENABLE_ZC_PREDICTION
+
+    void DimmerBase::set_halfwave_ticks(uint24_t ticks)
+    {
+        int32_t diff = halfwave_ticks_timer2 - ticks;
+        if (diff < 0) {
+            diff = -diff;
+        }
+        if (diff > kMicrosThresholdInCycles) {
+            #if DEBUG_ZC_PREDICTION
+                Serial.printf_P(PSTR("+REM=o=%ld,n=%ld\n"), (long)halfwave_ticks_timer2, (long)ticks);
+                Serial.flush();
+            #endif
+            ATOMIC_BLOCK(ATOMIC_RESTORESTATE) {
+                halfwave_ticks_timer2 = ticks;
+                FrequencyMeasurement::_calc_halfwave_min_max(halfwave_ticks_timer2, halfwave_ticks_min, halfwave_ticks_max);
+                halfwave_ticks = ticks / Timer<1>::prescaler;
+            }
+            sync_event.halfwave_micros = Timer<1>::ticksToMicros(halfwave_ticks);
+            set_frequency((F_CPU / 2.0) / ticks);
+        }
     }
-}
+
+#endif
 
 void DimmerBase::begin()
 {
-    #if DEBUG_ZC_PREDICTION
-        Serial.printf_P(PSTR("+REM=pstart(%f)\n"), register_mem.data.metrics.frequency);
-    #endif
     if (!isValidFrequency(register_mem.data.metrics.frequency)) {
         return;
     }
@@ -148,10 +164,11 @@ void DimmerBase::begin()
             dimmer.zc_interrupt_handler(
                 #if ENABLE_ZC_PREDICTION
                     // get clock cycles since last event to filter invalid signals
-                    timer2.get_timer()
+                    timer2.get_timer(),
                 #else
-                    0
+                    0,
                 #endif
+                true
             );            
             #if DEBUG_ZC_PREDICTION
                 dimmer.debug_pred.zc_signals++;
@@ -182,17 +199,13 @@ void DimmerBase::end()
         }
         timer2.end();
     }
-
-    #if DEBUG_ZC_PREDICTION
-        Serial.println(F("+REM=pend"));
-    #endif
 }
 
-void DimmerBase::zc_interrupt_handler(uint24_t ticks)
+void DimmerBase::zc_interrupt_handler(uint32_t ticks, bool integrate)
 {
     #if ENABLE_ZC_PREDICTION
         // get clock cycles since last call of this method
-        auto dur = ticks - last_ticks;
+        uint32_t dur = ticks - last_ticks;
         last_ticks = ticks;
 
         // check if the ticks since the last call are in range
@@ -202,13 +215,14 @@ void DimmerBase::zc_interrupt_handler(uint24_t ticks)
 
             #if DEBUG_ZC_PREDICTION
                 debug_pred.invalid_signals++;
-                debug_pred.times[debug_pred.pos++] = -dur;
+                debug_pred.times[debug_pred.pos++] = dur;
                 if (debug_pred.pos >= kTimeStorage) {
                     debug_pred.pos = 0;
                 }
             #endif
 
-            return;
+            // return;
+            integrate = false;
         }
         // the signal seems valid, reset counter
         sync_event.invalid_signals = 0;
@@ -226,10 +240,12 @@ void DimmerBase::zc_interrupt_handler(uint24_t ticks)
     sei();
 
     #if ENABLE_ZC_PREDICTION
-        // slowly adjust the ticks in case the clock cycles change due to heat
-        // TODO just a test if it changes over time, compare to halfwave_ticks_timer2
-        constexpr auto kHalfwaveNumber = 120.0;
-        halfwave_ticks_integral = ((halfwave_ticks_integral * kHalfwaveNumber) + dur) / (kHalfwaveNumber + 1.0);
+        if (integrate) {
+            // slowly adjust the ticks in case the clock cycles change due to heat
+            // TODO just a test if it changes over time, compare to halfwave_ticks_timer2
+            constexpr auto kHalfwaveNumber = 1000.0;
+            halfwave_ticks_integral = ((halfwave_ticks_integral * kHalfwaveNumber) + dur) / (kHalfwaveNumber + 1.0);
+        }
     #endif
     
     // apply fading with interrupts enabled
@@ -243,13 +259,6 @@ void DimmerBase::_start_halfwave()
 {
     // copying the data and checking if the signal is valid has a fixed number of clock cycles and can be 
     // compensated by the zero crossing delay during calibration
-
-    #if DEBUG_ZC_PREDICTION
-        auto t = timer2.get_timer();
-        debug_pred.times[debug_pred.pos++ % kTimeStorage] = t - debug_pred.last_time;
-        debug_pred.last_time = t;
-        debug_pred.start_halfwave++;
-    #endif
 
     #if ENABLE_ZC_PREDICTION
         // increase counter for an invalid signal. the counter is reset in the zc crossing handler to avoid any delay here doing more calculations

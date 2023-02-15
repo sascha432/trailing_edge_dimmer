@@ -383,6 +383,9 @@ void loop()
         ATOMIC_BLOCK(ATOMIC_FORCEON) {
             queues.check_temperature.timer = Queues::kTemperatureCheckTimerOverflows;
         }
+        #if ENABLE_ZC_PREDICTION
+            dimmer.set_halfwave_ticks(dimmer.halfwave_ticks_integral);
+        #endif
 
         int16_t current_temp;
         enable_serial_read_during_delay();
@@ -445,21 +448,16 @@ void loop()
                 Serial.printf_P(PSTR("+REM=zc=%u,n=%u,v=%u,p=%u,s=%u,i=%u\n"), dimmer.debug_pred.zc_signals, dimmer.debug_pred.next_cycle, dimmer.debug_pred.valid_signals, dimmer.debug_pred.pred_signals, dimmer.debug_pred.start_halfwave, dimmer.debug_pred.invalid_signals);
                 Serial.flush();
                 Serial.print(F("+REM="));
-                uint32_t avg = 0;
                 for(uint8_t i = 0; i < dimmer.kTimeStorage; i++) {
-                    auto tmp = dimmer.debug_pred.times[i];
-                    avg += tmp;
-                    if (i == dimmer.debug_pred.pos) {
-                        Serial.print('*');
-                    }
-                    Serial.print((long)tmp);
+                    long tmp = dimmer.debug_pred.times[i];
+                    Serial.print(tmp);
                     Serial.print(',');
                 }
-                Serial.print(avg / static_cast<float>(dimmer.kTimeStorage), 3);
+                Serial.print(dimmer.halfwave_ticks_integral, 1);
                 Serial.print(',');
-                Serial.print(dimmer.halfwave_ticks_integral, 3);
+                Serial.print(dimmer._get_frequency(), 4);
                 Serial.print(',');
-                Serial.println((F_CPU / 2) / dimmer.halfwave_ticks_integral, 3);
+                Serial.println((F_CPU / 2) / dimmer.halfwave_ticks_integral, 4);
                 Serial.flush();
             #endif
         }

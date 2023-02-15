@@ -29,12 +29,12 @@
 // clock cycles change if enabled
 // TODO unstable at the moment
 #ifndef ENABLE_ZC_PREDICTION
-#    define ENABLE_ZC_PREDICTION 1
+#    define ENABLE_ZC_PREDICTION 0
 #endif
 
 // enable serial debug output
 #ifndef DEBUG_ZC_PREDICTION
-#    define DEBUG_ZC_PREDICTION 1
+#    define DEBUG_ZC_PREDICTION 0
 #endif
 
 // pin for the zero crossing signal
@@ -131,7 +131,7 @@ static_assert(kValidSamplesPercent >= 50 && kValidSamplesPercent <= 80, "read co
 // the zc crossing event was pretty useless leading to flickering even after the startup. in case the zero crossing does not provide a valid signal,
 // the dimmer shuts down and restarts the calibration process
 #ifndef DIMMER_ZC_INTERVAL_MAX_DEVIATION
-#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (0.75 / 100.0)
+#    define DIMMER_ZC_INTERVAL_MAX_DEVIATION (0.5 / 100.0)
 #endif
 
 static constexpr auto kDeviationPercent = DIMMER_ZC_INTERVAL_MAX_DEVIATION * 100;

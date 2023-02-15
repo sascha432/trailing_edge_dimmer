@@ -168,8 +168,6 @@ namespace Dimmer {
     // timer 2 running to prescaler 1 to predict the next zc crossing event
     struct MeasureTimer : Timers::TimerBase<2, 1> {
 
-        using TickType = uint24_t;
-
         // start timer using the overflow interrupt
         void begin();
         // end timer
@@ -177,9 +175,9 @@ namespace Dimmer {
 
         // get clock cycles
         // interrupts must be disabled when calling from outside an ISR
-        TickType get_timer();
+        uint32_t get_timer();
 
-        volatile Dimmer::TickType _overflow;
+        volatile uint24_t _overflow;
     };
 
     inline void MeasureTimer::begin() 
@@ -196,7 +194,7 @@ namespace Dimmer {
         TimerBase::end<TimerBase::kIntMaskOverflow>();
     }
     
-    inline MeasureTimer::TickType MeasureTimer::get_timer() 
+    inline uint32_t MeasureTimer::get_timer() 
     {
         // similar to micros() but more precise depending on the MCU frequency and the timer 2 prescaler (ideally 1)
         auto tmp_overflow = _overflow;
@@ -205,7 +203,7 @@ namespace Dimmer {
             // we got an overflow during reading TCNT2
             tmp_overflow++;
         }
-        return (tmp_counter | (static_cast<TickType>(tmp_overflow) << 8)) * TimerBase::prescaler;
+        return (tmp_counter | (static_cast<uint32_t>(tmp_overflow) << 8)) * TimerBase::prescaler;
     }
 
     static constexpr float kZCFilterFrequencyDeviation = DIMMER_ZC_INTERVAL_MAX_DEVIATION;
@@ -293,7 +291,7 @@ namespace Dimmer {
             uint24_t halfwave_ticks_min;
             uint24_t halfwave_ticks_max;
             // last value to calculate difference
-            uint24_t last_ticks;
+            uint32_t last_ticks;
             // keeps track of frequency changes to adjust the timer (use method DimmerBase:.set_halfwave_ticks() to update all values)
             // the value should be equal to halfwave_ticks_timer2 but might suffer from temperature drift (or changes in the mains frequency)
             float halfwave_ticks_integral;
@@ -316,12 +314,12 @@ namespace Dimmer {
 
         void begin();
         void end();
-        void zc_interrupt_handler(uint24_t ticks);
+        void zc_interrupt_handler(uint32_t ticks, bool integrate);
         #if ENABLE_ZC_PREDICTION
             bool is_ticks_within_range(uint24_t ticks);
+            void set_halfwave_ticks(uint24_t ticks);
         #endif
 
-        void set_halfwave_ticks(uint24_t ticks);
         void set_frequency(float freq);
         void set_mode(ModeType mode);
 
@@ -430,7 +428,7 @@ namespace Dimmer {
         register_mem_t &_register_mem;
 
         #if DEBUG_ZC_PREDICTION
-            static constexpr uint8_t kTimeStorage = 16;
+            static constexpr uint8_t kTimeStorage = 8;
             struct {
                 uint16_t zc_signals;
                 uint16_t next_cycle;
@@ -438,8 +436,8 @@ namespace Dimmer {
                 uint16_t invalid_signals;
                 uint16_t pred_signals;
                 uint16_t start_halfwave;
-                MeasureTimer::TickType last_time;
-                MeasureTimer::TickType times[kTimeStorage];
+                uint24_t last_time;
+                uint24_t times[kTimeStorage];
                 uint8_t pos;
             } debug_pred;
         #endif
