@@ -11,8 +11,10 @@
         "url": "https://github.com/sascha432/trailing_edge_dimmer.git"
     },
     "build": {
-        "includeDir": "src",
-        "srcFilter": "-<*.cpp>"
+        "includeDir": "./src",
+        "srcFilter": [
+            "-<*.cpp>"
+        ]
     },
     "dependencies": [
         {
