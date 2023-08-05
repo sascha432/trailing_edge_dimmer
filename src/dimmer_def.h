@@ -38,7 +38,8 @@
 #endif
 
 // pin for the zero crossing signal
-#ifndef ZC_SIGNAL_PIN
+#if DIMMER_HEADERS_ONLY
+#elif !defined(ZC_SIGNAL_PIN)
 #    error ZC_SIGNAL_PIN not defined
 #endif
 
@@ -313,7 +314,8 @@ static constexpr auto kDimmerCheckIntervalCycles = microsecondsToClockCycles(DIM
 // The values described in the table above are typical values. However, due to process variation the
 // temperature sensor output voltage varies from one chip to another. To be capable of achieving more
 // accurate results the temperature measurement can be calibrated in the application software
-#if __AVR_ATmega328PB__ || MCU_IS_ATMEGA328PB == 1
+#if DIMMER_HEADERS_ONLY
+#elif __AVR_ATmega328PB__ || MCU_IS_ATMEGA328PB == 1
 
 #    ifndef DIMMER_AVR_TEMP_TS_OFFSET
 #       define DIMMER_AVR_TEMP_TS_OFFSET 112
