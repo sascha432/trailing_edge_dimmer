@@ -477,7 +477,7 @@ Increase zero crossing delay by 1 or the following byte value
 
     +I2CT=17,89,82[,<value>]
 
-### DIMMER_COMMAND_DEC_ZC_DELAY
+### DIMMER_COMMAND_DECR_ZC_DELAY
 
 Decrease zero crossing delay by 1 or the following byte value
 
@@ -495,7 +495,7 @@ Increase halfwave length by 1 or the following byte value
 
     +I2CT=17,89,85[,<value>]
 
-### DIMMER_COMMAND_DEC_HW_TICKS
+### DIMMER_COMMAND_DECR_HW_TICKS
 
 Decrease halfwave length by 1 or the following byte value
 

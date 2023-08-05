@@ -193,7 +193,7 @@ void _dimmer_i2c_on_receive(int length)
                     register_mem.data.cfg.zero_crossing_delay_ticks += Wire_read_uint8_t(length, 1);
                     Serial.printf_P(PSTR("+REM=zc=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
-                case DIMMER_COMMAND_DEC_ZC_DELAY:
+                case DIMMER_COMMAND_DECR_ZC_DELAY:
                     register_mem.data.cfg.zero_crossing_delay_ticks -= Wire_read_uint8_t(length, 1);
                     Serial.printf_P(PSTR("+REM=zc=%u,0x%04x\n"), register_mem.data.cfg.zero_crossing_delay_ticks, register_mem.data.cfg.zero_crossing_delay_ticks);
                     break;
@@ -222,7 +222,7 @@ void _dimmer_i2c_on_receive(int length)
                         dimmer.halfwave_ticks += Wire_read_uint8_t(length, 1);
                         Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                         break;
-                    case DIMMER_COMMAND_DEC_HW_TICKS:
+                    case DIMMER_COMMAND_DECR_HW_TICKS:
                         dimmer.halfwave_ticks -= Wire_read_uint8_t(length, 1);
                         Serial.printf_P(PSTR("+REM=ticks=%d\n"), dimmer.halfwave_ticks);
                         break;

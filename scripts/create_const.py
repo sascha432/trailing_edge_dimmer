@@ -51,8 +51,10 @@ with open(outfile1, 'w', newline='\n') as ofh1:
                 elif name.startswith('EVENT_'):
                     obj_name = 'EVENT'
                     np_name = np_name[len(obj_name) + 1:]
+                elif name in ('MAX_CHANNELS'):
+                    continue
                 else:
-                    raise Exception('invalid group')
+                    raise Exception('invalid group: %s' % name)
 
                 value = m[2]
                 try:

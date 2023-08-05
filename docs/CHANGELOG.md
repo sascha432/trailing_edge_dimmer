@@ -2,6 +2,7 @@
 
 ## 2.2.3-dev
 
+ - Fixed typo in macros
  - NOTE: currently the dimmer firmware is running on the ZC interrupt, not the predicted signal until it is more stable
  - Added Dimmer::delay() function that can read and execute I2C over UART commands while waiting
  - Option to set/face all channels with one command (DIMMER_HAVE_SET_ALL_CHANNELS_AT_ONCE; breaking change: disabled by default)

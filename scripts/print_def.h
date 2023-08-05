@@ -88,10 +88,10 @@ Serial.print(F("#define DIMMER_COMMAND_CUBIC_INT_TEST_PERF       ")); Serial.pri
 Serial.print(F("#define DIMMER_COMMAND_MEASURE_FREQ              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_MEASURE_FREQ);
 Serial.print(F("#define DIMMER_COMMAND_INIT_EEPROM               ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_INIT_EEPROM);
 Serial.print(F("#define DIMMER_COMMAND_INCR_ZC_DELAY             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_INCR_ZC_DELAY);
-Serial.print(F("#define DIMMER_COMMAND_DEC_ZC_DELAY              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DEC_ZC_DELAY);
+Serial.print(F("#define DIMMER_COMMAND_DECR_ZC_DELAY             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DECR_ZC_DELAY);
 Serial.print(F("#define DIMMER_COMMAND_SET_ZC_DELAY              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_SET_ZC_DELAY);
 Serial.print(F("#define DIMMER_COMMAND_INCR_HW_TICKS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_INCR_HW_TICKS);
-Serial.print(F("#define DIMMER_COMMAND_DEC_HW_TICKS              ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DEC_HW_TICKS);
+Serial.print(F("#define DIMMER_COMMAND_DECR_HW_TICKS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DECR_HW_TICKS);
 Serial.print(F("#define DIMMER_COMMAND_SET_ZC_SYNC               ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_SET_ZC_SYNC);
 Serial.print(F("#define DIMMER_COMMAND_DUMP_CHANNELS             ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DUMP_CHANNELS);
 Serial.print(F("#define DIMMER_COMMAND_DUMP_MEM                  ")); Serial.printf("0x%02x\n", (uint8_t)DIMMER_COMMAND_DUMP_MEM);
