@@ -14,9 +14,6 @@
         "includeDir": "./src",
         "srcFilter": [
             "-<*.cpp>"
-        ],
-        "flags": [
-            "-D DIMMER_HEADERS_ONLY=1"
         ]
     },
     "dependencies": [
