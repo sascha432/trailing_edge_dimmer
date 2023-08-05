@@ -431,10 +431,8 @@ static constexpr auto kDimmerCheckIntervalCycles = microsecondsToClockCycles(DIM
 #    define __GNUC_STR__ ""
 #endif
 
-#if F_CPU == 160000000UL
-#    define F_CPU_MHZ 160
-#elif F_CPU == 80000000UL
-#    define F_CPU_MHZ 80
+#if DIMMER_HEADERS_ONLY
+#    define F_CPU_MHZ 0
 #elif F_CPU == 20000000UL
 #    define F_CPU_MHZ 20
 #elif F_CPU == 16000000UL
