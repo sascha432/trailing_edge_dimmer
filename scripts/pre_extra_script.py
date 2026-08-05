@@ -7,7 +7,7 @@ print_cpp = path.abspath(env.subst(''))
 
 def process_node(node):
     if re.search(r'[/\\]FrameworkArduino[/\\]Print\.cpp\Z', node.get_abspath()):
-        print_h = node.srcnode().get_abspath()[0:-3] + 'h'
+        print_h = path.realpath(node.srcnode().get_abspath()[0:-3] + 'h')
         with open(print_h, 'r') as file:
             if file.read().find('friend void __debug_printf(const char *format, ...);')==-1:
                 click.secho('File not patched. Run following command:', fg='yellow')
